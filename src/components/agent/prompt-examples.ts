@@ -52,30 +52,28 @@ const SAMPLES: Record<
   { image: string; sourceImage?: string; sourceImages?: string[] }
 > = {
   'background-1': {
-    image:
-      'https://r2.imgany.ai/imgs/agent/sessions/s-1784988546557-yhpswr/img_1784989116777_0.png',
-    sourceImage:
-      'https://r2.imgany.ai/imgs/5c0ccfc8d43976772c34c5c4da24f00c.png',
+    image: '/imgs/examples/background-1-after.webp',
+    sourceImage: '/imgs/examples/background-1-before.webp',
   },
-  // Cover design is text-to-image, so these samples have no "before" picture.
   'background-2': {
-    image:
-      'https://r2.imgany.ai/imgs/agent/sessions/s-1784989520446-b7e85i/img_1784989625004_0.png',
-    sourceImage:
-      'https://r2.imgany.ai/imgs/bd45d1884a2481721ee04061494c9a83.png',
+    image: '/imgs/examples/background-2-after.webp',
+    sourceImage: '/imgs/examples/background-2-before.webp',
   },
   'background-3': {
-    image:
-      'https://r2.imgany.ai/imgs/agent/sessions/s-1784989832154-t69ctg/img_1784989992575_0.png',
-    sourceImage:
-      'https://r2.imgany.ai/imgs/dabb8b77c350e5f2b3a33d8d61626578.png',
+    image: '/imgs/examples/background-3-after.webp',
+    sourceImage: '/imgs/examples/background-3-before.webp',
   },
-  // Logo design: only the moodboard case works from a reference picture.
+  'background-4': {
+    image: '/imgs/examples/background-4-after.webp',
+    sourceImage: '/imgs/examples/background-4-before.webp',
+  },
+  // Logo and cover design are text-to-image, so most have no "before"; only
+  // the moodboard case works from a reference picture.
   'logo-1': { image: '/imgs/examples/logo-1.webp' },
   'logo-2': { image: '/imgs/examples/logo-2.webp' },
   'logo-3': {
     image: '/imgs/examples/logo-3.webp',
-    sourceImage: 'https://r2.imgany.ai/imgs/examples/logo-moodboard.jpg',
+    sourceImage: '/imgs/examples/logo-3-before.webp',
   },
   'logo-4': { image: '/imgs/examples/logo-4.webp' },
   'cover-1': { image: '/imgs/examples/cover-1.webp' },
@@ -83,57 +81,43 @@ const SAMPLES: Record<
   'cover-3': { image: '/imgs/examples/cover-3.webp' },
   'cover-4': { image: '/imgs/examples/cover-4.webp' },
   'makeup-1': {
-    image: 'https://r2.imgany.ai/imgs/examples/tryon-out-1784993287481.png',
+    image: '/imgs/examples/makeup-1-after.webp',
     // Two sources: the person and the garment — the composer attaches both.
     sourceImages: [
-      'https://r2.imgany.ai/imgs/examples/tryon-person-1784993287481.png',
-      'https://r2.imgany.ai/imgs/examples/tryon-cloth-1784993287481.png',
+      '/imgs/examples/makeup-1-before.webp',
+      '/imgs/examples/makeup-1-before-2.webp',
     ],
   },
   'makeup-2': {
-    image: 'https://r2.imgany.ai/imgs/examples/makeup-2-out-1784991619758.png',
-    sourceImage:
-      'https://r2.imgany.ai/imgs/examples/makeup-2-src-1784991619758.png',
+    image: '/imgs/examples/makeup-2-after.webp',
+    sourceImage: '/imgs/examples/makeup-2-before.webp',
   },
   'makeup-3': {
-    image: 'https://r2.imgany.ai/imgs/examples/makeup-3-out-1784991619758.png',
-    sourceImage:
-      'https://r2.imgany.ai/imgs/examples/makeup-3-src-1784991619758.png',
+    image: '/imgs/examples/makeup-3-after.webp',
+    sourceImage: '/imgs/examples/makeup-3-before.webp',
   },
   'makeup-4': {
-    image: 'https://r2.imgany.ai/imgs/examples/makeup-4-out-1784992187022.png',
-    sourceImage:
-      'https://r2.imgany.ai/imgs/examples/makeup-4-src-1784992187022.png',
+    image: '/imgs/examples/makeup-4-after.webp',
+    sourceImage: '/imgs/examples/makeup-4-before.webp',
   },
-  'background-4': {
-    image:
-      'https://r2.imgany.ai/imgs/agent/sessions/s-1784990356877-anjtq9/img_1784990509689_0.png',
-    sourceImage:
-      'https://r2.imgany.ai/imgs/a15f8f8f3c29e4547d4f651651273fae.png',
-  },
+  // The style samples share two source portraits, both generated rather than
+  // photographed: a template ships to other people's sites, so a recognisable
+  // face in the demo becomes their problem too.
   'style-1': {
-    image:
-      'https://r2.imgany.ai/imgs/agent/sessions/s-1784984984126-52ojye/img_1784986043378_0.png',
-    sourceImage:
-      'https://r2.imgany.ai/imgs/17840b4d7e3bc9c5ead1df611af53a5a.png',
+    image: '/imgs/examples/style-1-after.webp',
+    sourceImage: '/imgs/examples/style-source-a.webp',
   },
   'style-2': {
-    image:
-      'https://r2.imgany.ai/imgs/agent/sessions/s-1784970411172-qq4fpc/img_1784970569024_0.png',
-    sourceImage:
-      'https://r2.imgany.ai/imgs/555b2fe0116d507a63267de9077cde81.png',
+    image: '/imgs/examples/style-2-after.webp',
+    sourceImage: '/imgs/examples/style-source-b.webp',
   },
   'style-3': {
-    image:
-      'https://r2.imgany.ai/imgs/agent/sessions/s-1784969153750-x9pszz/img_1784969313304_0.png',
-    sourceImage:
-      'https://r2.imgany.ai/imgs/f708103f76a8e0cc21d93897247a8059.png',
+    image: '/imgs/examples/style-3-after.webp',
+    sourceImage: '/imgs/examples/style-source-a.webp',
   },
   'style-4': {
-    image:
-      'https://r2.imgany.ai/imgs/agent/sessions/s-1784968547088-8439rw/img_1784968706658_0.png',
-    sourceImage:
-      'https://r2.imgany.ai/imgs/98e58ff3b4930946ebbac0441f0e5bac.png',
+    image: '/imgs/examples/style-4-after.webp',
+    sourceImage: '/imgs/examples/style-source-b.webp',
   },
 };
 
