@@ -6,6 +6,10 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "shipany-tanstack",
+  // Pinned rather than left to the build, which stamps today's date — the
+  // API rejects a date it considers to be in the future, so a machine
+  // running ahead of Cloudflare's clock fails to deploy.
+  "compatibility_date": "2026-07-25",
   "compatibility_flags": ["nodejs_compat"],
   "observability": {
     "enabled": true,
