@@ -757,7 +757,7 @@ export function versionAgentFileUrl(src: string, sessionId: string) {
 
 export function stripUrlParam(src: string, key: string) {
   try {
-    const url = new URL(src, 'https://pixagent.local');
+    const url = new URL(src, 'https://image-agent.local');
     url.searchParams.delete(key);
     const path = `${url.pathname}${url.search}${url.hash}`;
     return src.startsWith('http') ? url.toString() : path;

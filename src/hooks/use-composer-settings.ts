@@ -8,7 +8,7 @@ import {
   type AgentComposerSettings,
 } from '@/lib/agent-settings';
 
-const STORAGE_KEY = 'pixagent:composer-settings';
+const STORAGE_KEY = 'image-agent:composer-settings';
 
 function readStored(): AgentComposerSettings | null {
   try {

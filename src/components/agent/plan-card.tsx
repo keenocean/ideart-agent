@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 
 // Generating an image spends credits, so the chat page fires this when a turn
 // settles — same shape as the sidebar's chats-changed event.
-const CREDITS_CHANGED_EVENT = 'pixagent:credits-changed';
+const CREDITS_CHANGED_EVENT = 'image-agent:credits-changed';
 
 export function notifyCreditsChanged() {
   if (typeof window === 'undefined') return;

@@ -263,7 +263,7 @@ function isDisplayableImageUrl(url: string) {
 
 function fileNameFromUrl(src: string) {
   try {
-    const url = new URL(src, 'https://pixagent.local');
+    const url = new URL(src, 'https://image-agent.local');
     const path = url.searchParams.get('path') || url.pathname;
     return decodeURIComponent(path.split('/').filter(Boolean).pop() || '');
   } catch {
