@@ -255,9 +255,6 @@ const IMAGE_EXT_RE = /\.(?:png|jpe?g|gif|webp|svg)\b/i;
 
 function isDisplayableImageUrl(url: string) {
   if (url.startsWith('data:image/')) return true;
-  if (url.startsWith('/workspace/')) return true;
-  if (url.startsWith('/api/imgany/')) return true;
-  if (/^https?:\/\//i.test(url)) return IMAGE_EXT_RE.test(url);
   return IMAGE_EXT_RE.test(url);
 }
 
@@ -277,27 +274,6 @@ function fileNameFromUrl(src: string) {
   }
 }
 
-function workspaceFileUrl(path: string) {
-  return `/api/imgany/file?path=${encodeURIComponent(path)}`;
-}
-
-function normalizeGeneratedImageUrl(src: string, chatId: string) {
-  if (src.startsWith('/workspace/')) {
-    const name = src.replace(/^\/workspace\//, '');
-    return workspaceFileUrl(`sessions/${chatId}/${name}`);
-  }
-  if (src.startsWith('/api/imgany/files/')) {
-    const rawPath = src
-      .slice('/api/imgany/files/'.length)
-      .replace(/[?#].*$/, '');
-    const path = rawPath.startsWith('sessions/')
-      ? rawPath
-      : `sessions/${chatId}/${rawPath}`;
-    return workspaceFileUrl(path);
-  }
-  return src;
-}
-
 /** The model named in a tool result, if it recorded one. */
 function extractModelFromResult(
   result: string | undefined
@@ -314,8 +290,7 @@ function extractModelFromResult(
 }
 
 function extractGeneratedImagesFromResult(
-  result: string | undefined,
-  chatId: string
+  result: string | undefined
 ): string[] {
   if (!result) return [];
 
@@ -323,10 +298,9 @@ function extractGeneratedImagesFromResult(
   const images: string[] = [];
   const push = (src: string) => {
     if (!isDisplayableImageUrl(src)) return;
-    const normalized = normalizeGeneratedImageUrl(src, chatId);
-    if (seen.has(normalized)) return;
-    seen.add(normalized);
-    images.push(normalized);
+    if (seen.has(src)) return;
+    seen.add(src);
+    images.push(src);
   };
 
   try {
@@ -339,27 +313,9 @@ function extractGeneratedImagesFromResult(
         }
         if (images.length > 0) return images;
       }
-
-      const workspaceFiles = (payload as { workspace_files?: unknown })
-        .workspace_files;
-      if (Array.isArray(workspaceFiles)) {
-        for (const file of workspaceFiles) {
-          if (typeof file === 'string') push(file);
-        }
-        if (images.length > 0) return images;
-      }
     }
   } catch {
-    // Fall through to regex extraction for older/plain-text tool results.
-  }
-
-  const re =
-    /(?:\/workspace\/|\/api\/imgany\/files\/(?:sessions\/[^/\s]+\/)?)([^\s"'<>)\\]+)/gi;
-  let match: RegExpExecArray | null;
-  while ((match = re.exec(result)) !== null) {
-    const rel = match[1];
-    if (!IMAGE_EXT_RE.test(rel)) continue;
-    push(`/workspace/${rel}`);
+    // A tool result that isn't JSON has no files to report.
   }
 
   return images;
@@ -430,10 +386,7 @@ export async function listGeneratedImages(
     for (const part of decodeParts(row.parts)) {
       if (part.type !== 'tool_call') continue;
       const model = extractModelFromResult(part.result);
-      for (const src of extractGeneratedImagesFromResult(
-        part.result,
-        row.chatId
-      )) {
+      for (const src of extractGeneratedImagesFromResult(part.result)) {
         const dedupeKey = `${row.chatId}:${src}`;
         if (seen.has(dedupeKey)) continue;
         seen.add(dedupeKey);
@@ -577,7 +530,7 @@ export async function listAllChats(
       if (!message) return;
       for (const part of decodeParts(message.parts)) {
         if (part.type !== 'tool_call') continue;
-        const [src] = extractGeneratedImagesFromResult(part.result, row.id);
+        const [src] = extractGeneratedImagesFromResult(part.result);
         if (src) {
           covers.set(row.id, src);
           return;

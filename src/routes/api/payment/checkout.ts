@@ -74,12 +74,9 @@ async function POST({ request }: { request: Request }) {
 
     // Build success/cancel URLs — only accept same-origin redirects.
     const baseUrl = configs.app_url || 'http://localhost:3000';
-    // Default landing spot after paying is the app itself — callers that care
-    // (credit top-ups, admin flows) pass their own `redirect`.
-    // Straight to the destination: safeSameOriginPath has already reduced it
-    // to a path on this site. The old detour through /auth-callback exists to
-    // hand a session token to the desktop client — a browser coming back from
-    // checkout is already signed in, and that page isn't part of this app.
+    // Straight to the destination, which safeSameOriginPath has already
+    // reduced to a path on this site. Callers that care (credit top-ups,
+    // admin flows) pass their own `redirect`; everyone else lands on /chat.
     const finalRedirect = `${baseUrl}${safeSameOriginPath(redirect, '/chat', baseUrl)}`;
     const successUrl = `${baseUrl}/api/payment/callback?redirect=${encodeURIComponent(finalRedirect)}`;
     const cancelUrl = `${baseUrl}/pricing`;

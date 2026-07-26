@@ -36,9 +36,7 @@ import { ChatShareMenu } from '@/components/agent/chat-share-menu';
 import {
   ChatTranscript,
   imageNameFromUrl,
-  stripUrlParam,
   useTranscriptImages,
-  versionAgentFileUrl,
 } from '@/components/agent/chat-transcript';
 import { notifyChatsChanged } from '@/components/agent/chats-sidebar';
 import { notifyCreditsChanged } from '@/components/agent/plan-card';
@@ -418,14 +416,8 @@ function ChatSessionPage() {
     if (appliedPreview.current === search.preview) return;
     appliedPreview.current = search.preview;
 
-    const target = stripUrlParam(
-      versionAgentFileUrl(search.preview, sessionId),
-      'v'
-    );
-    const matched = previewImages.find(
-      (img) => stripUrlParam(img.src, 'v') === target
-    );
-    const src = matched?.src ?? versionAgentFileUrl(search.preview, sessionId);
+    const matched = previewImages.find((img) => img.src === search.preview);
+    const src = matched?.src ?? search.preview;
     openImage({
       src,
       alt: search.previewAlt || matched?.alt || imageNameFromUrl(src),

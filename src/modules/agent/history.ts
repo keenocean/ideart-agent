@@ -21,10 +21,20 @@ export async function loadAgentHistory(
 ): Promise<NormalizedMessageParam[]> {
   const chat = await getChatWithMessages(chatId, userId);
   if (!chat) return [];
+  return mapRowsToHistory(chat.messages);
+}
 
+/**
+ * The mapping itself, split from the database read so it can be exercised
+ * directly — getting this wrong produces a conversation the provider rejects,
+ * or worse, silently accepts with the tool results detached from their calls.
+ */
+export function mapRowsToHistory(
+  rows: Array<{ role: 'user' | 'assistant'; parts: StoredPart[] }>
+): NormalizedMessageParam[] {
   const history: NormalizedMessageParam[] = [];
 
-  for (const row of chat.messages) {
+  for (const row of rows) {
     if (row.role === 'user') {
       const text = textOf(row.parts);
       if (text) history.push({ role: 'user', content: text });

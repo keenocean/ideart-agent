@@ -176,7 +176,7 @@ async function runImageGeneration(params: {
     return JSON.stringify({
       status: 'error',
       message:
-        'Image provider is not configured. Ask the site admin to set the gRouter gateway, a Fal API key, or a Replicate API token in Admin Settings.',
+        'Image provider is not configured. Ask the site admin to add a Replicate API token or a Fal API key in Admin Settings.',
     });
   }
 
@@ -394,6 +394,9 @@ function pickImageProvider(
   configs: Record<string, any>
 ): ImageProviderName | null {
   const configured: Record<ImageProviderName, boolean> = {
+    // gRouter is a self-hosted gateway rather than a service you sign up for,
+    // so it is not offered in Admin Settings; the provider is still wired up
+    // for anyone who runs one and sets the two config keys directly.
     grouter: !!configs.grouter_api_key && !!configs.grouter_base_url,
     fal: !!configs.fal_api_key,
     replicate: !!configs.replicate_api_token,
@@ -402,8 +405,8 @@ function pickImageProvider(
   const preferred = String(configs.default_image_provider || 'auto');
   const order: ImageProviderName[] =
     preferred === 'auto'
-      ? ['grouter', 'replicate', 'fal']
-      : [preferred as ImageProviderName, 'grouter', 'replicate', 'fal'];
+      ? ['replicate', 'fal', 'grouter']
+      : [preferred as ImageProviderName, 'replicate', 'fal', 'grouter'];
 
   return order.find((name) => configured[name]) ?? null;
 }

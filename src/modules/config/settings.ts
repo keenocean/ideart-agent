@@ -184,12 +184,6 @@ export function getSettingGroups(): SettingGroup[] {
       tab: 'ai',
     },
     { name: 'fal', title: 'Fal', description: 'Fal AI API', tab: 'ai' },
-    {
-      name: 'grouter',
-      title: 'gRouter',
-      description: 'gRouter gateway — OpenAI-compatible images API',
-      tab: 'ai',
-    },
 
     // Analytics
     {
@@ -868,11 +862,10 @@ export function getSettings(): Setting[] {
       type: 'select',
       options: [
         { label: 'Auto', value: 'auto' },
-        { label: 'gRouter', value: 'grouter' },
-        { label: 'Fal', value: 'fal' },
         { label: 'Replicate', value: 'replicate' },
+        { label: 'Fal', value: 'fal' },
       ],
-      tip: 'Auto prefers gRouter when it is configured, then Replicate, then Fal. Applies to both text-to-image and image editing.',
+      tip: 'Auto prefers Replicate when it is configured, then Fal. Applies to both text-to-image and image editing.',
       group: 'image_generation',
       tab: 'ai',
       defaultValue: 'auto',
@@ -885,33 +878,6 @@ export function getSettings(): Setting[] {
       type: 'password',
       placeholder: 'xxx',
       group: 'fal',
-      tab: 'ai',
-    },
-
-    // ─── AI / gRouter ────────────────────────────────────────────────
-    {
-      name: 'grouter_base_url',
-      title: 'Base URL',
-      type: 'text',
-      placeholder: 'http://localhost:8080/api/v1',
-      group: 'grouter',
-      tab: 'ai',
-    },
-    {
-      name: 'grouter_api_key',
-      title: 'API Key',
-      type: 'password',
-      placeholder: 'sk-xxx',
-      group: 'grouter',
-      tab: 'ai',
-    },
-    {
-      name: 'grouter_model_map',
-      title: 'Model route map',
-      type: 'textarea',
-      placeholder: '{"gpt-image-2": "fal/gpt-image-2"}',
-      tip: 'Optional JSON mapping the picker model key to the route name configured in your gateway. Defaults to the key itself (e.g. gpt-image-2).',
-      group: 'grouter',
       tab: 'ai',
     },
 

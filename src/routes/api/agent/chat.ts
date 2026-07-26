@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
 
 import { getAuth } from '@/core/auth';
+import { checkCredits, insufficientCreditsBody } from '@/modules/agent/paywall';
 import { runAgentTurn } from '@/modules/agent/service';
 import {
   appendMessage,
@@ -10,10 +11,7 @@ import {
 import { getBalance } from '@/modules/credits/service';
 import { getCurrentSubscription } from '@/modules/subscriptions/service';
 import { isAgentSessionId } from '@/lib/agent';
-import {
-  creditsForModelOption,
-  type AgentGenerationSettings,
-} from '@/lib/agent-settings';
+import type { AgentGenerationSettings } from '@/lib/agent-settings';
 
 interface ChatRequest {
   sessionId: string;
@@ -43,24 +41,15 @@ async function POST({ request }: { request: Request }) {
     return new Response('invalid sessionId', { status: 400 });
   }
 
-  // Gate on credits before spending anything. The tool call would refuse on
-  // its own, but only after a full LLM turn has been paid for and the user
-  // has watched the agent promise an image it can't deliver.
-  const required = creditsForModelOption(body.settings?.modelName);
-  const balance = await getBalance(userId);
-  if (balance < required) {
-    // Which paywall to show is the server's call: someone without a plan
-    // needs to subscribe, someone on a plan just ran dry and needs a top-up.
-    // Answering it here beats a client-side lookup that can be stale.
+  // Gate on credits before spending anything.
+  const verdict = checkCredits({
+    modelName: body.settings?.modelName,
+    balance: await getBalance(userId),
+  });
+  if (!verdict.allowed) {
     const subscribed = Boolean(await getCurrentSubscription(userId));
     return new Response(
-      JSON.stringify({
-        code: 'insufficient_credits',
-        message: 'insufficient credits',
-        required,
-        balance,
-        subscribed,
-      }),
+      JSON.stringify(insufficientCreditsBody(verdict, subscribed)),
       { status: 402, headers: { 'Content-Type': 'application/json' } }
     );
   }

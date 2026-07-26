@@ -167,51 +167,5 @@ function LibraryImageThumb({
   alt: string;
   className?: string;
 }) {
-  const [objectUrl, setObjectUrl] = useState<string | null>(null);
-  const [failed, setFailed] = useState(false);
-  const shouldProxy = src.startsWith('/api/imgany/');
-
-  useEffect(() => {
-    if (!shouldProxy) return;
-    let active = true;
-    let nextObjectUrl: string | null = null;
-    setObjectUrl(null);
-    setFailed(false);
-
-    fetch(src, { credentials: 'include' })
-      .then(async (res) => {
-        if (!res.ok) throw new Error(`Image request failed: ${res.status}`);
-        return res.blob();
-      })
-      .then((blob) => {
-        if (!active) return;
-        nextObjectUrl = URL.createObjectURL(blob);
-        setObjectUrl(nextObjectUrl);
-      })
-      .catch(() => {
-        if (active) setFailed(true);
-      });
-
-    return () => {
-      active = false;
-      if (nextObjectUrl) URL.revokeObjectURL(nextObjectUrl);
-    };
-  }, [shouldProxy, src]);
-
-  if (shouldProxy && !objectUrl) {
-    return (
-      <div
-        className={cn(
-          'text-muted-foreground flex items-center justify-center p-3 text-center text-xs',
-          className
-        )}
-      >
-        {failed
-          ? m['agent.preview.load_failed']()
-          : m['agent.preview.loading']()}
-      </div>
-    );
-  }
-
-  return <img src={objectUrl ?? src} alt={alt} className={className} />;
+  return <img src={src} alt={alt} className={className} />;
 }

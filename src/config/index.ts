@@ -78,13 +78,9 @@ export const envConfigs: Record<string, string> = {
   // to them would let the admin "Test" silently pass on the machine's own key.
   replicate_api_token: procEnv.REPLICATE_API_TOKEN ?? '',
 
-  // Agent (open-agent-sdk, in-process runtime). The chat model itself lives in
-  // Admin Settings (AI → Chat Model) — provider, credentials and model id all
-  // come from the config table, so nothing about the LLM is configured here.
-  // Image generation tool (Replicate model id + credits charged per image task)
-  agent_image_model: procEnv.AGENT_IMAGE_MODEL ?? '',
-  agent_image_edit_model: procEnv.AGENT_IMAGE_EDIT_MODEL ?? '',
-  agent_image_cost_credits: procEnv.AGENT_IMAGE_COST_CREDITS ?? '5',
+  // The agent is configured entirely from Admin Settings: the chat model
+  // under AI → Chat Model, the image model from the composer's catalog, and
+  // the credit price with it. Nothing about it belongs in env.
 
   // Locale (public)
   locale: publicEnv('VITE_DEFAULT_LOCALE') ?? 'en',

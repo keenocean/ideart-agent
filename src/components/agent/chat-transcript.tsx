@@ -77,67 +77,30 @@ function splitDataImages(
 // Image extensions our renderer treats as displayable.
 const IMAGE_EXT_RE = /\.(?:png|jpe?g|gif|webp|svg)\b/i;
 
-// Extract image file references from a tool-result payload. The
-// generate_image tool returns `{"files":["/workspace/img_xxx.png"], ...}`
-// as JSON; the agent's text reply may not re-embed the file as `![](...)`,
-// so the chat would otherwise show no picture. We scan the raw result for
-// `/workspace/<name>.<ext>` and the already-rewritten
-// `/api/imgany/files/<name>.<ext>` form, dedupe, and surface them as
-// attached images on the next agent bubble.
-function extractToolResultFiles(
-  result: string,
-  sessionId: string
-): InlineImage[] {
+// Pull image URLs out of a tool-result payload. The agent's text reply does
+// not always re-embed what it just made, so the picture is surfaced from the
+// result itself and attached to the next bubble.
+function extractToolResultFiles(result: string): InlineImage[] {
   const seen = new Set<string>();
   const imgs: InlineImage[] = [];
 
   try {
     const payload = JSON.parse(result);
-    let foundJsonFiles = false;
-    if (Array.isArray(payload?.files)) {
-      for (const file of payload.files) {
-        if (typeof file !== 'string' || !isDisplayableImageUrl(file)) continue;
-        const src = normalizeAgentFileUrl(file, sessionId);
-        if (seen.has(src)) continue;
-        seen.add(src);
-        imgs.push({ alt: file.split('/').pop() || '', src });
-        foundJsonFiles = true;
-      }
-    }
-    if (foundJsonFiles) return imgs;
-
-    if (Array.isArray(payload?.workspace_files)) {
-      for (const file of payload.workspace_files) {
-        if (typeof file !== 'string' || !isDisplayableImageUrl(file)) continue;
-        const src = normalizeAgentFileUrl(file, sessionId);
-        if (seen.has(src)) continue;
-        seen.add(src);
-        imgs.push({ alt: file.split('/').pop() || '', src });
-      }
-      if (imgs.length > 0) return imgs;
+    if (!Array.isArray(payload?.files)) return imgs;
+    for (const file of payload.files) {
+      if (typeof file !== 'string' || !isDisplayableImageUrl(file)) continue;
+      if (seen.has(file)) continue;
+      seen.add(file);
+      imgs.push({ alt: file.split('/').pop() || '', src: file });
     }
   } catch {
-    // Fall back to regex scanning below.
-  }
-
-  const re =
-    /(?:\/workspace\/|\/api\/imgany\/files\/(?:sessions\/[^/\s]+\/)?)([^\s"'<>)\\]+)/gi;
-  let match: RegExpExecArray | null;
-  while ((match = re.exec(result)) !== null) {
-    const rel = match[1];
-    if (!IMAGE_EXT_RE.test(rel)) continue;
-    const src = agentFileUrl(`sessions/${sessionId}/${rel}`);
-    if (seen.has(src)) continue;
-    seen.add(src);
-    imgs.push({ alt: rel.split('/').pop() || '', src });
+    // A result that isn't JSON carries no files.
   }
   return imgs;
 }
 
 function isDisplayableImageUrl(url: string) {
   if (url.startsWith('data:image/')) return true;
-  if (url.startsWith('/workspace/')) return true;
-  if (url.startsWith('/api/imgany/')) return true;
   if (/^https?:\/\//i.test(url)) return IMAGE_EXT_RE.test(url);
   return IMAGE_EXT_RE.test(url);
 }
@@ -178,7 +141,7 @@ export function useTranscriptImages(messages: Message[], sessionId: string) {
           for (const p of splitDataImages(tc.result)) {
             if (p.type === 'image') pending.push({ alt: p.alt, src: p.src });
           }
-          for (const img of extractToolResultFiles(tc.result, sessionId)) {
+          for (const img of extractToolResultFiles(tc.result)) {
             pending.push(img);
           }
         }
@@ -187,9 +150,8 @@ export function useTranscriptImages(messages: Message[], sessionId: string) {
       if (msg.role === 'agent' && pending.length > 0) {
         attached.set(msg.id, pending);
         for (const img of pending) {
-          const src = versionAgentFileUrl(img.src, sessionId);
-          surfaced.add(src);
-          preview.set(src, { ...img, src });
+          surfaced.add(img.src);
+          preview.set(img.src, img);
         }
         pending = [];
       }
@@ -325,10 +287,6 @@ function AgentBubble({
   sessionId: string;
 }) {
   const hasAttached = !!attachedImages && attachedImages.length > 0;
-  const withVersion = useCallback(
-    (src: string) => versionAgentFileUrl(src, sessionId),
-    [sessionId]
-  );
   if (!content && !hasAttached) return null;
   return (
     <div className="flex min-w-0 justify-start overflow-hidden">
@@ -338,7 +296,7 @@ function AgentBubble({
             {attachedImages!.map((img, i) => (
               <AgentImage
                 key={i}
-                src={withVersion(img.src)}
+                src={img.src}
                 alt={img.alt}
                 loading="lazy"
                 className="border-border max-h-60 w-auto max-w-full rounded-md border object-contain"
@@ -572,23 +530,12 @@ function MarkdownContent({
   // base64 bodies and stray newlines around `]/(` regularly trip up the
   // parser, and we already render them as native <img>.
   const parts = useMemo(() => splitDataImages(content), [content]);
-  const rewriteUrl = useCallback(
-    (url: string) => {
-      const rewritten = (() => {
-        if (!url.startsWith('/workspace/')) return url;
-        const name = url.replace(/^\/workspace\//, '');
-        return agentFileUrl(`sessions/${sessionId}/${name}`);
-      })();
-      return versionAgentFileUrl(rewritten, sessionId);
-    },
-    [sessionId]
-  );
 
   return (
     <div className="text-foreground min-w-0 space-y-3 overflow-hidden text-sm leading-relaxed break-words [&_p]:m-0 [&_p+p]:mt-3">
       {parts.map((p, i) => {
         if (p.type === 'image') {
-          const src = rewriteUrl(p.src);
+          const src = p.src;
           if (suppressInlineImages) return null;
           if (surfacedSrcs?.has(src)) return null;
           return (
@@ -606,10 +553,10 @@ function MarkdownContent({
           <ReactMarkdown
             key={i}
             remarkPlugins={[remarkGfm, remarkBreaks]}
-            urlTransform={(url, key) => agentUrlTransform(rewriteUrl(url), key)}
+            urlTransform={(url, key) => agentUrlTransform(url, key)}
             components={{
               img: ({ src, alt }) => {
-                const url = rewriteUrl(src as string);
+                const url = src as string;
                 // Already surfaced as an attached image on this bubble
                 // (or a sibling) — don't render a duplicate inline.
                 if (surfacedSrcs?.has(url)) return null;
@@ -661,50 +608,7 @@ function AgentImage({
   className?: string;
   loading?: 'eager' | 'lazy';
 }) {
-  const [objectUrl, setObjectUrl] = useState<string | null>(null);
-  const [failed, setFailed] = useState(false);
   const { openImage } = usePreviewPane();
-  const shouldProxy = src.startsWith('/api/imgany/');
-
-  useEffect(() => {
-    if (!shouldProxy) return;
-    let active = true;
-    let nextObjectUrl: string | null = null;
-    setObjectUrl(null);
-    setFailed(false);
-
-    fetch(src, { credentials: 'include' })
-      .then(async (res) => {
-        if (!res.ok) throw new Error(`Image request failed: ${res.status}`);
-        return res.blob();
-      })
-      .then((blob) => {
-        if (!active) return;
-        nextObjectUrl = URL.createObjectURL(blob);
-        setObjectUrl(nextObjectUrl);
-      })
-      .catch(() => {
-        if (active) setFailed(true);
-      });
-
-    return () => {
-      active = false;
-      if (nextObjectUrl) URL.revokeObjectURL(nextObjectUrl);
-    };
-  }, [shouldProxy, src]);
-
-  if (shouldProxy && !objectUrl) {
-    return (
-      <div
-        className={cn(
-          'border-border bg-background/60 text-muted-foreground flex min-h-24 max-w-full items-center justify-center rounded-md border px-3 py-2 text-xs',
-          className
-        )}
-      >
-        {failed ? alt || 'Image failed to load' : alt || 'Loading image'}
-      </div>
-    );
-  }
 
   return (
     <button
@@ -719,12 +623,7 @@ function AgentImage({
       className="group relative block max-w-full cursor-zoom-in overflow-hidden rounded-md text-left"
       title={m['agent.preview.open_image']()}
     >
-      <img
-        src={objectUrl ?? src}
-        alt={alt}
-        loading={loading}
-        className={className}
-      />
+      <img src={src} alt={alt} loading={loading} className={className} />
       <span className="pointer-events-none absolute top-3 right-3 rounded-full bg-black/55 px-2 py-1 text-[11px] font-medium text-white opacity-0 transition-opacity group-hover:opacity-100">
         {m['agent.preview.open_image']()}
       </span>
@@ -746,44 +645,4 @@ export function imageNameFromUrl(src: string) {
         ?.replace(/[?#].*$/, '') || ''
     );
   }
-}
-
-export function versionAgentFileUrl(src: string, sessionId: string) {
-  const fileUrl = normalizeAgentFileUrl(src, sessionId);
-  if (!fileUrl.startsWith('/api/imgany/file?')) return fileUrl;
-  const sep = fileUrl.includes('?') ? '&' : '?';
-  return `${fileUrl}${sep}v=${encodeURIComponent(sessionId)}`;
-}
-
-export function stripUrlParam(src: string, key: string) {
-  try {
-    const url = new URL(src, 'https://image-agent.local');
-    url.searchParams.delete(key);
-    const path = `${url.pathname}${url.search}${url.hash}`;
-    return src.startsWith('http') ? url.toString() : path;
-  } catch {
-    return src;
-  }
-}
-
-function normalizeAgentFileUrl(src: string, sessionId: string) {
-  if (src.startsWith('/workspace/')) {
-    return agentFileUrl(
-      `sessions/${sessionId}/${src.replace(/^\/workspace\//, '')}`
-    );
-  }
-  if (src.startsWith('/api/imgany/files/')) {
-    const rawPath = src
-      .slice('/api/imgany/files/'.length)
-      .replace(/[?#].*$/, '');
-    const path = rawPath.startsWith('sessions/')
-      ? rawPath
-      : `sessions/${sessionId}/${rawPath}`;
-    return agentFileUrl(path);
-  }
-  return src;
-}
-
-function agentFileUrl(path: string) {
-  return `/api/imgany/file?path=${encodeURIComponent(path)}`;
 }

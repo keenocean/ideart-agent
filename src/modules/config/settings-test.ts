@@ -9,7 +9,6 @@
  */
 
 import { FalProvider } from '@/core/ai/fal';
-import { GRouterProvider } from '@/core/ai/grouter';
 import { ReplicateProvider } from '@/core/ai/replicate';
 import { AIMediaType } from '@/core/ai/types';
 import { ResendProvider } from '@/core/email/resend';
@@ -63,8 +62,6 @@ export async function runTest(
         return await testReplicate(inputs, configs);
       case 'fal':
         return await testFal(inputs, configs);
-      case 'grouter':
-        return await testGRouter(inputs, configs);
       default:
         return { success: false, message: `No test available for "${group}"` };
     }
@@ -505,37 +502,5 @@ async function testFal(
     success: true,
     message: 'Fal accepted the request',
     details: { 'Task ID': result.taskId, Status: result.taskStatus },
-  };
-}
-
-async function testGRouter(
-  inputs: Record<string, string>,
-  configs: Record<string, string>
-): Promise<TestResult> {
-  const missing = need(configs, ['grouter_api_key', 'grouter_base_url']);
-  if (missing) return { success: false, message: missing };
-
-  const provider = new GRouterProvider({
-    apiKey: configs.grouter_api_key,
-    baseUrl: configs.grouter_base_url,
-    appName: envConfigs.app_name,
-    appUrl: envConfigs.app_url,
-  });
-  // Sync call: waits for the image so the test proves the whole path —
-  // key, base URL, model route and upstream provider — not just that a task
-  // was queued.
-  const result = await provider.generate({
-    params: {
-      mediaType: AIMediaType.IMAGE,
-      model: inputs.model,
-      prompt: inputs.prompt,
-      async: false,
-    },
-  });
-  const imageUrl = result.taskInfo?.images?.[0]?.imageUrl ?? '';
-  return {
-    success: true,
-    message: 'gRouter generated an image',
-    details: { Model: inputs.model, 'Image URL': imageUrl },
   };
 }

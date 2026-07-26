@@ -285,53 +285,5 @@ function PreviewImageElement({
   alt: string;
   className?: string;
 }) {
-  const [objectUrl, setObjectUrl] = useState<string | null>(null);
-  const [failed, setFailed] = useState(false);
-  const shouldProxy = src.startsWith('/api/imgany/');
-
-  useEffect(() => {
-    setObjectUrl(null);
-    setFailed(false);
-    // Nothing to fetch for a public URL — but the reset above still has to
-    // run, or a blob from the previously shown image keeps rendering.
-    if (!shouldProxy) return;
-    let active = true;
-    let nextObjectUrl: string | null = null;
-
-    fetch(src, { credentials: 'include' })
-      .then(async (res) => {
-        if (!res.ok) throw new Error(`Image request failed: ${res.status}`);
-        return res.blob();
-      })
-      .then((blob) => {
-        if (!active) return;
-        nextObjectUrl = URL.createObjectURL(blob);
-        setObjectUrl(nextObjectUrl);
-      })
-      .catch(() => {
-        if (active) setFailed(true);
-      });
-
-    return () => {
-      active = false;
-      if (nextObjectUrl) URL.revokeObjectURL(nextObjectUrl);
-    };
-  }, [shouldProxy, src]);
-
-  if (shouldProxy && !objectUrl) {
-    return (
-      <div
-        className={cn(
-          'border-border bg-muted/40 text-muted-foreground flex min-h-80 w-full items-center justify-center rounded-lg border px-4 text-sm',
-          className
-        )}
-      >
-        {failed
-          ? m['agent.preview.load_failed']()
-          : m['agent.preview.loading']()}
-      </div>
-    );
-  }
-
-  return <img src={objectUrl ?? src} alt={alt} className={className} />;
+  return <img src={src} alt={alt} className={className} />;
 }

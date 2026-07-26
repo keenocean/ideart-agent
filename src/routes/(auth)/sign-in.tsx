@@ -33,15 +33,13 @@ function SignInPage() {
   const navigatingRef = useRef(false);
   const [error, setError] = useState('');
 
-  // redirect: client protocol, goes through auth-callback
-  // callbackUrl: web page URL, goes directly after login
-  const [redirectParam, setRedirectParam] = useState<string | null>(null);
+  // Where to land after signing in. `redirect` is accepted as an alias so a
+  // link written either way works; both are held to the same same-site rule.
   const [callbackUrl, setCallbackUrl] = useState<string | null>(null);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    setRedirectParam(params.get('redirect'));
-    setCallbackUrl(params.get('callbackUrl'));
+    setCallbackUrl(params.get('callbackUrl') || params.get('redirect'));
   }, []);
 
   // Already signed in (visited /sign-in directly, or a stale callbackUrl looped
@@ -63,15 +61,12 @@ function SignInPage() {
       ? callbackUrl
       : null;
 
-  const afterLoginUrl = redirectParam
-    ? `/auth-callback?redirect=${encodeURIComponent(redirectParam)}`
-    : safeCallbackUrl || '/chat';
+  const afterLoginUrl = safeCallbackUrl || '/chat';
 
   // Carry callbackUrl/redirect across to sign-up so the destination survives the switch.
   const switchQuery = (() => {
     const p = new URLSearchParams();
     if (safeCallbackUrl) p.set('callbackUrl', safeCallbackUrl);
-    if (redirectParam) p.set('redirect', redirectParam);
     const s = p.toString();
     return s ? `?${s}` : '';
   })();
