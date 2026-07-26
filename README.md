@@ -95,7 +95,9 @@ into the generated config. Database is D1.
 cp wrangler.example.jsonc wrangler.jsonc     # gitignored — holds real ids
 ```
 
-Set `name` to your worker name and `vars.VITE_APP_NAME`.
+Set `name` to your worker name and `vars.VITE_APP_NAME`. Note that
+`wrangler d1 create` suggests a binding named after the database — ignore it
+and keep `"binding": "DB"`, which is the name the code looks for.
 
 ### 2. Create the database
 
@@ -124,7 +126,10 @@ up:
 
 ```bash
 npx wrangler d1 migrations apply <your-db-name> --local
-LOCAL_D1=$(find .wrangler/state -name '*.sqlite' -path '*d1*' | head -1)
+
+# miniflare keeps its own metadata.sqlite next to the database — skip it or
+# you will seed the wrong file and the copy below comes out empty.
+LOCAL_D1=$(find .wrangler/state -path '*d1*' -name '*.sqlite' ! -name 'metadata.sqlite' | head -1)
 DATABASE_PROVIDER=sqlite DATABASE_URL="file:$LOCAL_D1" pnpm rbac:init
 
 sqlite3 "$LOCAL_D1" ".dump role permission role_permission" \
