@@ -20,7 +20,7 @@ export function Footer() {
       title: m['landing.footer.products'](),
       links: [
         { label: 'ShipAny', href: 'https://shipany.ai' },
-        { label: 'Termany', href: 'https://termany.sh' },
+        { label: 'ImgAny', href: 'https://imgany.ai' },
       ],
     },
     {
