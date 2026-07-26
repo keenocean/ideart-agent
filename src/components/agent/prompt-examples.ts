@@ -1,11 +1,7 @@
 import {
-  Eraser,
-  IdCard,
   LayoutTemplate,
   Palette,
   PenTool,
-  ShoppingBag,
-  Smile,
   Sparkles,
   type LucideIcon,
 } from 'lucide-react';
@@ -51,18 +47,6 @@ const SAMPLES: Record<
   string,
   { image: string; sourceImage?: string; sourceImages?: string[] }
 > = {
-  'background-1': {
-    image: '/imgs/examples/background-1-after.webp',
-    sourceImage: '/imgs/examples/background-1-before.webp',
-  },
-  'background-2': {
-    image: '/imgs/examples/background-2-after.webp',
-    sourceImage: '/imgs/examples/background-2-before.webp',
-  },
-  'background-3': {
-    image: '/imgs/examples/background-3-after.webp',
-    sourceImage: '/imgs/examples/background-3-before.webp',
-  },
   // Logo and cover design are text-to-image, so most have no "before"; only
   // the moodboard case works from a reference picture.
   'logo-1': { image: '/imgs/examples/logo-1.webp' },
@@ -119,25 +103,12 @@ const SAMPLES: Record<
 
 const CATEGORY_ICONS: Record<string, LucideIcon> = {
   style: Palette,
-  background: Eraser,
   makeup: Sparkles,
   cover: LayoutTemplate,
   logo: PenTool,
-  portrait: IdCard,
-  product: ShoppingBag,
-  sticker: Smile,
 };
 
-const CATEGORY_KEYS = [
-  'style',
-  'background',
-  'makeup',
-  'cover',
-  'logo',
-  'portrait',
-  'product',
-  'sticker',
-] as const;
+const CATEGORY_KEYS = ['style', 'makeup', 'cover', 'logo'] as const;
 
 // Upper bound for the scan below, not a required count — a category ends at
 // its first missing translation.
