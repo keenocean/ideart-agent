@@ -1100,5 +1100,6 @@
   "admin.settings.tips.r2_endpoint": "留空则使用 R2 默认端点。",
   "admin.settings.tips.r2_upload_path": "文件上传到的路径，留空使用默认值。例如：uploads/foo/bar",
   "admin.settings.fields.signup_ip_daily_limit": "每 IP 每日注册数",
-  "admin.settings.tips.signup_ip_daily_limit": "限制同一地址 24 小时内可注册的账号数，避免注册赠送的积分被批量刷取。填 0 关闭限制，留空使用默认值 5。"
+  "admin.settings.tips.signup_ip_daily_limit": "限制同一地址 24 小时内可注册的账号数，避免注册赠送的积分被批量刷取。填 0 关闭限制，留空使用默认值 5。",
+  "admin.settings.tips.grouter_base_url": "自建的 OpenAI 兼容图片网关。没有自己搭的话，整组留空即可。"
 }

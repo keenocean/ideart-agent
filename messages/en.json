@@ -1100,5 +1100,6 @@
   "admin.settings.tips.r2_endpoint": "Leave empty to use the default R2 endpoint",
   "admin.settings.tips.r2_upload_path": "Path to upload files to; leave empty to use the default. Example: uploads/foo/bar",
   "admin.settings.fields.signup_ip_daily_limit": "Signups per IP / day",
-  "admin.settings.tips.signup_ip_daily_limit": "Caps how many accounts one address may open in 24 hours, so the signup credit grant cannot be farmed. 0 disables the cap; blank uses the default of 5."
+  "admin.settings.tips.signup_ip_daily_limit": "Caps how many accounts one address may open in 24 hours, so the signup credit grant cannot be farmed. 0 disables the cap; blank uses the default of 5.",
+  "admin.settings.tips.grouter_base_url": "A self-hosted OpenAI-compatible image gateway. Leave the whole group blank unless you run one."
 }
