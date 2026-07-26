@@ -63,10 +63,6 @@ const SAMPLES: Record<
     image: '/imgs/examples/background-3-after.webp',
     sourceImage: '/imgs/examples/background-3-before.webp',
   },
-  'background-4': {
-    image: '/imgs/examples/background-4-after.webp',
-    sourceImage: '/imgs/examples/background-4-before.webp',
-  },
   // Logo and cover design are text-to-image, so most have no "before"; only
   // the moodboard case works from a reference picture.
   'logo-1': { image: '/imgs/examples/logo-1.webp' },
@@ -143,7 +139,24 @@ const CATEGORY_KEYS = [
   'sticker',
 ] as const;
 
-const ITEMS_PER_CATEGORY = 4;
+// Upper bound for the scan below, not a required count — a category ends at
+// its first missing translation.
+const MAX_ITEMS_PER_CATEGORY = 8;
+
+/**
+ * How many examples a category actually has. `tDynamic` echoes the key back
+ * when there is no message for it, which is what marks the end — so dropping
+ * an example is an edit to messages/*.json, not to this file.
+ */
+function itemCount(cat: string): number {
+  let count = 0;
+  while (count < MAX_ITEMS_PER_CATEGORY) {
+    const key = `landing.examples.${cat}.item_${count + 1}_title`;
+    if (tDynamic(key) === key) break;
+    count += 1;
+  }
+  return count;
+}
 
 /**
  * The example browser's content: a handful of broad categories, each with a
@@ -155,7 +168,7 @@ export function promptCategories(): PromptCategory[] {
     key: cat,
     icon: CATEGORY_ICONS[cat],
     title: tDynamic(`landing.examples.${cat}.title`),
-    examples: Array.from({ length: ITEMS_PER_CATEGORY }, (_, i) => {
+    examples: Array.from({ length: itemCount(cat) }, (_, i) => {
       const key = `${cat}-${i + 1}`;
       return {
         key,
