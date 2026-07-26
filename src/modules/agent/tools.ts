@@ -57,9 +57,18 @@ function sleep(ms: number, signal?: AbortSignal): Promise<void> {
  * both live in object storage) or as data URIs. Anything else can't be read
  * from a Worker, so it's rejected instead of silently failing upstream.
  */
-function resolveReferenceImage(src: string): string {
+export function resolveReferenceImage(
+  src: string,
+  appUrl: string = envConfigs.app_url
+): string {
   const value = src.trim();
   if (/^https?:\/\//i.test(value) || value.startsWith('data:')) return value;
+  // Site-relative, which is how the example browser attaches its sample
+  // images. The provider fetches this URL from the outside, so it has to be
+  // made absolute — `//host/x` is excluded, that points off-site.
+  if (value.startsWith('/') && !value.startsWith('//')) {
+    return `${appUrl.replace(/\/+$/, '')}${value}`;
+  }
   throw new Error(`unsupported image reference: ${src}`);
 }
 
