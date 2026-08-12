@@ -114,6 +114,16 @@ export interface AIProvider {
     mediaType?: string;
     model?: string;
   }): Promise<AITaskResult>;
+  /** Best-effort cancellation for an asynchronous provider task. */
+  cancel?({
+    taskId,
+    mediaType,
+    model,
+  }: {
+    taskId: string;
+    mediaType?: string;
+    model?: string;
+  }): Promise<void>;
 }
 
 /**

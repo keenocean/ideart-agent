@@ -1,13 +1,7 @@
 import { m } from '@/paraglide/messages.js';
 
 export function ModelsStrip() {
-  const items = [
-    m['landing.models.item_1'](),
-    m['landing.models.item_2'](),
-    m['landing.models.item_3'](),
-    m['landing.models.item_4'](),
-    m['landing.models.item_5'](),
-  ];
+  const items = [m['landing.models.item_1'](), m['landing.models.item_2']()];
 
   return (
     <section className="border-border/60 bg-secondary/30 border-y px-4 py-10">

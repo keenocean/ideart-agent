@@ -4,7 +4,6 @@ import { createFileRoute } from '@tanstack/react-router';
 import { ChevronDown, FlaskConical, Minus, Plus, Save } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { tDynamic } from '@/core/i18n/dynamic';
 import {
   getSettingGroups,
   getSettings,
@@ -28,6 +27,13 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+
+import {
+  settingFieldLabel,
+  settingGroupLabel,
+  settingTabLabel,
+  settingTip,
+} from './-settings-messages';
 
 function AdminSettingsPage() {
   const placeholders: Record<string, string> = {
@@ -176,7 +182,7 @@ function AdminSettingsPage() {
                 : 'text-muted-foreground hover:text-foreground border-transparent'
             )}
           >
-            {tDynamic(`admin.settings.tabs.${tab.name}`)}
+            {settingTabLabel(tab.name, tab.title)}
           </button>
         ))}
       </div>
@@ -250,7 +256,7 @@ function AdminSettingsPage() {
               >
                 <div className="flex items-center justify-between">
                   <CardTitle>
-                    {tDynamic(`admin.settings.groups.${group.name}.title`)}
+                    {settingGroupLabel(group.name, group.title)}
                   </CardTitle>
                   <div className="flex items-center gap-2">
                     {testSpec && (
@@ -281,13 +287,13 @@ function AdminSettingsPage() {
                     <SettingField
                       key={setting.name}
                       setting={setting}
-                      label={tDynamic(`admin.settings.fields.${setting.name}`)}
+                      label={settingFieldLabel(setting.name, setting.title)}
                       placeholder={
                         placeholders[setting.name] ?? setting.placeholder
                       }
                       tip={
                         setting.tip
-                          ? tDynamic(`admin.settings.tips.${setting.name}`)
+                          ? settingTip(setting.name, setting.tip)
                           : undefined
                       }
                       value={
@@ -309,7 +315,11 @@ function AdminSettingsPage() {
           onOpenChange={(open) => !open && setTestingGroup(null)}
           group={testingGroup}
           spec={getTestSpec(testingGroup)!}
-          groupTitle={tDynamic(`admin.settings.groups.${testingGroup}.title`)}
+          groupTitle={settingGroupLabel(
+            testingGroup,
+            groups.find((group) => group.name === testingGroup)?.title ??
+              testingGroup
+          )}
           configOverrides={Object.fromEntries(
             settings
               .filter(

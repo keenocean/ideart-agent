@@ -1,33 +1,72 @@
-# ShipAny Image Agent
+# ShipAny Video Agent
 
-A complete AI image product, ready to rebrand and ship. Users describe an edit
-in plain language; an agent decides which tool to call, generates or edits the
-image, and charges credits for it. Payments, subscriptions, credits, auth,
-admin panel and i18n are already wired — you change the branding, the examples
-and the prices.
+A production-ready conversational AI video SaaS, built to rebrand and ship.
+Users describe a shot or attach source media; the agent decides how to use the
+material, chooses the right video tool, writes the cinematic prompt, renders
+the clip, and charges credits for it. Payments, subscriptions, credits, auth,
+admin, sharing, media library, and i18n are already wired.
 
 Built on [ShipAny](https://shipany.ai) (TanStack Start + Drizzle + better-auth).
-It deploys to Cloudflare Workers with no filesystem and no background workers.
+It runs on Node or Cloudflare Workers without relying on a writable filesystem.
 
 ## What it does
 
 The chat is an agent loop, not a prompt box. A message goes to an LLM that has
-two tools — `generate_image` and `edit_image` — and it picks one, writes the
-prompt, and calls it. That's why a user can say "make the background white and
-keep her hair" and get one image back instead of a form to fill in.
+two tools — `generate_video` (text-to-video) and `animate_image`
+(image-to-video) — and it picks one, writes the cinematic prompt, and calls it.
+That's why a user can say "slow push in on her while the background goes soft"
+and get a clip back instead of a form to fill in.
 
 Around that loop:
 
-- **Credits** — priced per model from a catalog, deducted atomically, refunded
-  when generation fails. The turn is refused up front when the balance is
-  short, so nobody pays for an LLM turn that ends in a paywall.
+- **Agent-owned media routing** — the composer only asks users to upload from
+  their device or choose something from their library. The agent decides
+  whether each image, audio file, or video is a frame or reference input and
+  maps it to the generation tool's parameters.
+- **Video Lite-compatible composer** — MiniMax H3 and Seedance 2.5 expose the
+  same duration, resolution, aspect-ratio, provider model mapping, and example
+  behavior as `shipany-video-lite`.
+- **Living showcase** — examples use a responsive masonry layout, load and
+  autoplay only near the viewport, and open in a full-screen preview with
+  “Use this prompt” and “Use as reference” actions.
+- **Credits** — priced per model _and per second_ from a catalog, deducted
+  atomically, refunded when a render fails or is canceled. A 10-second clip
+  costs twice a 5-second one before resolution multipliers. The turn is
+  refused up front when the balance is short, so nobody pays for an LLM turn
+  that ends in a paywall.
 - **Paywall that fits** — someone without a plan is shown plans; someone on a
   plan who ran dry is shown top-ups. The server decides which.
-- **Providers** — Replicate and Fal, both configured in the admin panel. The
-  composer's model list maps each model to the id every provider knows it by,
-  so switching provider doesn't change what the user picked.
+- **Providers** — gRouter, Fal, and Replicate, all configured in the admin
+  panel. The model catalog maps a single UI choice to the id each provider
+  expects, so switching providers does not change what the user selected.
+- **Renders take minutes, not seconds** — the tool polls for up to 15 minutes
+  at a 5-second interval. The upstream and local task ids are persisted; the
+  composer becomes a stop button while work is active, cancellation is sent
+  upstream when supported, and stale unfinished transcript rows are shown as
+  interrupted instead of spinning forever.
 - **Stateless** — conversation history replays from the database each turn, and
-  generated images go straight to object storage. No session files, no disk.
+  generated clips go straight to object storage. No session files, no disk.
+- **Product shell included** — chat history, reusable media library, clip
+  preview/download, public share pages, bilingual UI, billing, top-ups, and an
+  admin settings/test surface are included.
+
+## How generation works
+
+```text
+User message + uploaded/library media
+  → agent chooses generate_video or animate_image
+  → provider accepts an asynchronous task
+  → server stores both task ids and polls every 5 seconds over the chat SSE
+  → completed clip is copied to object storage
+  → tool result and final answer are persisted in the conversation
+```
+
+The active chat request owns the polling loop; this repository does not ship a
+separate queue consumer. Task metadata is durable so the UI can recover the
+correct active/interrupted state and cancel a provider task after navigation
+or reconnection. If you need renders to survive server process restarts and
+continue without an open request, move the same polling service behind a queue
+or workflow runner.
 
 ## Quick start
 
@@ -40,25 +79,41 @@ pnpm dev                             # http://localhost:3000
 ```
 
 Then sign in and open `/admin/settings` — **the app cannot generate anything
-until you configure it there.** Nothing is baked into env.
+until you configure a chat model, video provider, and object storage there.**
+Provider credentials are stored in the database rather than baked into env.
 
 ## Configure
 
 Admin → Settings → **AI**:
 
-| Group                | What to set                                                                              |
-| -------------------- | ---------------------------------------------------------------------------------------- |
-| **Chat Model**       | Default provider (`auto` prefers OpenAI, falls back to Anthropic), and the model id      |
-| **OpenAI**           | Base URL + API key. Any OpenAI-compatible gateway works — OpenRouter, Together, your own |
-| **Anthropic**        | Base URL + API key, if you'd rather drive the agent with Claude                          |
-| **Image Generation** | Default provider, then the **Replicate** token or **Fal** key in the groups below        |
+| Group                | What to set                                                                                |
+| -------------------- | ------------------------------------------------------------------------------------------ |
+| **Chat Model**       | Default provider (`auto` prefers OpenAI, falls back to Anthropic), plus its model id       |
+| **OpenAI**           | Base URL + API key. OpenAI-compatible gateways such as OpenRouter or Together also work    |
+| **Anthropic**        | Base URL + API key when Claude should drive the agent                                      |
+| **Video Generation** | Default route: `auto` prefers gRouter, then Fal, then Replicate                            |
+| **gRouter**          | Gateway base URL + API key for MiniMax, Seedance, and multimodal reference-to-video inputs |
+| **Fal**              | API key for supported MiniMax and Seedance video routes                                    |
+| **Replicate**        | API token for supported MiniMax routes                                                     |
 
-Admin → Settings → **Storage** (Cloudflare R2 / S3). Generated images are uploaded there,
+Current model/provider support:
+
+| Model        | gRouter | Fal | Replicate | Duration | Resolution     |
+| ------------ | :-----: | :-: | :-------: | -------- | -------------- |
+| MiniMax H3   |    ✓    |  ✓  |     ✓     | 5–15s    | 768P / 2K / 4K |
+| Seedance 2.5 |    ✓    |  ✓  |     —     | 4–30s    | 480p / 720p    |
+
+Admin → Settings → **Storage** (Cloudflare R2 / S3). Generated clips are uploaded there,
 and **on Cloudflare Workers this is not optional** — there is no disk to fall
-back to.
+back to. Video files are far larger than images were, so budget storage
+accordingly. Composer attachments and bundled example media are published to
+the same storage first, ensuring video providers receive a downloadable public
+URL instead of a localhost or site-relative path.
 
 Every group has a **Test** button that makes one real request, so you find out
-a key is wrong before a user does.
+a key is wrong before a user does. For Fal and Replicate that request queues a
+real render on the cheapest model — it proves the account can reach the video
+models, and it costs what one clip costs.
 
 Also worth setting: Payment (Stripe/Creem/PayPal), Email (Resend or Cloudflare
 Email) for verification mail, and Google OAuth.
@@ -70,19 +125,26 @@ Email) for verification mail, and Google OAuth.
 | Name, logo, favicon | `VITE_APP_NAME` / `VITE_APP_LOGO`, and `public/logo.*`, `public/favicon.*` |
 | Theme colour        | `src/styles/globals.css` — one `oklch` hue drives accent and neutrals      |
 | Landing copy        | `messages/en.json` + `messages/zh.json`, keys under `landing.*`            |
-| Example gallery     | `src/components/agent/prompt-examples.ts` + `landing.examples.*`           |
+| Example gallery     | `src/components/agent/prompt-examples.ts`, `public/videos/showcase/`       |
 | Models and prices   | `AGENT_MODEL_OPTIONS` in `src/lib/agent-settings.ts`                       |
 | Plans and top-ups   | `src/config/pricing.ts`                                                    |
 
 A category's examples end at the first missing translation, so removing one is
 an edit to `messages/*.json` — no code change.
 
-**Set your credit prices against real cost.** `AGENT_MODEL_OPTIONS` carries a
-`credits` figure per model; the comment above it records what each model costs
-upstream and the ruler used (200 credits per dollar at the top-up rate). Change
-the models and you must redo that arithmetic, or you will sell images below
+**Set your credit prices against real cost — and check them before launch.**
+`AGENT_MODEL_OPTIONS` carries a `creditsPerSecond` figure plus each model's
+supported durations. The server rounds the resulting clip price to ten
+credits. The figures shipped here are approximations of Fal/Replicate's
+published rates at the time of writing; **video pricing moves fast, so verify
+each one against the provider's current page before you take money.** Change
+the models and you must redo that arithmetic, or you will sell clips below
 cost. Note that plans hand out credits more cheaply than the top-up rate, so
 check the cheapest tier, not the standard one.
+
+Also revisit **Admin → Settings → General → Credits**. With the catalog shipped
+here, a default 5-second MiniMax H3 render at 2K costs 550 credits; signup
+grants, plans, and top-ups should be sized accordingly.
 
 ## Deploy to Cloudflare Workers
 
@@ -203,38 +265,41 @@ and the baked env change.
 `pnpm build && pnpm start` runs the Node build on any host. A `Dockerfile` is
 included. Postgres and MySQL are supported via `DATABASE_PROVIDER` — run
 `pnpm db:setup` after changing it to swap the schema template. Object storage
-is still required for generated images.
+is still required for generated clips.
 
 ## Commands
 
 | Command            | What it does                               |
 | ------------------ | ------------------------------------------ |
 | `pnpm dev`         | Dev server on port 3000                    |
-| `pnpm build`       | Production build                           |
+| `pnpm build`       | Production Node build                      |
 | `pnpm start`       | Run the production build                   |
-| `pnpm test`        | Unit tests (vitest)                        |
+| `pnpm test`        | Unit tests (Vitest)                        |
+| `pnpm cf:build`    | Production Cloudflare Workers build        |
+| `pnpm cf:deploy`   | Build and deploy to Cloudflare Workers     |
 | `pnpm db:push`     | Sync schema to the database — dev only     |
 | `pnpm db:generate` | Write a migration to `drizzle/`            |
 | `pnpm db:migrate`  | Apply pending migrations                   |
 | `pnpm db:studio`   | Drizzle Studio                             |
 | `pnpm rbac:init`   | Seed roles and permissions, optional admin |
-| `pnpm cf:deploy`   | Build and deploy to Cloudflare Workers     |
 
 ## Structure
 
 ```
 src/
-├── modules/agent/      # The agent: runtime, tools, history replay, paywall
-├── modules/            # credits, payment, subscriptions, chats, rbac, config
-├── core/               # db, auth, payment, email, storage, ai providers
-├── routes/(agent)/     # Chat, library, chat list
-├── routes/api/agent/   # Chat SSE endpoint, library, chat CRUD
-├── routes/admin/       # Admin panel
-├── components/agent/   # Composer, transcript, preview pane, sidebar
-├── lib/agent-settings.ts   # Model catalog, credit prices, provider mapping
+├── modules/agent/          # Agent runtime, tools, provider polling, paywall
+├── modules/ai-tasks/       # Durable task status and credit refund lifecycle
+├── modules/chats/          # Chat history, sharing, and generated-media library
+├── core/ai/                # gRouter, Fal, and Replicate adapters
+├── routes/(agent)/         # Chat, library, and editor surfaces
+├── routes/api/agent/       # Chat SSE, history/status, stop, library, CRUD
+├── routes/admin/           # Admin settings, provider tests, chat inspection
+├── components/agent/       # Composer, transcript, preview pane, sidebar
+├── lib/agent-settings.ts   # Model catalog, capabilities, prices, route mapping
 └── config/pricing.ts       # Plans and top-up packs
 
-messages/{en,zh}.json   # All copy, flat dot-keyed
+messages/{en,zh}.json       # All copy, flat dot-keyed
+public/videos/showcase/     # Bundled masonry example clips
 ```
 
 ## License

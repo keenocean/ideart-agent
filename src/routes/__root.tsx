@@ -28,10 +28,10 @@ import { GoogleOneTap } from '@/components/google-one-tap';
 import { SandboxPreviewBridge } from '@/components/sandbox-preview-bridge';
 import { Toaster } from '@/components/ui/sonner';
 
-import '@fontsource-variable/inter';
-import '@fontsource/libre-baskerville/400.css';
-import '@fontsource/libre-baskerville/700.css';
-import '@fontsource/libre-baskerville/400-italic.css';
+import '@fontsource-variable/ibm-plex-sans';
+import '@fontsource/ibm-plex-serif/400.css';
+import '@fontsource/ibm-plex-serif/600.css';
+import '@fontsource/ibm-plex-serif/400-italic.css';
 import '@/styles/globals.css';
 
 // Analytics IDs live in the DB config (1h-cached service). Fetched via a
@@ -135,11 +135,11 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={getQueryClient()}>
-      {/* Light is the default look; visitors who pick dark (or "system" in the
-          toggle) keep their choice in localStorage. */}
+      {/* The video workspace opens like an editing room with the lights down.
+          A visitor's explicit theme choice still persists in localStorage. */}
       <ThemeProvider
         attribute="class"
-        defaultTheme="light"
+        defaultTheme="dark"
         enableSystem
         disableTransitionOnChange
       >

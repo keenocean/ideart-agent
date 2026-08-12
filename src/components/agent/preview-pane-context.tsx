@@ -6,7 +6,7 @@ import {
   useState,
 } from 'react';
 
-export interface PreviewImage {
+export interface PreviewMedia {
   src: string;
   alt?: string;
   name?: string;
@@ -15,11 +15,11 @@ export interface PreviewImage {
 interface PreviewPaneState {
   open: boolean;
   setOpen: (v: boolean) => void;
-  image: PreviewImage | null;
-  images: PreviewImage[];
-  setImages: (images: PreviewImage[]) => void;
-  openImage: (image: PreviewImage) => void;
-  clearImage: () => void;
+  image: PreviewMedia | null;
+  images: PreviewMedia[];
+  setImages: (images: PreviewMedia[]) => void;
+  openMedia: (image: PreviewMedia) => void;
+  clearMedia: () => void;
 }
 
 const PreviewPaneCtx = createContext<PreviewPaneState | null>(null);
@@ -30,16 +30,16 @@ export function PreviewPaneProvider({
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
-  const [image, setImage] = useState<PreviewImage | null>(null);
-  const [images, setImages] = useState<PreviewImage[]>([]);
-  const openImage = useCallback((nextImage: PreviewImage) => {
+  const [image, setImage] = useState<PreviewMedia | null>(null);
+  const [images, setImages] = useState<PreviewMedia[]>([]);
+  const openMedia = useCallback((nextImage: PreviewMedia) => {
     setImage(nextImage);
     setOpen(true);
   }, []);
-  const clearImage = useCallback(() => setImage(null), []);
+  const clearMedia = useCallback(() => setImage(null), []);
   const value = useMemo(
-    () => ({ open, setOpen, image, images, setImages, openImage, clearImage }),
-    [open, image, images, openImage, clearImage]
+    () => ({ open, setOpen, image, images, setImages, openMedia, clearMedia }),
+    [open, image, images, openMedia, clearMedia]
   );
   return (
     <PreviewPaneCtx.Provider value={value}>{children}</PreviewPaneCtx.Provider>
@@ -54,8 +54,8 @@ export function usePreviewPane(): PreviewPaneState {
       image: null,
       images: [],
       setImages: () => {},
-      openImage: () => {},
-      clearImage: () => {},
+      openMedia: () => {},
+      clearMedia: () => {},
     }
   );
 }

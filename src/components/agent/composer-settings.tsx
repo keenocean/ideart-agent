@@ -1,11 +1,11 @@
 import { ChevronDown } from 'lucide-react';
 
-import { tDynamic } from '@/core/i18n/dynamic';
 import {
-  AGENT_ASPECT_RATIOS,
   AGENT_RESOLUTIONS,
-  AUTO_ASPECT_RATIO,
-  AUTO_RESOLUTION,
+  aspectRatiosForModel,
+  isAutoAspectRatio,
+  modelOptionFor,
+  resolutionsForModel,
   type AgentComposerSettings,
 } from '@/lib/agent-settings';
 import { cn } from '@/lib/utils';
@@ -35,8 +35,9 @@ function RatioGlyph({ ratio }: { ratio: string }) {
 }
 
 /**
- * Output settings (resolution + aspect ratio) as a single pill next to the
- * model picker; the label mirrors the current pair, e.g. "2K · 16:9".
+ * Output settings (duration + resolution + aspect ratio) as a single pill next
+ * to the model picker; the label mirrors the current set, e.g. "5s · 720p ·
+ * 16:9". Duration leads because it is the one that changes the price.
  */
 export function ComposerSettings({
   settings,
@@ -52,14 +53,19 @@ export function ComposerSettings({
   }
 
   const resolutionLabel =
-    settings.resolution === AUTO_RESOLUTION
-      ? m['agent.composer.auto']()
-      : (AGENT_RESOLUTIONS.find((item) => item.value === settings.resolution)
-          ?.label ?? settings.resolution);
-  const aspectLabel =
-    settings.aspectRatio === AUTO_ASPECT_RATIO
-      ? m['agent.composer.auto']()
-      : settings.aspectRatio;
+    AGENT_RESOLUTIONS.find((item) => item.value === settings.resolution)
+      ?.label ?? settings.resolution;
+  const aspectLabel = isAutoAspectRatio(settings.aspectRatio)
+    ? m['agent.composer.auto']()
+    : settings.aspectRatio;
+  const activeModel = modelOptionFor(settings.modelOption)!;
+  const resolutions = resolutionsForModel(settings.modelOption);
+  const aspectRatios = aspectRatiosForModel(settings.modelOption);
+  const durationRange = activeModel.durationMax - activeModel.durationMin;
+  const durationProgress =
+    durationRange === 0
+      ? 100
+      : ((settings.duration - activeModel.durationMin) / durationRange) * 100;
 
   return (
     <DropdownMenu>
@@ -75,26 +81,64 @@ export function ComposerSettings({
         }
       >
         <span className="truncate">
-          {resolutionLabel} · {aspectLabel}
+          {m['agent.composer.duration_seconds']({ seconds: settings.duration })}{' '}
+          · {resolutionLabel} · {aspectLabel}
         </span>
         <ChevronDown className="text-muted-foreground size-3.5" />
       </DropdownMenuTrigger>
 
-      <DropdownMenuContent align="end" className="w-[300px] p-3">
-        <p className="mb-2 text-xs font-medium">
+      <DropdownMenuContent align="end" className="w-[320px] p-3">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-xs font-medium">
+            {m['agent.composer.duration']()}
+          </p>
+          <output
+            htmlFor="agent-video-duration"
+            className="bg-primary/10 text-primary min-w-10 rounded-full px-2 py-1 text-center text-xs font-semibold"
+          >
+            {m['agent.composer.duration_seconds']({
+              seconds: settings.duration,
+            })}
+          </output>
+        </div>
+        <div className="relative mt-3 flex h-5 items-center">
+          <div className="bg-muted pointer-events-none absolute inset-x-0 h-1.5 rounded-full" />
+          <div
+            className="bg-primary pointer-events-none absolute left-0 h-1.5 rounded-full"
+            style={{ width: `${durationProgress}%` }}
+          />
+          <input
+            id="agent-video-duration"
+            type="range"
+            min={activeModel.durationMin}
+            max={activeModel.durationMax}
+            step={1}
+            value={settings.duration}
+            onChange={(event) =>
+              update({ duration: Number(event.currentTarget.value) })
+            }
+            className="accent-primary [&::-moz-range-thumb]:border-background [&::-moz-range-thumb]:bg-primary [&::-webkit-slider-thumb]:border-background [&::-webkit-slider-thumb]:bg-primary absolute inset-x-0 h-5 w-full cursor-pointer appearance-none bg-transparent [&::-moz-range-thumb]:size-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-2 [&::-webkit-slider-runnable-track]:h-1.5 [&::-webkit-slider-runnable-track]:bg-transparent [&::-webkit-slider-thumb]:mt-[-5px] [&::-webkit-slider-thumb]:size-4 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2"
+          />
+        </div>
+        <div className="text-muted-foreground mt-1 flex justify-between text-[10px] font-medium">
+          <span>{activeModel.durationMin}s</span>
+          <span>{activeModel.durationMax}s</span>
+        </div>
+
+        <p className="mt-4 mb-2 text-xs font-medium">
           {m['agent.composer.resolution']()}
         </p>
         <div className="bg-muted flex rounded-md p-0.5">
-          {AGENT_RESOLUTIONS.map((item) => {
-            const active = settings.resolution === item.value;
+          {resolutions.map((value) => {
+            const item = AGENT_RESOLUTIONS.find(
+              (candidate) => candidate.value === value
+            );
+            const active = settings.resolution === value;
             return (
               <button
-                key={item.value}
+                key={value}
                 type="button"
-                onClick={() => update({ resolution: item.value })}
-                title={tDynamic(
-                  `agent.composer.resolution_${item.value}_description`
-                )}
+                onClick={() => update({ resolution: value })}
                 className={cn(
                   'flex-1 rounded-[5px] py-1.5 text-xs transition-colors',
                   active
@@ -102,9 +146,7 @@ export function ComposerSettings({
                     : 'text-muted-foreground hover:text-foreground'
                 )}
               >
-                {item.value === AUTO_RESOLUTION
-                  ? m['agent.composer.auto']()
-                  : item.label}
+                {item?.label ?? value}
               </button>
             );
           })}
@@ -114,9 +156,9 @@ export function ComposerSettings({
           {m['agent.composer.aspect_ratio']()}
         </p>
         <div className="grid grid-cols-4 gap-1.5">
-          {AGENT_ASPECT_RATIOS.map((ratio) => {
+          {aspectRatios.map((ratio) => {
             const active = settings.aspectRatio === ratio;
-            const isAuto = ratio === AUTO_ASPECT_RATIO;
+            const isAuto = isAutoAspectRatio(ratio);
             return (
               <button
                 key={ratio}

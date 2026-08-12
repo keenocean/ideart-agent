@@ -166,6 +166,12 @@ export function getSettingGroups(): SettingGroup[] {
       tab: 'ai',
     },
     {
+      name: 'video_generation',
+      title: 'Video Generation',
+      description: 'Which provider serves video generation',
+      tab: 'ai',
+    },
+    {
       name: 'openai',
       title: 'OpenAI',
       description: 'OpenAI (or compatible) API',
@@ -187,7 +193,7 @@ export function getSettingGroups(): SettingGroup[] {
     {
       name: 'grouter',
       title: 'gRouter',
-      description: 'gRouter gateway — OpenAI-compatible images API',
+      description: 'gRouter gateway for image and video generation',
       tab: 'ai',
     },
 
@@ -333,6 +339,14 @@ export function getSettings(): Setting[] {
       group: 'email_auth',
       tab: 'auth',
       defaultValue: 'false',
+    },
+    {
+      name: 'desktop_auth_schemes',
+      title: 'Desktop hand-off schemes',
+      type: 'text',
+      placeholder: 'myapp,myapp-dev',
+      group: 'email_auth',
+      tab: 'auth',
     },
     {
       name: 'invite_code_required',
@@ -869,11 +883,28 @@ export function getSettings(): Setting[] {
       options: [
         { label: 'Auto', value: 'auto' },
         { label: 'gRouter', value: 'grouter' },
-        { label: 'Replicate', value: 'replicate' },
         { label: 'Fal', value: 'fal' },
+        { label: 'Replicate', value: 'replicate' },
       ],
       tip: 'Auto prefers gRouter when it is configured, then Replicate, then Fal. Applies to both text-to-image and image editing.',
       group: 'image_generation',
+      tab: 'ai',
+      defaultValue: 'auto',
+    },
+
+    // ─── AI / Video generation ───────────────────────────────────────
+    {
+      name: 'default_video_provider',
+      title: 'Default provider',
+      type: 'select',
+      options: [
+        { label: 'Auto', value: 'auto' },
+        { label: 'gRouter', value: 'grouter' },
+        { label: 'Fal', value: 'fal' },
+        { label: 'Replicate', value: 'replicate' },
+      ],
+      tip: 'Auto prefers gRouter when it is configured, then Fal, then Replicate. Applies to both text-to-video and image-to-video.',
+      group: 'video_generation',
       tab: 'ai',
       defaultValue: 'auto',
     },
@@ -893,8 +924,7 @@ export function getSettings(): Setting[] {
       name: 'grouter_base_url',
       title: 'Base URL',
       type: 'text',
-      placeholder: 'https://your-gateway.example.com/api/v1',
-      tip: 'A self-hosted OpenAI-compatible image gateway. Leave the whole group blank unless you run one.',
+      placeholder: 'http://localhost:8080/api/v1',
       group: 'grouter',
       tab: 'ai',
     },

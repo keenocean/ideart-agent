@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { Images, Pencil } from 'lucide-react';
+import { Clapperboard, Pencil } from 'lucide-react';
 
 import { useSession } from '@/core/auth/client';
 import { usePathname, useRouter } from '@/core/i18n/navigation';
@@ -75,7 +75,7 @@ export function AgentLayout({ children }: { children: React.ReactNode }) {
 
 function AgentHeader({ showGallery }: { showGallery: boolean }) {
   const { content } = useAgentHeader();
-  const { open, images, setOpen, clearImage } = usePreviewPane();
+  const { open, images, setOpen, clearMedia } = usePreviewPane();
 
   return (
     <header className="flex h-14 shrink-0 items-center gap-2 px-4">
@@ -108,14 +108,14 @@ function AgentHeader({ showGallery }: { showGallery: boolean }) {
             variant="ghost"
             size="icon"
             onClick={() => {
-              clearImage();
+              clearMedia();
               setOpen(true);
             }}
             aria-label={m['agent.preview.open_gallery']()}
             title={m['agent.preview.open_gallery']()}
             className="text-muted-foreground hover:text-foreground size-8 shrink-0 rounded-md"
           >
-            <Images className="size-4" />
+            <Clapperboard className="size-4" />
             {images.length > 0 && (
               <span className="text-muted-foreground ml-1 text-xs">
                 {images.length}

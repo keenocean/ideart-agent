@@ -2,96 +2,202 @@ import { describe, expect, it } from 'vitest';
 
 import {
   AGENT_MODEL_OPTIONS,
-  creditsForModelOption,
+  aspectRatiosForModel,
+  creditsForGeneration,
   defaultComposerSettings,
+  durationsForModel,
   labelForGeneratedModel,
+  normalizeClientGenerationSettings,
   providerModelFor,
+  resolutionsForModel,
   resolveGenerationSettings,
+  settingsForModel,
 } from './agent-settings';
 
-// What an image costs is the one number a user pays for, and the composer
-// sends its own copy of it in the request body. These tests pin the rule that
-// the server prices from the catalog instead.
-describe('creditsForModelOption', () => {
-  it('prices each catalogued model', () => {
+function expectedCredits(rate: number, seconds: number, multiplier = 1) {
+  return Math.ceil((rate * seconds * multiplier) / 10) * 10;
+}
+
+describe('creditsForGeneration', () => {
+  it('prices every model from its lite rate and default settings', () => {
     for (const option of AGENT_MODEL_OPTIONS) {
-      expect(creditsForModelOption(option.value)).toBe(option.credits);
+      expect(
+        creditsForGeneration(
+          option.value,
+          option.defaultDuration,
+          option.defaultResolution
+        )
+      ).toBe(expectedCredits(option.creditsPerSecond, option.defaultDuration));
     }
   });
 
-  it('charges the dearest model for an unknown key', () => {
-    const dearest = Math.max(...AGENT_MODEL_OPTIONS.map((o) => o.credits));
-    // A request naming a model that isn't sold must never come out cheaper
-    // than one that is — that would be a free image for anyone who asked.
-    expect(creditsForModelOption('not-a-model')).toBe(dearest);
-    expect(creditsForModelOption(undefined)).toBe(dearest);
-    expect(creditsForModelOption('')).toBe(dearest);
+  it('charges more for a longer clip', () => {
+    for (const option of AGENT_MODEL_OPTIONS) {
+      expect(
+        creditsForGeneration(
+          option.value,
+          option.durationMax,
+          option.defaultResolution
+        )
+      ).toBeGreaterThan(
+        creditsForGeneration(
+          option.value,
+          option.durationMin,
+          option.defaultResolution
+        )
+      );
+    }
   });
 
-  it('never prices an image at zero', () => {
-    for (const option of AGENT_MODEL_OPTIONS) {
-      expect(option.credits).toBeGreaterThan(0);
-    }
+  it('uses the same resolution multipliers as video-lite', () => {
+    expect(creditsForGeneration('minimax-h3', 5, '768P')).toBe(
+      expectedCredits(110, 5, 0.75)
+    );
+    expect(creditsForGeneration('minimax-h3', 5, '2K')).toBe(
+      expectedCredits(110, 5)
+    );
+    expect(creditsForGeneration('minimax-h3', 5, '4K')).toBe(
+      expectedCredits(110, 5, 1.5)
+    );
+  });
+
+  it('clamps duration to the selected model range', () => {
+    expect(creditsForGeneration('minimax-h3', 1, '2K')).toBe(
+      creditsForGeneration('minimax-h3', 5, '2K')
+    );
+    expect(creditsForGeneration('minimax-h3', 99, '2K')).toBe(
+      creditsForGeneration('minimax-h3', 15, '2K')
+    );
+  });
+
+  it('uses the highest rate for an unknown key', () => {
+    const rate = Math.max(
+      ...AGENT_MODEL_OPTIONS.map((option) => option.creditsPerSecond)
+    );
+    const expected = expectedCredits(rate, 5);
+    expect(creditsForGeneration('not-a-model', 5)).toBe(expected);
+    expect(creditsForGeneration(undefined, 5)).toBe(expected);
+    expect(creditsForGeneration('', 5)).toBe(expected);
   });
 });
 
-describe('defaultComposerSettings', () => {
-  it('starts on a model the catalog still sells', () => {
-    const { modelOption } = defaultComposerSettings();
-    expect(AGENT_MODEL_OPTIONS.map((o) => o.value)).toContain(modelOption);
+describe('composer model capabilities', () => {
+  it('matches the current video-lite catalog in order', () => {
+    expect(AGENT_MODEL_OPTIONS.map((option) => option.label)).toEqual([
+      'MiniMax H3',
+      'Seedance 2.5',
+    ]);
   });
 
-  it('starts on the cheapest model', () => {
-    const cheapest = [...AGENT_MODEL_OPTIONS].sort(
-      (a, b) => a.credits - b.credits
-    )[0];
-    // A new account's grant is finite and the first attempts usually go on
-    // getting the prompt right, so the default should be the cheap one.
-    expect(defaultComposerSettings().modelOption).toBe(cheapest.value);
+  it('starts with the video-lite defaults', () => {
+    expect(defaultComposerSettings()).toEqual({
+      modelOption: 'minimax-h3',
+      duration: 5,
+      resolution: '2K',
+      aspectRatio: 'adaptive',
+    });
+  });
+
+  it('exposes model-specific settings', () => {
+    expect(durationsForModel('minimax-h3')).toEqual([
+      5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
+    ]);
+    expect(durationsForModel('seedance-2-5')).toHaveLength(27);
+    expect(resolutionsForModel('minimax-h3')).toEqual(['768P', '2K', '4K']);
+    expect(resolutionsForModel('seedance-2-5')).toEqual(['480p', '720p']);
+    expect(aspectRatiosForModel('minimax-h3')).toContain('adaptive');
+    expect(aspectRatiosForModel('seedance-2-5')).toContain('auto');
+  });
+
+  it('resets incompatible values when the model changes', () => {
+    expect(
+      settingsForModel(
+        {
+          modelOption: 'seedance-2-5',
+          duration: 30,
+          resolution: '720p',
+          aspectRatio: 'auto',
+        },
+        'minimax-h3'
+      )
+    ).toEqual({
+      modelOption: 'minimax-h3',
+      duration: 5,
+      resolution: '2K',
+      aspectRatio: 'adaptive',
+    });
   });
 });
 
 describe('resolveGenerationSettings', () => {
-  it('sends the picker key, not a provider id', () => {
-    const settings = resolveGenerationSettings({
-      modelOption: 'gpt-image-2',
-      aspectRatio: 'auto',
-      resolution: 'auto',
+  it('sends the picker key and explicit lite defaults', () => {
+    expect(resolveGenerationSettings(defaultComposerSettings())).toEqual({
+      modelName: 'minimax-h3',
+      aspectRatio: 'adaptive',
+      resolution: '2K',
+      duration: 5,
+      creditCost: creditsForGeneration('minimax-h3', 5, '2K'),
     });
-    expect(settings.modelName).toBe('gpt-image-2');
-    // "auto" means "say nothing", so the provider applies its own default.
-    expect(settings.aspectRatio).toBeUndefined();
-    expect(settings.resolution).toBeUndefined();
   });
 
-  it('passes explicit aspect ratio and resolution through', () => {
+  it('passes supported explicit settings through', () => {
     const settings = resolveGenerationSettings({
-      modelOption: 'gpt-image-2',
+      modelOption: 'seedance-2-5',
       aspectRatio: '16:9',
-      resolution: '2k',
+      resolution: '480p',
+      duration: 8,
     });
-    expect(settings.aspectRatio).toBe('16:9');
-    expect(settings.resolution).toBe('2k');
+    expect(settings).toEqual({
+      modelName: 'seedance-2-5',
+      aspectRatio: '16:9',
+      resolution: '480p',
+      duration: 8,
+      creditCost: creditsForGeneration('seedance-2-5', 8, '480p'),
+    });
+  });
+
+  it('does not trust client pricing or unsupported values', () => {
+    expect(
+      normalizeClientGenerationSettings({
+        modelName: 'seedance-2-5',
+        duration: 99,
+        resolution: '4K',
+        aspectRatio: 'adaptive',
+        creditCost: 0,
+      })
+    ).toEqual({
+      modelName: 'seedance-2-5',
+      duration: 30,
+      aspectRatio: 'auto',
+      resolution: '720p',
+      creditCost: creditsForGeneration('seedance-2-5', 30, '720p'),
+    });
+    expect(
+      normalizeClientGenerationSettings({ modelName: 'free-video' })
+    ).toBeNull();
   });
 });
 
 describe('providerModelFor', () => {
-  it('maps every catalogued model for every provider', () => {
-    for (const option of AGENT_MODEL_OPTIONS) {
-      for (const provider of ['fal', 'replicate', 'grouter'] as const) {
-        expect(
-          providerModelFor(option.value, provider, 'generate')
-        ).toBeTruthy();
-        expect(providerModelFor(option.value, provider, 'edit')).toBeTruthy();
-      }
-    }
+  it('matches the current provider routes', () => {
+    expect(providerModelFor('minimax-h3', 'grouter', 'generate', '2K')).toBe(
+      'minimax-h3'
+    );
+    expect(providerModelFor('seedance-2-5', 'fal', 'animate', '720p')).toBe(
+      'bytedance/seedance-2.5/image-to-video'
+    );
+    expect(providerModelFor('minimax-h3', 'fal', 'generate', '768P')).toBe(
+      'fal-ai/minimax/hailuo-2.3/standard/text-to-video'
+    );
+    expect(providerModelFor('minimax-h3', 'fal', 'animate', '4K')).toBe(
+      'fal-ai/minimax/hailuo-2.3/pro/image-to-video'
+    );
   });
 
-  it('lets an override win over the built-in id', () => {
-    const id = providerModelFor('gpt-image-2', 'grouter', 'generate', {
-      'gpt-image-2': 'my-own-route',
-    });
-    expect(id).toBe('my-own-route');
+  it('does not downgrade Seedance on Replicate', () => {
+    expect(
+      providerModelFor('seedance-2-5', 'replicate', 'generate', '720p')
+    ).toBeUndefined();
   });
 
   it('returns nothing for a model it cannot map', () => {
@@ -101,20 +207,23 @@ describe('providerModelFor', () => {
 });
 
 describe('labelForGeneratedModel', () => {
-  it('names a model from any provider id it was recorded under', () => {
+  it('names picker and provider ids', () => {
     for (const option of AGENT_MODEL_OPTIONS) {
       expect(labelForGeneratedModel(option.value)).toBe(option.label);
       for (const ids of Object.values(option.providers)) {
+        if (!ids) continue;
         expect(labelForGeneratedModel(ids.model)).toBe(option.label);
-        expect(labelForGeneratedModel(ids.editModel)).toBe(option.label);
+        expect(labelForGeneratedModel(ids.imageModel)).toBe(option.label);
       }
     }
+    expect(
+      labelForGeneratedModel('fal-ai/minimax/hailuo-2.3/pro/image-to-video')
+    ).toBe('MiniMax H3');
   });
 
   it('shows the raw id for a model no longer sold', () => {
-    // Old images outlive the catalog; a blank label would lose the record.
-    expect(labelForGeneratedModel('black-forest-labs/flux-schnell')).toBe(
-      'black-forest-labs/flux-schnell'
+    expect(labelForGeneratedModel('retired/video-model')).toBe(
+      'retired/video-model'
     );
   });
 });

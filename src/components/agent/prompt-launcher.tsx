@@ -1,29 +1,51 @@
 import { useRef, useState } from 'react';
-import { X } from 'lucide-react';
+import { FileVideo2, Play, WandSparkles } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { useSession } from '@/core/auth/client';
 import { useRouter } from '@/core/i18n/navigation';
 import {
+  isLocalChatMediaUrl,
+  mediaTypeForFile,
   newAgentSessionId,
   newAttachmentId,
-  uploadChatImage,
+  publishChatMediaSources,
+  uploadChatMedia,
   type PendingAttachment,
 } from '@/lib/agent';
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
 import { useComposerSettings } from '@/hooks/use-composer-settings';
-import { ChatComposer } from '@/components/agent/chat-composer';
+import {
+  ChatComposer,
+  type LibraryMedia,
+} from '@/components/agent/chat-composer';
 import {
   promptCategories,
   type PromptExample,
 } from '@/components/agent/prompt-examples';
+import { VideoPreviewDialog } from '@/components/video-preview-dialog';
+import { ViewportVideo } from '@/components/viewport-video';
 
-const VISIBLE_CATEGORIES = 5;
-const DEFAULT_CATEGORY = 'style';
 // Attachments added by an example carry this id prefix so switching examples
 // can swap them out without touching the user's own uploads.
 const EXAMPLE_PREFIX = 'example:';
+
+// Alternating real frame shapes makes the examples read as a film-wall,
+// rather than a rigid thumbnail grid. The order matches video-lite's gallery.
+const EXAMPLE_ASPECT_RATIOS = [
+  '16 / 10',
+  '4 / 5',
+  '3 / 4',
+  '16 / 9',
+  '1 / 1',
+  '2 / 3',
+  '3 / 2',
+  '9 / 16',
+  '5 / 4',
+  '4 / 3',
+  '3 / 5',
+] as const;
 
 /**
  * The "start a new chat" surface: headline, prompt composer (local upload +
@@ -40,16 +62,12 @@ export function PromptLauncher({ className }: { className?: string }) {
   const [value, setValue] = useState('');
   const [attachments, setAttachments] = useState<PendingAttachment[]>([]);
   const [composerSettings, setComposerSettings] = useComposerSettings();
-  // Start on the first category so the examples are visible right away.
-  const [categoryKey, setCategoryKey] = useState<string | null>(
-    DEFAULT_CATEGORY
-  );
   const [submitting, setSubmitting] = useState(false);
+  const [previewIndex, setPreviewIndex] = useState<number | null>(null);
 
-  // Only the first few categories are offered up front — the rest stay in
-  // prompt-examples.ts, ready to surface by bumping this number.
-  const categories = promptCategories().slice(0, VISIBLE_CATEGORIES);
-  const category = categories.find((item) => item.key === categoryKey) ?? null;
+  const examples = promptCategories()[0]?.examples ?? [];
+  const preview =
+    previewIndex === null ? null : (examples[previewIndex] ?? null);
   const uploading = attachments.some((item) => item.status === 'uploading');
   const hasUploaded = attachments.some((item) => item.status === 'uploaded');
 
@@ -66,42 +84,177 @@ export function PromptLauncher({ className }: { className?: string }) {
 
   /**
    * Picking an example drops in its prompt and, for the ones that ship a
-   * sample, the "before" picture it was made from — it's already a public URL,
-   * so it counts as uploaded without a round trip. Switching examples swaps
-   * that sample out; images the user brought themselves are left alone.
+   * sample, the "before" picture it was made from. Matching lite, choosing an
+   * example replaces the current reference mode instead of mixing unrelated
+   * user material into the example.
    */
-  function applyExample(example: PromptExample) {
+  async function applyExample(example: PromptExample) {
+    fillPrompt(example.prompt);
+    const sources =
+      example.sourceImages ??
+      (example.sourceImage ? [example.sourceImage] : []);
+    if (sources.length === 0) {
+      setAttachments((prev) => {
+        prev.forEach((item) => {
+          if (item.preview.startsWith('blob:')) {
+            URL.revokeObjectURL(item.preview);
+          }
+        });
+        return [];
+      });
+      return;
+    }
+    if (
+      sources.some((source) => isLocalChatMediaUrl(source)) &&
+      !session?.user
+    ) {
+      setAttachments((prev) => {
+        prev.forEach((item) => {
+          if (item.preview.startsWith('blob:')) {
+            URL.revokeObjectURL(item.preview);
+          }
+        });
+        return [];
+      });
+      toast.error(m['landing.hero.sign_in_to_upload']());
+      return;
+    }
+
+    const created: PendingAttachment[] = sources.map((src, index) => ({
+      id: `${EXAMPLE_PREFIX}${example.key}-${index}`,
+      name: example.title,
+      kind: 'image',
+      preview: src,
+      status: 'uploading',
+    }));
+    setAttachments((prev) => {
+      prev.forEach((item) => {
+        if (item.preview.startsWith('blob:')) URL.revokeObjectURL(item.preview);
+      });
+      return created;
+    });
+
+    try {
+      const urls = await publishChatMediaSources(
+        sources.map((src) => ({ src, name: example.title }))
+      );
+      setAttachments((current) =>
+        current.map((item) => {
+          const index = created.findIndex(
+            (createdItem) => createdItem.id === item.id
+          );
+          return index >= 0 && urls[index]
+            ? { ...item, url: urls[index], status: 'uploaded' }
+            : item;
+        })
+      );
+    } catch (error) {
+      const message = (error as Error).message || 'Upload failed';
+      toast.error(message);
+      const ids = new Set(
+        created
+          .filter((item) => item.status === 'uploading')
+          .map((item) => item.id)
+      );
+      setAttachments((current) =>
+        current.map((item) =>
+          ids.has(item.id) ? { ...item, status: 'error', error: message } : item
+        )
+      );
+    }
+  }
+
+  function navigatePreview(offset: number) {
+    setPreviewIndex((current) => {
+      if (current === null || examples.length === 0) return null;
+      return (current + offset + examples.length) % examples.length;
+    });
+  }
+
+  function usePreviewPrompt() {
+    if (!preview) return;
+    const example = preview;
+    setPreviewIndex(null);
+    requestAnimationFrame(() => {
+      void applyExample(example);
+      textareaRef.current?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center',
+      });
+    });
+  }
+
+  async function usePreviewAsReference() {
+    const video = preview?.video;
+    if (!preview || !video) return;
+    if (isLocalChatMediaUrl(video) && !session?.user) {
+      toast.error(m['landing.hero.sign_in_to_upload']());
+      return;
+    }
+    const example = preview;
+    const id = `${EXAMPLE_PREFIX}${example.key}-video`;
+    const name = video.split('/').pop() || example.title;
+    setPreviewIndex(null);
     fillPrompt(example.prompt);
     setAttachments((prev) => {
-      const own = prev.filter((item) => !item.id.startsWith(EXAMPLE_PREFIX));
-      // A try-on case ships two: the person and the garment.
-      const sources =
-        example.sourceImages ??
-        (example.sourceImage ? [example.sourceImage] : []);
-      if (sources.length === 0 || own.length > 0) return own;
-      return sources.map((src, index) => ({
-        id: `${EXAMPLE_PREFIX}${example.key}-${index}`,
-        name: example.title,
-        preview: src,
-        url: src,
-        status: 'uploaded' as const,
-      }));
+      const next: PendingAttachment = {
+        id,
+        name,
+        kind: 'video',
+        preview: video,
+        status: 'uploading',
+      };
+      return prev.some((item) => item.id === id)
+        ? prev.map((item) => (item.id === id ? next : item))
+        : [...prev, next];
+    });
+
+    try {
+      const [url] = await publishChatMediaSources([{ src: video, name }]);
+      if (!url) throw new Error('Upload failed');
+      setAttachments((current) =>
+        current.map((item) =>
+          item.id === id ? { ...item, url, status: 'uploaded' } : item
+        )
+      );
+    } catch (error) {
+      const message = (error as Error).message || 'Upload failed';
+      toast.error(message);
+      setAttachments((current) =>
+        current.map((item) =>
+          item.id === id ? { ...item, status: 'error', error: message } : item
+        )
+      );
+    }
+
+    textareaRef.current?.scrollIntoView({
+      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches
+        ? 'auto'
+        : 'smooth',
+      block: 'center',
     });
   }
 
   // Uploads need a session — the API rejects anonymous requests, so say why
   // instead of letting every thumbnail fail.
   async function addFiles(files: File[]) {
-    const images = files.filter((file) => file.type.startsWith('image/'));
-    if (images.length === 0) return;
+    const selected = files
+      .map((file) => ({ file, kind: mediaTypeForFile(file) }))
+      .filter(
+        (item): item is { file: File; kind: 'image' | 'audio' | 'video' } =>
+          item.kind !== null
+      )
+      .slice(0, 10);
+    if (selected.length === 0) return;
     if (!session?.user) {
       toast.error(m['landing.hero.sign_in_to_upload']());
       return;
     }
 
-    const created = images.map((file) => ({
+    const created = selected.map(({ file, kind }) => ({
       id: newAttachmentId(),
-      name: file.name || 'image',
+      name: file.name || 'media',
+      kind,
       preview: URL.createObjectURL(file),
       status: 'uploading' as const,
       file,
@@ -112,26 +265,85 @@ export function PromptLauncher({ className }: { className?: string }) {
       ...created.map(({ file: _file, ...item }) => item),
     ]);
 
-    await Promise.all(
-      created.map(async (item) => {
-        try {
-          const url = await uploadChatImage(item.file);
-          setAttachments((prev) =>
-            prev.map((att) =>
-              att.id === item.id ? { ...att, url, status: 'uploaded' } : att
-            )
+    try {
+      const urls = await uploadChatMedia(created.map((item) => item.file));
+      setAttachments((prev) =>
+        prev.map((item) => {
+          const index = created.findIndex(
+            (createdItem) => createdItem.id === item.id
           );
-        } catch (err) {
-          const error = (err as Error).message || 'Upload failed';
-          toast.error(error);
-          setAttachments((prev) =>
-            prev.map((att) =>
-              att.id === item.id ? { ...att, status: 'error', error } : att
-            )
-          );
-        }
-      })
+          return index >= 0 && urls[index]
+            ? { ...item, url: urls[index], status: 'uploaded' }
+            : item;
+        })
+      );
+    } catch (err) {
+      const error = (err as Error).message || 'Upload failed';
+      toast.error(error);
+      const createdIds = new Set(created.map((item) => item.id));
+      setAttachments((prev) =>
+        prev.map((item) =>
+          createdIds.has(item.id) ? { ...item, status: 'error', error } : item
+        )
+      );
+    }
+  }
+
+  async function addLibraryMedia(media: LibraryMedia[]) {
+    const selected = media.filter(
+      (item) =>
+        !attachments.some(
+          (attachment) =>
+            attachment.preview === item.src || attachment.url === item.src
+        )
     );
+    if (selected.length === 0) return;
+    if (
+      selected.some((item) => isLocalChatMediaUrl(item.src)) &&
+      !session?.user
+    ) {
+      toast.error(m['landing.hero.sign_in_to_upload']());
+      return;
+    }
+
+    const created: PendingAttachment[] = selected.map((item) => ({
+      id: newAttachmentId(),
+      name: item.name || 'video',
+      kind: 'video',
+      preview: item.src,
+      ...(isLocalChatMediaUrl(item.src) ? {} : { url: item.src }),
+      status: isLocalChatMediaUrl(item.src) ? 'uploading' : 'uploaded',
+    }));
+    setAttachments((previous) => [...previous, ...created]);
+
+    try {
+      const urls = await publishChatMediaSources(
+        selected.map((item) => ({ src: item.src, name: item.name }))
+      );
+      setAttachments((current) =>
+        current.map((item) => {
+          const index = created.findIndex(
+            (createdItem) => createdItem.id === item.id
+          );
+          return index >= 0 && urls[index]
+            ? { ...item, url: urls[index], status: 'uploaded' }
+            : item;
+        })
+      );
+    } catch (error) {
+      const message = (error as Error).message || 'Upload failed';
+      toast.error(message);
+      const ids = new Set(
+        created
+          .filter((item) => item.status === 'uploading')
+          .map((item) => item.id)
+      );
+      setAttachments((current) =>
+        current.map((item) =>
+          ids.has(item.id) ? { ...item, status: 'error', error: message } : item
+        )
+      );
+    }
   }
 
   function removeAttachment(id: string) {
@@ -170,12 +382,12 @@ export function PromptLauncher({ className }: { className?: string }) {
 
   return (
     <div className={cn('w-full', className)}>
-      <h1 className="text-foreground text-center font-serif text-3xl font-normal tracking-[-0.01em] sm:text-4xl">
+      <h1 className="text-foreground mx-auto max-w-3xl text-center font-serif text-3xl font-normal tracking-[-0.01em] sm:text-4xl">
         {m['landing.hero.headline_1']()}
       </h1>
 
       <ChatComposer
-        className="mt-10"
+        className="mx-auto mt-10 max-w-3xl"
         textareaRef={textareaRef}
         value={value}
         onValueChange={setValue}
@@ -183,89 +395,99 @@ export function PromptLauncher({ className }: { className?: string }) {
         placeholder={m['agent.home.placeholder']()}
         attachments={attachments}
         onAddFiles={(files) => void addFiles(files)}
+        onAddLibraryMedia={(media) => void addLibraryMedia(media)}
         onRemoveAttachment={removeAttachment}
         settings={composerSettings}
         onSettingsChange={setComposerSettings}
         disabled={submitting}
         submitDisabled={(!value.trim() && !hasUploaded) || uploading}
-        toolbarExtra={
-          category && (
-            <span className="border-primary/30 bg-primary/10 text-primary inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-3 text-xs">
-              <category.icon className="size-3.5" />
-              <span className="max-w-[10rem] truncate">{category.title}</span>
-              <button
-                type="button"
-                onClick={() => setCategoryKey(null)}
-                aria-label={m['landing.examples.clear']()}
-                className="hover:text-primary/70"
-              >
-                <X className="size-3" />
-              </button>
-            </span>
-          )
-        }
       />
 
-      <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
-        {categories.map((item) => {
-          const active = item.key === categoryKey;
-          return (
-            <button
-              key={item.key}
-              type="button"
-              onClick={() => setCategoryKey(active ? null : item.key)}
-              aria-pressed={active}
-              className={cn(
-                'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs transition-colors',
-                active
-                  ? 'border-primary/40 bg-primary/10 text-primary'
-                  : 'border-border text-muted-foreground hover:border-primary/40 hover:bg-primary/5 hover:text-foreground'
-              )}
-            >
-              <item.icon className="size-3.5" />
-              {item.title}
-            </button>
-          );
-        })}
-      </div>
-
-      {category && (
-        <div className="mt-6">
-          <p className="text-muted-foreground mb-3 text-sm font-medium">
-            {m['landing.examples.recommended']()}
-          </p>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {category.examples.map((example) => (
+      <section className="mx-auto mt-14 max-w-3xl">
+        <h2 className="text-foreground text-sm font-medium">
+          {m['landing.examples.recommended']()}
+        </h2>
+        <div className="mt-4 columns-2 gap-2 sm:columns-3 lg:columns-4">
+          {examples.map((example, index) => {
+            return (
               <button
                 key={example.key}
                 type="button"
-                onClick={() => applyExample(example)}
+                onClick={() => setPreviewIndex(index)}
                 title={example.prompt}
-                className="group text-left"
+                aria-label={example.title}
+                className="border-border bg-muted group focus-visible:ring-primary relative mb-2 block w-full break-inside-avoid overflow-hidden rounded-lg border text-left focus-visible:ring-2 focus-visible:outline-none focus-visible:ring-inset"
+                style={{
+                  aspectRatio:
+                    EXAMPLE_ASPECT_RATIOS[index % EXAMPLE_ASPECT_RATIOS.length],
+                }}
               >
-                <span
-                  className={cn(
-                    'border-border block aspect-square w-full overflow-hidden rounded-md border bg-gradient-to-br transition-shadow group-hover:shadow-md',
-                    !example.image && example.swatch
-                  )}
-                >
-                  {example.image && (
-                    <img
-                      src={example.image}
-                      alt={example.title}
-                      loading="lazy"
-                      className="size-full object-cover"
-                    />
-                  )}
+                {example.video && (
+                  <ViewportVideo
+                    src={example.video}
+                    className="size-full object-cover transition-transform duration-500 group-hover:scale-[1.025]"
+                  />
+                )}
+                <span className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/5 opacity-20 transition-opacity group-hover:opacity-70" />
+                <span className="pointer-events-none absolute top-1/2 left-1/2 flex size-10 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/20 bg-black/40 text-white opacity-0 shadow-lg backdrop-blur-md transition group-hover:scale-105 group-hover:opacity-100 group-focus-visible:opacity-100">
+                  <Play className="ml-0.5 size-3.5 fill-current" />
                 </span>
-                <span className="text-muted-foreground group-hover:text-foreground mt-2 block truncate text-sm transition-colors">
+                <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 to-transparent px-3 pt-8 pb-3 text-xs font-medium text-white opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
                   {example.title}
                 </span>
               </button>
-            ))}
-          </div>
+            );
+          })}
         </div>
-      )}
+      </section>
+
+      <VideoPreviewDialog
+        open={preview !== null}
+        item={
+          preview?.video
+            ? {
+                src: preview.video,
+                title: preview.title,
+                prompt: preview.prompt,
+              }
+            : null
+        }
+        index={previewIndex ?? -1}
+        total={examples.length}
+        labels={{
+          video: m['showcase.dialog.video'](),
+          prompt: m['showcase.dialog.prompt'](),
+          download: m['showcase.dialog.download'](),
+          previous: m['showcase.dialog.previous'](),
+          next: m['showcase.dialog.next'](),
+          close: m['showcase.dialog.close'](),
+        }}
+        downloadHref={preview?.video ?? '#'}
+        onClose={() => setPreviewIndex(null)}
+        onNavigate={navigatePreview}
+        actions={
+          preview ? (
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
+              <button
+                type="button"
+                onClick={usePreviewPrompt}
+                className="bg-primary text-primary-foreground focus-visible:ring-primary flex h-11 w-full items-center justify-center gap-2 rounded-xl px-4 text-sm font-medium transition-colors hover:opacity-90 focus-visible:ring-2 focus-visible:outline-none"
+              >
+                <WandSparkles className="size-4" />
+                {m['showcase.dialog.use_prompt']()}
+              </button>
+              <button
+                type="button"
+                onClick={usePreviewAsReference}
+                className="focus-visible:ring-primary flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-white/12 bg-white/5 px-4 text-sm font-medium text-white transition-colors hover:bg-white/10 focus-visible:ring-2 focus-visible:outline-none"
+              >
+                <FileVideo2 className="size-4" />
+                {m['showcase.dialog.use_reference']()}
+              </button>
+            </div>
+          ) : null
+        }
+      />
     </div>
   );
 }

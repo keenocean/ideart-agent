@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState, type MouseEvent } from 'react';
-import { Download, ExternalLink, ImageIcon, X } from 'lucide-react';
+import { Download, ExternalLink, Film, Play, X } from 'lucide-react';
 
+import { isVideoUrl } from '@/lib/media';
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
 import {
   usePreviewPane,
-  type PreviewImage,
+  type PreviewMedia,
 } from '@/components/agent/preview-pane-context';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { useSidebar } from '@/components/ui/sidebar';
@@ -45,7 +46,7 @@ function clampPaneWidth(next: number) {
 }
 
 export function PreviewPane() {
-  const { open, setOpen, image, images, openImage } = usePreviewPane();
+  const { open, setOpen, image, images, openMedia } = usePreviewPane();
   const { open: sidebarOpen, setOpen: setSidebarOpen } = useSidebar();
   const [width, setWidth] = useState(620);
   // Only re-open the sidebar if we're the ones who closed it.
@@ -188,11 +189,14 @@ export function PreviewPane() {
               {/* Centred both ways: a short image shouldn't hug the top of a
                   tall pane. */}
               <div className="flex min-h-full items-center justify-center">
-                <PreviewImageElement
+                <PreviewMediaElement
                   src={current.src}
                   alt={
-                    current.alt || current.name || m['agent.preview.image']()
+                    current.alt || current.name || m['agent.preview.media']()
                   }
+                  // The big view is where a clip is actually watched, so it
+                  // gets full controls; the strip below stays silent.
+                  controls
                   className="max-h-none max-w-full rounded-lg border object-contain shadow-sm"
                 />
               </div>
@@ -201,7 +205,7 @@ export function PreviewPane() {
               <FilmStrip
                 images={images}
                 current={current}
-                onSelect={openImage}
+                onSelect={openMedia}
               />
             )}
           </div>
@@ -216,17 +220,17 @@ export function PreviewPane() {
 }
 
 /**
- * Every image in the conversation, oldest first — uploads and results alike.
- * Clicking one swaps the large view above it.
+ * Everything in the conversation, oldest first — uploaded stills and
+ * generated clips alike. Clicking one swaps the large view above it.
  */
 function FilmStrip({
   images,
   current,
   onSelect,
 }: {
-  images: PreviewImage[];
-  current: PreviewImage;
-  onSelect: (image: PreviewImage) => void;
+  images: PreviewMedia[];
+  current: PreviewMedia;
+  onSelect: (image: PreviewMedia) => void;
 }) {
   return (
     <div className="shrink-0 overflow-x-auto px-4 py-3">
@@ -238,20 +242,27 @@ function FilmStrip({
               key={item.src}
               type="button"
               onClick={() => onSelect(item)}
-              title={item.name || item.alt || m['agent.preview.image']()}
+              title={item.name || item.alt || m['agent.preview.media']()}
               aria-current={selected ? 'true' : undefined}
               className={cn(
-                'bg-muted size-16 shrink-0 overflow-hidden rounded-md border-2 transition-colors',
+                'bg-muted relative size-16 shrink-0 overflow-hidden rounded-md border-2 transition-colors',
                 selected
                   ? 'border-primary'
                   : 'hover:border-border border-transparent'
               )}
             >
-              <PreviewImageElement
+              <PreviewMediaElement
                 src={item.src}
-                alt={item.alt || item.name || m['agent.preview.image']()}
+                alt={item.alt || item.name || m['agent.preview.media']()}
                 className="size-full object-cover"
               />
+              {isVideoUrl(item.src) && (
+                // A paused first frame is indistinguishable from a still, so
+                // the strip says which entries are clips.
+                <span className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/25">
+                  <Play className="size-4 fill-white text-white" />
+                </span>
+              )}
             </button>
           );
         })}
@@ -264,7 +275,7 @@ function EmptyPreview() {
   return (
     <div className="flex h-full flex-col items-center justify-center px-6 text-center">
       <div className="border-border bg-muted/40 flex size-12 items-center justify-center rounded-lg border">
-        <ImageIcon className="text-muted-foreground size-5" />
+        <Film className="text-muted-foreground size-5" />
       </div>
       <p className="mt-3 text-sm font-medium">
         {m['agent.preview.empty_title']()}
@@ -276,14 +287,35 @@ function EmptyPreview() {
   );
 }
 
-function PreviewImageElement({
+/**
+ * `controls` is only honoured for clips — the strip renders the same element
+ * at thumbnail size, where a control bar would be unreadable, and a still
+ * never has one.
+ */
+function PreviewMediaElement({
   src,
   alt,
   className,
+  controls,
 }: {
   src: string;
   alt: string;
   className?: string;
+  controls?: boolean;
 }) {
+  if (isVideoUrl(src)) {
+    return (
+      <video
+        src={src}
+        aria-label={alt || undefined}
+        controls={controls}
+        playsInline
+        // metadata only: the strip can hold a dozen clips and preloading all
+        // of them would pull tens of megabytes for a pane nobody scrolled to.
+        preload="metadata"
+        className={className}
+      />
+    );
+  }
   return <img src={src} alt={alt} className={className} />;
 }

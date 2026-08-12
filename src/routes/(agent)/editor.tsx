@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { createFileRoute } from '@tanstack/react-router';
-import { Sparkles, Upload, Wand2 } from 'lucide-react';
+import { Film, Sparkles, Upload } from 'lucide-react';
 
 import { AGENT_MODEL_OPTIONS } from '@/lib/agent-settings';
 import { m } from '@/paraglide/messages.js';
@@ -47,10 +47,12 @@ function EditorPage() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[1fr_380px]">
-        {/* Canvas */}
+        {/* Opening frame */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Canvas</CardTitle>
+            <CardTitle className="text-base">
+              {m['agent.editor.frame_title']()}
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <label
@@ -110,7 +112,7 @@ function EditorPage() {
             />
 
             <Button className="w-full gap-2" disabled={!prompt.trim()}>
-              <Wand2 className="size-4" />
+              <Film className="size-4" />
               {m['agent.editor.submit']()}
             </Button>
           </CardContent>

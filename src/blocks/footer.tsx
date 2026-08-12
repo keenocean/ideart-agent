@@ -19,6 +19,8 @@ export function Footer() {
     {
       title: m['landing.footer.products'](),
       links: [
+        // Sibling products, not this one — a footer that links to the site
+        // you are already on is just noise.
         { label: 'ShipAny', href: 'https://shipany.ai' },
         { label: 'ImgAny', href: 'https://imgany.ai' },
       ],

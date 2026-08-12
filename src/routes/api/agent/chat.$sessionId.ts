@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
 
 import { getAuth } from '@/core/auth';
+import { getActiveTasksForSession } from '@/modules/ai-tasks/service';
 import {
   deleteChat,
   getChatWithMessages,
@@ -20,11 +21,27 @@ async function GET({ request, params }: Ctx) {
   const user = await requireUser(request);
   if (!user) return respErr('Unauthorized');
 
-  const detail = await getChatWithMessages(params.sessionId, user.id);
+  const [detail, activeTasks] = await Promise.all([
+    getChatWithMessages(params.sessionId, user.id),
+    getActiveTasksForSession({
+      userId: user.id,
+      sessionId: params.sessionId,
+    }),
+  ]);
   if (!detail) {
     // Fresh session that hasn't been persisted yet — let the UI start blank.
-    return respData({ chat: null, messages: [] });
+    return respData({
+      chat: null,
+      messages: [],
+      run: { active: activeTasks.length > 0 },
+    });
   }
+
+  const interruptedResult = JSON.stringify({
+    status: 'interrupted',
+    message: 'Generation was interrupted before a final result was recorded.',
+  });
+  const hasActiveRun = activeTasks.length > 0;
 
   return respData({
     chat: {
@@ -35,9 +52,18 @@ async function GET({ request, params }: Ctx) {
     messages: detail.messages.map((m) => ({
       id: m.id,
       role: m.role,
-      parts: m.parts,
+      parts: hasActiveRun
+        ? m.parts
+        : m.parts.map((part) =>
+            part.type === 'tool_call' &&
+            part.result === undefined &&
+            (part.name === 'generate_video' || part.name === 'animate_image')
+              ? { ...part, result: interruptedResult }
+              : part
+          ),
       createdAt: m.createdAt.toISOString(),
     })),
+    run: { active: hasActiveRun },
   });
 }
 

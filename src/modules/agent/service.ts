@@ -10,14 +10,14 @@ import {
 import { loadAgentHistory } from './history';
 import { createAgentTools } from './tools';
 
-// In-process agent runtime for the ImgAny chat, replacing the remote
+// In-process runtime for the Video Agent chat, replacing the remote
 // FastClaw runtime the Next.js version proxied to. Each request creates a
 // fresh Agent seeded with the conversation replayed from the database, runs
 // one turn, and emits the same event shapes the old runtime streamed:
 // content / tool_call / tool_result / error / done.
 //
 // Nothing here touches a filesystem: history comes from `chat_message` and
-// generated images go to object storage, so the whole runtime works on
+// generated clips go to object storage, so the whole runtime works on
 // Cloudflare Workers.
 
 export interface AgentStreamEvent {
@@ -25,15 +25,21 @@ export interface AgentStreamEvent {
   data?: Record<string, unknown>;
 }
 
-const SYSTEM_PROMPT = `You are ImgAny, an image-generation agent. You help users create and edit images through conversation.
+const SYSTEM_PROMPT = `You are Video Agent, an AI video-generation assistant. You help users create video clips through conversation.
 
 Rules:
-- Understand the user's intent, then call generate_image (text-to-image) or edit_image (when the user refers to an existing image or provides one).
-- When the user message includes "Attached images", use those URLs as source images for edit_image if the request asks to transform, restyle, repair, remove, replace, extend, or otherwise modify an image.
-- Write image prompts in English, enriching the user's request with useful visual detail (style, lighting, composition), but never changing their intent.
+- Understand the user's intent, then call generate_video (text-to-video) or animate_image (when the user provides a still image to bring to life, or refers to one already in the conversation).
+- "Attached media" lists what the user supplied, not how it must be used. You decide the correct tool parameters from the user's words and the conversation; do not ask them to classify uploads as frames or references when their intent is reasonably inferable.
+- For an attached image: use animate_image when the user asks to animate it, make it move, or explicitly calls images the first/opening and last/ending frames. Preserve attachment order when passing multiple images. Use generate_video reference_images when the image is described as visual, character, object, composition, or style guidance instead of a frame.
+- Pass attached audio and video to generate_video as reference_audios and reference_videos when they should guide sound, rhythm, motion, subject, or visual direction.
+- Legacy messages may use "Attached frames", "Attached images", or parameter-specific reference headings; honor those explicit roles.
+- Write video prompts in English, enriching the user's request with useful cinematic detail — subject, action, camera movement, lens, lighting, pacing and mood — but never changing their intent.
+- A clip is one shot, not a montage. If the user describes a sequence, either pick the strongest single shot or generate the shots one at a time, saying which is which.
 - Reply to the user in the language they used.
-- After a tool returns generated files, ALWAYS embed each one in your reply as a markdown image using the returned URL: ![description](<url>).
-- If a tool returns an error, explain it briefly and suggest what the user can do (e.g. top up credits, try a simpler prompt). Never invent image paths.`;
+- Rendering takes a few minutes. Call the tool once and wait for it; never retry a call that has not returned yet.
+- The only valid model keys are minimax-h3 and seedance-2-5. Leave the model argument empty unless the user explicitly asks to switch.
+- After a tool returns generated files, the chat already shows the clip with a player. Reference it as a markdown link, e.g. [clip](<url>), and never paste the raw URL as plain text or embed it as a markdown image.
+- If a tool returns an error, explain it briefly and suggest what the user can do (e.g. top up credits, shorten the clip, try a simpler prompt). Never invent file paths.`;
 
 export interface RunAgentTurnParams {
   sessionId: string;
@@ -236,7 +242,12 @@ function withGenerationSettings(
   message: string,
   settings: AgentGenerationSettings | undefined
 ) {
-  if (!settings?.modelName && !settings?.aspectRatio && !settings?.resolution)
+  if (
+    !settings?.modelName &&
+    !settings?.aspectRatio &&
+    !settings?.resolution &&
+    !settings?.duration
+  )
     return message;
   const lines = [
     '',
@@ -244,16 +255,19 @@ function withGenerationSettings(
     // The tools resolve this name to whatever id the active provider uses —
     // the agent should pass the name through, not invent a provider id.
     settings.modelName
-      ? `- The user picked the "${settings.modelName}" image model. Leave the \`model\` argument of generate_image/edit_image empty so it is used, unless the user explicitly asks for a different model.`
+      ? `- The user picked the "${settings.modelName}" video model. Leave the \`model\` argument of generate_video/animate_image empty so it is used, unless the user explicitly asks for a different model.`
       : '',
     settings.aspectRatio
-      ? `- Use aspect_ratio "${settings.aspectRatio}" when calling generate_image or edit_image unless the user explicitly asks for a different aspect ratio.`
+      ? `- Use aspect_ratio "${settings.aspectRatio}" when calling generate_video or animate_image unless the user explicitly asks for a different aspect ratio.`
+      : '',
+    settings.duration
+      ? `- Generate ${settings.duration}-second clips unless the user explicitly asks for a different length.`
       : '',
     settings.resolution
-      ? `- Target ${settings.resolution.toUpperCase()} output quality. If the selected image model supports a resolution/quality parameter, use it; otherwise incorporate "${settings.resolution.toUpperCase()} high-resolution, sharp detail" into the image prompt.`
+      ? `- Target ${settings.resolution} output. If the selected video model supports a resolution parameter, use it; otherwise incorporate "${settings.resolution}, sharp detail, clean motion" into the video prompt.`
       : '',
     settings.creditCost
-      ? `- The selected image model costs ${settings.creditCost} credits per generation.`
+      ? `- The selected model costs ${settings.creditCost} credits for a clip of this length.`
       : '',
   ].filter(Boolean);
   return `${message}\n\n${lines.join('\n')}`;

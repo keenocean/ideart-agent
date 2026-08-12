@@ -1,15 +1,9 @@
-import { Cpu, GitBranch, MessageSquare, Network } from 'lucide-react';
+import { ArrowRight, Cpu, Film, Layers, MessageSquare } from 'lucide-react';
 
 import { m } from '@/paraglide/messages.js';
 
 export function Features() {
-  const models = [
-    m['landing.models.item_1'](),
-    m['landing.models.item_2'](),
-    m['landing.models.item_3'](),
-    m['landing.models.item_4'](),
-    m['landing.models.item_5'](),
-  ];
+  const models = [m['landing.models.item_1'](), m['landing.models.item_2']()];
 
   return (
     <section id="features" className="px-4 py-20 sm:py-24">
@@ -44,18 +38,19 @@ export function Features() {
             {/* Mock chat bubbles */}
             <div className="border-border bg-background/60 mt-6 space-y-2 rounded-lg border p-3">
               <div className="bg-primary/10 text-foreground ml-auto inline-block max-w-[85%] rounded-md rounded-tr-sm px-3 py-2 text-xs">
-                Make the sky a sunset and add a soft glow
+                Slow drone push over the cliff at golden hour
               </div>
               <div className="bg-secondary text-muted-foreground block max-w-[85%] rounded-md rounded-tl-sm px-3 py-2 text-xs">
-                Done — generated 1 variation in 4.1s. Want it warmer?
+                Rendered a 5s clip on MiniMax H3. Want it longer, or a tighter
+                framing?
               </div>
             </div>
           </div>
 
-          {/* Infinite Canvas */}
+          {/* Stills become motion */}
           <div className="group border-border bg-card relative overflow-hidden rounded-lg border p-7">
             <div className="bg-primary/10 text-primary flex size-11 items-center justify-center rounded-md">
-              <Network className="size-5" />
+              <Layers className="size-5" />
             </div>
             <h3 className="mt-5 text-xl font-semibold tracking-tight">
               {m['landing.features.canvas_title']()}
@@ -64,16 +59,18 @@ export function Features() {
               {m['landing.features.canvas_description']()}
             </p>
 
-            {/* Mock node graph */}
-            <div className="border-border bg-background/60 mt-6 grid grid-cols-3 items-center gap-3 rounded-lg border p-4">
-              <div className="border-border bg-card text-muted-foreground rounded-lg border p-3 text-center text-[10px] font-medium">
-                Source
+            {/* Still → motion */}
+            <div className="border-border bg-background/60 mt-6 flex items-center gap-3 rounded-lg border p-4">
+              <div className="border-border bg-card text-muted-foreground flex-1 rounded-lg border p-3 text-center text-[10px] font-medium">
+                Your photo
               </div>
-              <div className="border-primary/40 bg-primary/10 text-primary rounded-lg border p-3 text-center text-[10px] font-medium">
-                Style: Pixar
+              <ArrowRight className="text-muted-foreground/60 size-4 shrink-0" />
+              <div className="border-border bg-card text-muted-foreground flex-1 rounded-lg border p-3 text-center text-[10px] font-medium">
+                Opening frame
               </div>
-              <div className="border-border bg-card text-muted-foreground rounded-lg border p-3 text-center text-[10px] font-medium">
-                v3
+              <ArrowRight className="text-muted-foreground/60 size-4 shrink-0" />
+              <div className="border-primary/40 bg-primary/10 text-primary flex-1 rounded-lg border p-3 text-center text-[10px] font-medium">
+                5s clip
               </div>
             </div>
           </div>
@@ -95,7 +92,7 @@ export function Features() {
               {m['landing.features.multimodel_desc']()}
             </p>
 
-            <div className="mt-6 grid grid-cols-3 gap-3 sm:grid-cols-4">
+            <div className="mt-6 grid grid-cols-2 gap-3">
               {models.map((name) => (
                 <div
                   key={name}
@@ -104,15 +101,12 @@ export function Features() {
                   {name}
                 </div>
               ))}
-              <div className="border-border bg-background/40 text-muted-foreground rounded-md border border-dashed px-3 py-3 text-center text-xs font-medium">
-                + more
-              </div>
             </div>
           </div>
 
           <div className="border-border bg-card relative overflow-hidden rounded-lg border p-7">
             <div className="bg-primary/10 text-primary flex size-11 items-center justify-center rounded-md">
-              <GitBranch className="size-5" />
+              <Film className="size-5" />
             </div>
             <h3 className="mt-5 text-xl font-semibold tracking-tight">
               {m['landing.features.version_title']()}
@@ -121,13 +115,13 @@ export function Features() {
               {m['landing.features.version_description']()}
             </p>
 
-            {/* Version timeline */}
+            {/* Take history */}
             <ol className="mt-6 space-y-2">
               {[
-                'Original',
-                'v1 · style transfer',
-                'v2 · color grade',
-                'v3 · final',
+                'Take 1 · wide',
+                'Take 2 · slower push',
+                'Take 3 · 9:16',
+                'Take 4 · final',
               ].map((label, i) => (
                 <li
                   key={label}

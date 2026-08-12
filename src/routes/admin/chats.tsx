@@ -4,6 +4,7 @@ import { createFileRoute } from '@tanstack/react-router';
 import { ExternalLink } from 'lucide-react';
 
 import { apiGet, pageQuery, type PageResult } from '@/lib/api-client';
+import { isVideoUrl } from '@/lib/media';
 import { formatDateTime } from '@/lib/time';
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
@@ -60,15 +61,25 @@ function ChatsPage() {
             <button
               type="button"
               onClick={() => setZoom(row.cover)}
-              title={m['agent.preview.open_image']()}
+              title={m['agent.preview.open_video']()}
               className="bg-muted size-9 shrink-0 cursor-zoom-in overflow-hidden rounded-md"
             >
-              <img
-                src={row.cover}
-                alt=""
-                loading="lazy"
-                className="size-full object-cover"
-              />
+              {isVideoUrl(row.cover) ? (
+                <video
+                  src={row.cover}
+                  muted
+                  playsInline
+                  preload="metadata"
+                  className="pointer-events-none size-full object-cover"
+                />
+              ) : (
+                <img
+                  src={row.cover}
+                  alt=""
+                  loading="lazy"
+                  className="size-full object-cover"
+                />
+              )}
             </button>
           )}
           <span className="block max-w-[320px] truncate font-medium">
@@ -159,15 +170,24 @@ function ChatsPage() {
       <Dialog open={!!zoom} onOpenChange={(open) => !open && setZoom(null)}>
         <DialogContent className="max-h-[90dvh] overflow-auto p-2 sm:max-w-3xl">
           <DialogTitle className="sr-only">
-            {m['agent.preview.image']()}
+            {m['agent.preview.media']()}
           </DialogTitle>
-          {zoom && (
-            <img
-              src={zoom}
-              alt=""
-              className="h-auto w-full rounded-md object-contain"
-            />
-          )}
+          {zoom &&
+            (isVideoUrl(zoom) ? (
+              <video
+                src={zoom}
+                controls
+                playsInline
+                preload="metadata"
+                className="h-auto w-full rounded-md"
+              />
+            ) : (
+              <img
+                src={zoom}
+                alt=""
+                className="h-auto w-full rounded-md object-contain"
+              />
+            ))}
         </DialogContent>
       </Dialog>
     </div>

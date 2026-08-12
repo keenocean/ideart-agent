@@ -3,8 +3,8 @@ import { Check, ChevronDown } from 'lucide-react';
 import {
   AGENT_MODEL_OPTIONS,
   labelForModelOption,
+  settingsForModel,
   type AgentComposerSettings,
-  type AgentModelOptionValue,
 } from '@/lib/agent-settings';
 import { m } from '@/paraglide/messages.js';
 import { ModelLogo } from '@/components/agent/model-logos';
@@ -25,10 +25,6 @@ export function ComposerControls({
   onChange: (settings: AgentComposerSettings) => void;
   disabled?: boolean;
 }) {
-  function update(patch: Partial<AgentComposerSettings>) {
-    onChange({ ...settings, ...patch });
-  }
-
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
@@ -50,14 +46,12 @@ export function ComposerControls({
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-60">
         <div className="text-muted-foreground px-2 py-1.5 text-xs">
-          {m['agent.composer.image_models']()}
+          {m['agent.composer.video_models']()}
         </div>
         {AGENT_MODEL_OPTIONS.map((model) => (
           <DropdownMenuItem
             key={model.value}
-            onClick={() =>
-              update({ modelOption: model.value as AgentModelOptionValue })
-            }
+            onClick={() => onChange(settingsForModel(settings, model.value))}
             className="items-center gap-2.5"
           >
             <ModelLogo model={model.value} className="size-4 shrink-0" />

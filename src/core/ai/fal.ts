@@ -301,6 +301,32 @@ export class FalProvider implements AIProvider {
     };
   }
 
+  async cancel({
+    taskId,
+    model,
+  }: {
+    taskId: string;
+    mediaType?: string;
+    model?: string;
+  }): Promise<void> {
+    const queryModel = this.getQueryModel(model);
+    const response = await fetch(
+      `${this.baseUrl}/${queryModel}/requests/${encodeURIComponent(taskId)}/cancel`,
+      {
+        method: 'PUT',
+        headers: { Authorization: `Key ${this.configs.apiKey}` },
+      }
+    );
+    // A completed or missing request no longer needs cancellation. Treat both
+    // as a successful best-effort stop instead of obscuring the user action.
+    if (!response.ok && response.status !== 400 && response.status !== 404) {
+      const text = await response.text().catch(() => '');
+      throw new Error(
+        `Fal cancel (${queryModel}) failed with status ${response.status}: ${text.slice(0, 300)}`
+      );
+    }
+  }
+
   private mapStatus(status: string): AITaskStatus {
     switch (status) {
       case 'IN_QUEUE':
@@ -317,14 +343,10 @@ export class FalProvider implements AIProvider {
   }
 
   private getQueryModel(model?: string): string {
-    if (!model) {
-      return '';
-    }
-    const parts = model.split('/');
-    if (parts.length <= 2) {
-      return model;
-    }
-    return `${parts[0]}/${parts[1]}`;
+    // Queue URLs use the full endpoint id. Video endpoints commonly have
+    // nested paths (for example `.../pro/text-to-video`); truncating those
+    // submits successfully but makes every status poll hit the wrong route.
+    return model || '';
   }
 
   private formatInput({
@@ -362,6 +384,14 @@ export class FalProvider implements AIProvider {
     if (options.video_input && Array.isArray(options.video_input)) {
       input.video_url = options.video_input[0];
       delete input.video_input;
+    }
+
+    // fal's video endpoints take the clip length as a string of seconds;
+    // the Veo family spells it with the unit ("8s").
+    if (mediaType === AIMediaType.VIDEO && options.duration !== undefined) {
+      input.duration = model.includes('/veo')
+        ? `${options.duration}s`
+        : String(options.duration);
     }
 
     return input;

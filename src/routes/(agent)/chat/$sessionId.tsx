@@ -1,11 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createFileRoute } from '@tanstack/react-router';
 import { ArrowDown } from 'lucide-react';
+import { toast } from 'sonner';
 
 import { useRouter } from '@/core/i18n/navigation';
 import {
+  isLocalChatMediaUrl,
+  mediaTypeForFile,
   newAttachmentId,
-  uploadChatImage,
+  publishChatMediaSources,
+  uploadChatMedia,
   type PendingAttachment,
 } from '@/lib/agent';
 import {
@@ -19,6 +23,7 @@ import {
   hasRun,
   seedRun,
   startRun,
+  stopRun,
   useAgentRun,
 } from '@/lib/agent-runs';
 import {
@@ -26,16 +31,19 @@ import {
   resolveGenerationSettings,
   type AgentGenerationSettings,
 } from '@/lib/agent-settings';
-import { apiGet, apiPatch } from '@/lib/api-client';
+import { apiGet, apiPatch, apiPost } from '@/lib/api-client';
+import { mediaNameFromUrl } from '@/lib/media';
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
 import { useComposerSettings } from '@/hooks/use-composer-settings';
 import { useAgentHeader } from '@/components/agent/agent-header-context';
-import { ChatComposer } from '@/components/agent/chat-composer';
+import {
+  ChatComposer,
+  type LibraryMedia,
+} from '@/components/agent/chat-composer';
 import { ChatShareMenu } from '@/components/agent/chat-share-menu';
 import {
   ChatTranscript,
-  imageNameFromUrl,
   useTranscriptImages,
 } from '@/components/agent/chat-transcript';
 import { notifyChatsChanged } from '@/components/agent/chats-sidebar';
@@ -72,9 +80,9 @@ function ChatSessionPage() {
   const { setContent: setHeaderContent } = useAgentHeader();
   const {
     setOpen: setPreviewOpen,
-    clearImage: clearPreviewImage,
+    clearMedia: clearPreviewImage,
     setImages: setPreviewImages,
-    openImage,
+    openMedia,
   } = usePreviewPane();
 
   const sessionLabel = sessionId.replace(/^s-/, '').slice(0, 12);
@@ -87,12 +95,26 @@ function ChatSessionPage() {
   // The transcript and its stream live in the run store, not in this
   // component — a turn keeps going when you switch chats or leave the page.
   const { messages, streaming } = useAgentRun(sessionId);
+  const [serverRunning, setServerRunning] = useState(false);
+  const pendingGeneration = useMemo(
+    () =>
+      messages.some(
+        (message) =>
+          message.role === 'tool-group' &&
+          message.tools.some(
+            (tool) =>
+              tool.result === undefined &&
+              (tool.name === 'generate_video' || tool.name === 'animate_image')
+          )
+      ),
+    [messages]
+  );
+  const generationRunning = streaming || serverRunning || pendingGeneration;
   const [value, setValue] = useState('');
   const [composerSettings, setComposerSettings] = useComposerSettings();
   const [attachments, setAttachments] = useState<PendingAttachment[]>([]);
   const attachmentsRef = useRef<PendingAttachment[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [atBottom, setAtBottom] = useState(true);
   const initialPromptHandled = useRef(false);
   const lastSessionId = useRef(sessionId);
@@ -198,6 +220,7 @@ function ChatSessionPage() {
           return;
         }
         if (data.chat.title) setTitle(data.chat.title);
+        setServerRunning(data.run?.active === true);
         const stored = data.messages ?? [];
         // Ignored while a turn is streaming — the live transcript is ahead of
         // what the server has persisted.
@@ -210,6 +233,32 @@ function ChatSessionPage() {
       cancelled = true;
     };
   }, [sessionId, router]);
+
+  // If the browser stream disappeared but the durable provider task is still
+  // alive, keep checking history. Completion/failure is then restored into
+  // the transcript instead of leaving an eternal "Executing…" row.
+  useEffect(() => {
+    if (streaming || (!serverRunning && !pendingGeneration)) return;
+    let cancelled = false;
+    const refresh = async () => {
+      try {
+        const data = await apiGet<ChatHistoryData>(
+          `/api/agent/chat/${encodeURIComponent(sessionId)}`
+        );
+        if (cancelled) return;
+        setServerRunning(data.run?.active === true);
+        const stored = data.messages ?? [];
+        if (stored.length > 0) seedRun(sessionId, storedToMessages(stored));
+      } catch {
+        // Keep the last known state; the next poll can recover.
+      }
+    };
+    const timer = window.setInterval(() => void refresh(), 5000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [sessionId, streaming, serverRunning, pendingGeneration]);
 
   const send = useCallback(
     (
@@ -233,6 +282,7 @@ function ChatSessionPage() {
           notifyChatsChanged();
         },
         onSettled: () => {
+          setServerRunning(false);
           // The title is derived from the first message and the chat bubbles
           // to the top on updatedAt; the balance moved if the turn generated
           // anything.
@@ -302,6 +352,7 @@ function ChatSessionPage() {
     if (hasUploading) return;
 
     const text = value;
+    if (!text.trim() && uploadedAttachments.length === 0) return;
     setValue('');
     setAttachments([]);
     send(
@@ -311,13 +362,35 @@ function ChatSessionPage() {
     );
   }
 
+  const handleStop = useCallback(() => {
+    // Resolve the current UI immediately, then ask the server to cancel the
+    // durable task as well. This path also works after reload when there is no
+    // browser AbortController left to abort.
+    stopRun(sessionId);
+    setServerRunning(false);
+    void apiPost(`/api/agent/chat/${encodeURIComponent(sessionId)}/stop`).then(
+      () => {
+        notifyChatsChanged();
+        notifyCreditsChanged();
+      },
+      (error: Error) => toast.error(error.message)
+    );
+  }, [sessionId]);
+
   async function handleFiles(files: File[]) {
-    const selected = files.filter((file) => file.type.startsWith('image/'));
+    const selected = files
+      .map((file) => ({ file, kind: mediaTypeForFile(file) }))
+      .filter(
+        (item): item is { file: File; kind: 'image' | 'audio' | 'video' } =>
+          item.kind !== null
+      )
+      .slice(0, 10);
     if (selected.length === 0) return;
 
-    const created = selected.map((file) => ({
+    const created = selected.map(({ file, kind }) => ({
       id: newAttachmentId(),
-      name: file.name || 'image',
+      name: file.name || 'media',
+      kind,
       preview: URL.createObjectURL(file),
       status: 'uploading' as const,
       file,
@@ -328,30 +401,80 @@ function ChatSessionPage() {
       ...created.map(({ file: _file, ...item }) => item),
     ]);
 
-    await Promise.all(
-      created.map(async (item) => {
-        try {
-          const url = await uploadChatImage(item.file);
-          setAttachments((prev) =>
-            prev.map((att) =>
-              att.id === item.id ? { ...att, url, status: 'uploaded' } : att
-            )
+    try {
+      const urls = await uploadChatMedia(created.map((item) => item.file));
+      setAttachments((prev) =>
+        prev.map((item) => {
+          const index = created.findIndex(
+            (createdItem) => createdItem.id === item.id
           );
-        } catch (err) {
-          setAttachments((prev) =>
-            prev.map((att) =>
-              att.id === item.id
-                ? {
-                    ...att,
-                    status: 'error',
-                    error: (err as Error).message || 'Upload failed',
-                  }
-                : att
-            )
-          );
-        }
-      })
+          return index >= 0 && urls[index]
+            ? { ...item, url: urls[index], status: 'uploaded' }
+            : item;
+        })
+      );
+    } catch (err) {
+      const error = (err as Error).message || 'Upload failed';
+      toast.error(error);
+      const createdIds = new Set(created.map((item) => item.id));
+      setAttachments((prev) =>
+        prev.map((item) =>
+          createdIds.has(item.id) ? { ...item, status: 'error', error } : item
+        )
+      );
+    }
+  }
+
+  async function addLibraryMedia(media: LibraryMedia[]) {
+    const selected = media.filter(
+      (item) =>
+        !attachments.some(
+          (attachment) =>
+            attachment.preview === item.src || attachment.url === item.src
+        )
     );
+    if (selected.length === 0) return;
+
+    const created: PendingAttachment[] = selected.map((item) => ({
+      id: newAttachmentId(),
+      name: item.name || 'video',
+      kind: 'video',
+      preview: item.src,
+      ...(isLocalChatMediaUrl(item.src) ? {} : { url: item.src }),
+      status: isLocalChatMediaUrl(item.src) ? 'uploading' : 'uploaded',
+    }));
+    setAttachments((previous) => [...previous, ...created]);
+
+    try {
+      const urls = await publishChatMediaSources(
+        selected.map((item) => ({ src: item.src, name: item.name }))
+      );
+      setAttachments((current) =>
+        current.map((item) => {
+          const index = created.findIndex(
+            (createdItem) => createdItem.id === item.id
+          );
+          return index >= 0 && urls[index]
+            ? { ...item, url: urls[index], status: 'uploaded' }
+            : item;
+        })
+      );
+    } catch (error) {
+      const message = (error as Error).message || 'Upload failed';
+      toast.error(message);
+      const localIds = new Set(
+        created
+          .filter((item) => item.status === 'uploading')
+          .map((item) => item.id)
+      );
+      setAttachments((current) =>
+        current.map((item) =>
+          localIds.has(item.id)
+            ? { ...item, status: 'error', error: message }
+            : item
+        )
+      );
+    }
   }
 
   function removeAttachment(id: string) {
@@ -399,7 +522,7 @@ function ChatSessionPage() {
       previewImages.map((img) => ({
         src: img.src,
         alt: img.alt,
-        name: imageNameFromUrl(img.src) || img.alt,
+        name: mediaNameFromUrl(img.src) || img.alt,
       }))
     );
   }, [previewImages, setPreviewImages]);
@@ -418,12 +541,12 @@ function ChatSessionPage() {
 
     const matched = previewImages.find((img) => img.src === search.preview);
     const src = matched?.src ?? search.preview;
-    openImage({
+    openMedia({
       src,
-      alt: search.previewAlt || matched?.alt || imageNameFromUrl(src),
+      alt: search.previewAlt || matched?.alt || mediaNameFromUrl(src),
       name:
         search.previewName ||
-        imageNameFromUrl(src) ||
+        mediaNameFromUrl(src) ||
         matched?.alt ||
         m['agent.preview.image'](),
     });
@@ -433,7 +556,7 @@ function ChatSessionPage() {
     search.previewName,
     sessionId,
     previewImages,
-    openImage,
+    openMedia,
   ]);
 
   return (
@@ -471,13 +594,16 @@ function ChatSessionPage() {
             value={value}
             onValueChange={setValue}
             onSubmit={handleSend}
+            onStop={handleStop}
             placeholder={m['agent.chat.placeholder']()}
             attachments={attachments}
             onAddFiles={(files) => void handleFiles(files)}
+            onAddLibraryMedia={(media) => void addLibraryMedia(media)}
             onRemoveAttachment={removeAttachment}
             settings={composerSettings}
             onSettingsChange={setComposerSettings}
-            disabled={streaming}
+            disabled={generationRunning}
+            running={generationRunning}
             submitDisabled={
               attachments.some((item) => item.status === 'uploading') ||
               (!value.trim() &&
