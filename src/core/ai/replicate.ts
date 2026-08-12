@@ -232,6 +232,10 @@ export class ReplicateProvider implements AIProvider {
     };
   }
 
+  async cancel({ taskId }: { taskId: string }): Promise<void> {
+    await this.client.predictions.cancel(taskId);
+  }
+
   private mapStatus(status: string): AITaskStatus {
     switch (status) {
       case 'starting':
@@ -280,6 +284,17 @@ export class ReplicateProvider implements AIProvider {
       } else if (['openai/sora-2'].includes(model)) {
         input.input_reference = options.image_input[0];
         delete input.image_input;
+      } else if (model.startsWith('kwaivgi/kling')) {
+        // Kling names the opening frame `start_image`.
+        input.start_image = options.image_input[0];
+        delete input.image_input;
+      } else if (
+        model.startsWith('bytedance/seedance') ||
+        model.startsWith('google/veo')
+      ) {
+        // Seedance and the Veo variants take a single first frame as `image`.
+        input.image = options.image_input[0];
+        delete input.image_input;
       } else if (model.startsWith('black-forest-labs/flux-kontext')) {
         input.input_image = options.image_input[0];
         delete input.image_input;
@@ -290,7 +305,22 @@ export class ReplicateProvider implements AIProvider {
       if (['openai/sora-2'].includes(model)) {
         input.seconds = Number(options.duration);
         delete input.duration;
+      } else if (mediaType === AIMediaType.VIDEO) {
+        input.duration = Number(options.duration);
       }
+    }
+
+    // Sora describes its frame as an orientation word rather than a ratio,
+    // and has no square option — a "1:1" request drops to the model default
+    // instead of being rejected upstream.
+    if (['openai/sora-2'].includes(model) && options.aspect_ratio) {
+      const orientation: Record<string, string> = {
+        '16:9': 'landscape',
+        '9:16': 'portrait',
+      };
+      const mapped = orientation[String(options.aspect_ratio)];
+      if (mapped) input.aspect_ratio = mapped;
+      else delete input.aspect_ratio;
     }
 
     return input;

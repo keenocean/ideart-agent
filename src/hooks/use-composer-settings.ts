@@ -3,12 +3,14 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   defaultComposerSettings,
   isAspectRatioValue,
+  isDurationValue,
   isModelOptionValue,
   isResolutionValue,
+  settingsForModel,
   type AgentComposerSettings,
 } from '@/lib/agent-settings';
 
-const STORAGE_KEY = 'image-agent:composer-settings';
+const STORAGE_KEY = 'video-agent:composer-settings';
 
 function readStored(): AgentComposerSettings | null {
   try {
@@ -18,9 +20,10 @@ function readStored(): AgentComposerSettings | null {
     // A model that's since been retired must not resurrect itself.
     if (!isModelOptionValue(parsed?.modelOption)) return null;
     const defaults = defaultComposerSettings();
-    // Same for an aspect ratio or resolution we no longer offer — otherwise
-    // the panel shows nothing selected and we keep sending a dead value.
-    return {
+    // Same for an aspect ratio, resolution or duration we no longer offer —
+    // otherwise the panel shows nothing selected and we keep sending a dead
+    // value. Duration matters most: it is what the render is priced on.
+    const candidate = {
       ...defaults,
       ...parsed,
       aspectRatio: isAspectRatioValue(parsed.aspectRatio)
@@ -29,14 +32,19 @@ function readStored(): AgentComposerSettings | null {
       resolution: isResolutionValue(parsed.resolution)
         ? parsed.resolution
         : defaults.resolution,
+      duration: isDurationValue(parsed.duration)
+        ? parsed.duration
+        : defaults.duration,
     } as AgentComposerSettings;
+    return settingsForModel(candidate, candidate.modelOption);
   } catch {
     return null;
   }
 }
 
 /**
- * Composer settings (model, aspect ratio, resolution) that outlive a reload.
+ * Composer settings (model, aspect ratio, resolution, duration) that outlive
+ * a reload.
  *
  * Starts from the defaults so server and client render the same markup, then
  * swaps in the stored choice right after mount.

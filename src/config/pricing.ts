@@ -37,9 +37,13 @@ export type PricingProduct = {
  * Keys MUST match what the pricing UI sends as product_id.
  */
 /**
- * Live catalog. Credits are priced at 200 per US dollar, and one GPT Image 2
- * render costs 50 — see AGENT_MODEL_OPTIONS for the per-model rates. Yearly
- * plans charge ten months and grant twelve months of credits.
+ * Live catalog. Credits are priced at 200 per US dollar, and a default 5-second
+ * MiniMax H3 clip costs 550 credits — see AGENT_MODEL_OPTIONS for the per-model
+ * rates. Yearly plans charge ten months and grant twelve months of credits.
+ *
+ * Video renders cost far more per unit than image renders: Lite's 2000 monthly
+ * credits buy three default MiniMax H3 clips. Re-check the tiers against the
+ * audience you are selling to before launch.
  */
 export const pricingCatalog: Record<string, PricingProduct> = {
   lite_monthly: {

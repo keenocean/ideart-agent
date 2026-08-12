@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
-import { ImageIcon } from 'lucide-react';
+import { Film, Play } from 'lucide-react';
 
 import { useRouter } from '@/core/i18n/navigation';
 import { labelForGeneratedModel } from '@/lib/agent-settings';
 import { apiGet } from '@/lib/api-client';
+import { isVideoUrl } from '@/lib/media';
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
 import { useAgentHeader } from '@/components/agent/agent-header-context';
@@ -35,7 +36,7 @@ interface LibraryData {
 function LibraryPage() {
   const router = useRouter();
   const { setContent: setHeaderContent } = useAgentHeader();
-  const { setOpen, clearImage, setImages } = usePreviewPane();
+  const { setOpen, clearMedia, setImages } = usePreviewPane();
   const libraryQuery = useInfiniteQuery({
     queryKey: ['agent-library'],
     initialPageParam: undefined as string | undefined,
@@ -60,13 +61,13 @@ function LibraryPage() {
 
   useEffect(() => {
     setOpen(false);
-    clearImage();
+    clearMedia();
     return () => {
       setImages([]);
-      clearImage();
+      clearMedia();
       setOpen(false);
     };
-  }, [clearImage, setImages, setOpen]);
+  }, [clearMedia, setImages, setOpen]);
 
   useEffect(() => {
     setImages(
@@ -78,7 +79,7 @@ function LibraryPage() {
     );
   }, [images, setImages]);
 
-  function openImage(image: LibraryImage) {
+  function openMedia(image: LibraryImage) {
     const params = new URLSearchParams({
       preview: image.src,
       previewName: image.name,
@@ -103,15 +104,25 @@ function LibraryPage() {
               <button
                 key={image.id}
                 type="button"
-                onClick={() => openImage(image)}
+                onClick={() => openMedia(image)}
                 className="group border-border bg-card hover:border-primary/50 min-w-0 overflow-hidden rounded-lg border text-left transition-colors"
               >
-                <div className="bg-muted aspect-square overflow-hidden">
-                  <LibraryImageThumb
+                {/* Clips are shot in 16:9 or 9:16 far more often than square,
+                    so the tile is a video frame rather than the image grid's
+                    square. */}
+                <div className="bg-muted relative aspect-video overflow-hidden">
+                  <LibraryMediaThumb
                     src={image.src}
                     alt={image.alt || image.name}
                     className="size-full object-cover transition-transform group-hover:scale-[1.02]"
                   />
+                  {isVideoUrl(image.src) && (
+                    <span className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/20 transition-colors group-hover:bg-black/10">
+                      <span className="flex size-9 items-center justify-center rounded-full bg-black/55 backdrop-blur">
+                        <Play className="size-4 fill-white text-white" />
+                      </span>
+                    </span>
+                  )}
                 </div>
                 <div className="min-w-0 px-3 py-2">
                   <p className="text-muted-foreground truncate text-xs">
@@ -150,7 +161,7 @@ function LibraryState({ text, muted }: { text: string; muted?: string }) {
   return (
     <div className="flex min-h-[320px] flex-col items-center justify-center px-6 text-center">
       <div className="border-border bg-muted/40 flex size-12 items-center justify-center rounded-lg border">
-        <ImageIcon className="text-muted-foreground size-5" />
+        <Film className="text-muted-foreground size-5" />
       </div>
       <p className="mt-3 text-sm font-medium">{text}</p>
       {muted && <p className="text-muted-foreground mt-1 text-xs">{muted}</p>}
@@ -158,7 +169,7 @@ function LibraryState({ text, muted }: { text: string; muted?: string }) {
   );
 }
 
-function LibraryImageThumb({
+function LibraryMediaThumb({
   src,
   alt,
   className,
@@ -167,5 +178,19 @@ function LibraryImageThumb({
   alt: string;
   className?: string;
 }) {
+  if (isVideoUrl(src)) {
+    // No controls and metadata-only: this is a poster frame in a grid that
+    // can hold a hundred clips, not a player. Playback happens in the chat.
+    return (
+      <video
+        src={src}
+        aria-label={alt || undefined}
+        muted
+        playsInline
+        preload="metadata"
+        className={className}
+      />
+    );
+  }
   return <img src={src} alt={alt} className={className} />;
 }

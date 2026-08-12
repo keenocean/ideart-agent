@@ -1,20 +1,22 @@
-import { ArrowRight, Sparkles } from 'lucide-react';
+import { ArrowRight, Play } from 'lucide-react';
 
 import { Link } from '@/core/i18n/navigation';
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
 import { buttonVariants } from '@/components/ui/button';
 
-// Subtle gradient palettes used as image placeholders for the first version
+// Logo-colour placeholders standing in for sample clips. Drop real posters
+// in when you have them — a still is a fair stand-in for a frame, but don't
+// pass one off as a video.
 const swatches = [
-  'from-rose-200 via-pink-200 to-orange-200',
-  'from-amber-200 via-yellow-200 to-lime-200',
-  'from-sky-200 via-indigo-200 to-violet-200',
-  'from-emerald-200 via-teal-200 to-cyan-200',
-  'from-fuchsia-200 via-purple-200 to-indigo-200',
-  'from-orange-200 via-rose-200 to-red-200',
-  'from-stone-200 via-amber-100 to-yellow-100',
-  'from-cyan-200 via-sky-200 to-blue-200',
+  'from-rose-200 via-pink-200 to-fuchsia-200',
+  'from-pink-200 via-rose-100 to-fuchsia-200',
+  'from-zinc-300 via-rose-200 to-pink-200',
+  'from-fuchsia-200 via-pink-200 to-rose-200',
+  'from-rose-100 via-pink-200 to-fuchsia-300',
+  'from-pink-200 via-fuchsia-200 to-violet-200',
+  'from-zinc-200 via-rose-100 to-fuchsia-100',
+  'from-rose-300 via-pink-200 to-zinc-200',
 ];
 
 export function Gallery() {
@@ -52,13 +54,17 @@ export function Gallery() {
             >
               <div
                 className={cn(
-                  'relative aspect-[4/5] w-full bg-gradient-to-br',
+                  'relative aspect-video w-full bg-gradient-to-br',
                   swatches[i % swatches.length]
                 )}
               >
-                <span className="bg-background/80 text-foreground absolute top-2 right-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium backdrop-blur">
-                  <Sparkles className="text-primary size-3" />
-                  AI
+                <span className="absolute inset-0 flex items-center justify-center">
+                  <span className="flex size-10 items-center justify-center rounded-full bg-black/40 backdrop-blur transition-transform group-hover:scale-110">
+                    <Play className="size-4 fill-white text-white" />
+                  </span>
+                </span>
+                <span className="bg-background/80 text-foreground absolute top-2 right-2 rounded-full px-2 py-0.5 text-[10px] font-medium backdrop-blur">
+                  5s
                 </span>
               </div>
               <div className="p-4">

@@ -2,9 +2,11 @@ import {
   AIConfigs,
   AIGenerateParams,
   AIImage,
+  AIMediaType,
   AIProvider,
   AITaskResult,
   AITaskStatus,
+  AIVideo,
 } from './types';
 
 /**
@@ -98,24 +100,38 @@ export class GRouterProvider implements AIProvider {
     const { model, prompt, options } = params;
     if (!model) throw new Error('model is required');
     if (!prompt) throw new Error('prompt is required');
+    const isVideo = params.mediaType === AIMediaType.VIDEO;
 
     // Async by default; `async: false` holds the connection open and returns
-    // the finished image in one call (used by the settings test).
+    // the finished media in one call (used by the image settings test).
     const wantAsync = params.async !== false;
     const body: Record<string, unknown> = {
       model,
       prompt,
       ...(wantAsync ? { async: true } : {}),
-      ...formatOptions(options),
+      ...(isVideo ? formatVideoOptions(options) : formatImageOptions(options)),
     };
 
     const data = await this.fetchJson(
-      `${this.apiRoot()}/images/generations`,
+      `${this.apiRoot()}/${isVideo ? 'videos' : 'images'}/generations`,
       { method: 'POST', headers: this.headers(), body: JSON.stringify(body) },
       `gRouter generate (${model})`
     );
 
     if (!wantAsync) {
+      if (isVideo) {
+        const videos = extractVideos(data?.data ?? data?.result ?? data);
+        if (videos.length === 0) {
+          throw new Error('generate failed: no video in response');
+        }
+        return {
+          taskStatus: AITaskStatus.SUCCESS,
+          taskId: '',
+          taskInfo: { status: 'completed', videos },
+          taskResult: data,
+        };
+      }
+
       const images = extractImages(data);
       if (images.length === 0) {
         throw new Error('generate failed: no image in response');
@@ -138,15 +154,25 @@ export class GRouterProvider implements AIProvider {
     };
   }
 
-  async query({ taskId }: { taskId: string }): Promise<AITaskResult> {
+  async query({
+    taskId,
+    mediaType,
+  }: {
+    taskId: string;
+    mediaType?: AIMediaType;
+  }): Promise<AITaskResult> {
+    const isVideo = mediaType === AIMediaType.VIDEO;
     const data = await this.fetchJson(
-      `${this.apiRoot()}/images/generations/${encodeURIComponent(taskId)}`,
+      `${this.apiRoot()}/${isVideo ? 'videos' : 'images'}/generations/${encodeURIComponent(taskId)}`,
       { method: 'GET', headers: this.headers() },
       `gRouter task (${taskId})`
     );
 
     const taskStatus = mapStatus(data?.status);
-    const images = extractImages(data?.result);
+    const images = isVideo ? [] : extractImages(data?.result);
+    const videos = isVideo
+      ? extractVideos(data?.data ?? data?.result ?? data)
+      : [];
 
     return {
       taskId,
@@ -154,12 +180,60 @@ export class GRouterProvider implements AIProvider {
       taskInfo: {
         status: data?.status,
         images: images.length > 0 ? images : undefined,
+        videos: videos.length > 0 ? videos : undefined,
         errorMessage: data?.error ? formatGatewayError(data.error) : '',
         errorCode: data?.error?.type || '',
       },
       taskResult: data,
     };
   }
+
+  async cancel({
+    taskId,
+    mediaType,
+  }: {
+    taskId: string;
+    mediaType?: string;
+  }): Promise<void> {
+    const isVideo = mediaType === AIMediaType.VIDEO;
+    await this.fetchJson(
+      `${this.apiRoot()}/${isVideo ? 'videos' : 'images'}/generations/${encodeURIComponent(taskId)}`,
+      { method: 'DELETE', headers: this.headers() },
+      `gRouter cancel (${taskId})`
+    );
+  }
+}
+
+/** Pull video URLs out of the gateway's completed task payload. */
+function extractVideos(payload: any): AIVideo[] {
+  const urls = new Set<string>();
+
+  function collect(value: any): void {
+    if (!value) return;
+    if (typeof value === 'string') {
+      if (/^(https?:\/\/|data:video\/)/.test(value)) urls.add(value);
+      return;
+    }
+    if (Array.isArray(value)) {
+      value.forEach(collect);
+      return;
+    }
+    if (typeof value !== 'object') return;
+
+    for (const key of ['url', 'video_url', 'videoUrl']) {
+      if (typeof value[key] === 'string') collect(value[key]);
+    }
+    for (const key of ['data', 'result', 'output', 'video', 'videos']) {
+      if (value[key] !== value) collect(value[key]);
+    }
+  }
+
+  collect(payload);
+  return [...urls].map((videoUrl) => ({
+    id: '',
+    createTime: new Date(),
+    videoUrl,
+  }));
 }
 
 /**
@@ -186,6 +260,7 @@ function extractImages(payload: any): AIImage[] {
  * the upstream that refused. Compose them into a single line for the agent.
  */
 function formatGatewayError(error: any): string {
+  if (typeof error === 'string') return error.trim() || 'request failed';
   const message = String(error?.message ?? '').trim() || 'request failed';
   const parts: string[] = [];
   if (error?.provider) parts.push(String(error.provider));
@@ -239,7 +314,7 @@ const SIZE_BY_ASPECT_RATIO: Record<string, string> = {
   '3:4': '1024x1536',
 };
 
-function formatOptions(options: any): Record<string, unknown> {
+function formatImageOptions(options: any): Record<string, unknown> {
   if (!options || typeof options !== 'object') return {};
   const out: Record<string, unknown> = {};
 
@@ -261,6 +336,51 @@ function formatOptions(options: any): Record<string, unknown> {
   }
   if (typeof options.output_format === 'string' && options.output_format) {
     out.output_format = options.output_format;
+  }
+
+  return out;
+}
+
+/** Map normalized video options to gRouter's video generation API. */
+function formatVideoOptions(options: any): Record<string, unknown> {
+  if (!options || typeof options !== 'object') return {};
+  const out: Record<string, unknown> = {};
+
+  if (
+    (typeof options.duration === 'string' && options.duration !== 'auto') ||
+    typeof options.duration === 'number'
+  ) {
+    out.duration = options.duration;
+  }
+  if (typeof options.size === 'string' && options.size) {
+    out.size = options.size;
+  }
+  if (typeof options.aspect_ratio === 'string' && options.aspect_ratio) {
+    out.aspect_ratio = options.aspect_ratio;
+  }
+  if (typeof options.resolution === 'string' && options.resolution) {
+    out.resolution = options.resolution;
+  }
+  if (typeof options.generate_audio === 'boolean') {
+    out.generate_audio = options.generate_audio;
+  }
+
+  const imageInput = Array.isArray(options.image_input)
+    ? options.image_input.filter(Boolean)
+    : [];
+  if (imageInput[0]) out.first_image_url = imageInput[0];
+  if (imageInput[1]) out.last_image_url = imageInput[1];
+
+  for (const key of [
+    'mode',
+    'first_image_url',
+    'last_image_url',
+    'reference_image_urls',
+    'reference_audio_urls',
+    'reference_video_urls',
+    'params',
+  ]) {
+    if (options[key] !== undefined) out[key] = options[key];
   }
 
   return out;

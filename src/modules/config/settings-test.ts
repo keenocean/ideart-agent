@@ -472,9 +472,11 @@ async function testReplicate(
   const provider = new ReplicateProvider({
     apiToken: configs.replicate_api_token,
   });
+  // Queues a real render, so the test proves the account can actually reach
+  // the video models — not just that the token parses.
   const result = await provider.generate({
     params: {
-      mediaType: AIMediaType.IMAGE,
+      mediaType: AIMediaType.VIDEO,
       model: inputs.model,
       prompt: inputs.prompt,
     },
@@ -486,7 +488,27 @@ async function testReplicate(
   };
 }
 
-// --- gRouter --------------------------------------------------------------
+async function testFal(
+  inputs: Record<string, string>,
+  configs: Record<string, string>
+): Promise<TestResult> {
+  const missing = need(configs, ['fal_api_key']);
+  if (missing) return { success: false, message: missing };
+
+  const provider = new FalProvider({ apiKey: configs.fal_api_key });
+  const result = await provider.generate({
+    params: {
+      mediaType: AIMediaType.VIDEO,
+      model: inputs.model,
+      prompt: inputs.prompt,
+    },
+  });
+  return {
+    success: true,
+    message: 'Fal accepted the request',
+    details: { 'Task ID': result.taskId, Status: result.taskStatus },
+  };
+}
 
 async function testGRouter(
   inputs: Record<string, string>,
@@ -501,43 +523,21 @@ async function testGRouter(
     appName: envConfigs.app_name,
     appUrl: envConfigs.app_url,
   });
-  // Sync call: waits for the image so the test proves the whole path — key,
-  // base URL, model route and upstream provider — not just that a task was
-  // queued.
   const result = await provider.generate({
     params: {
-      mediaType: AIMediaType.IMAGE,
+      mediaType: AIMediaType.VIDEO,
       model: inputs.model,
       prompt: inputs.prompt,
-      async: false,
-    },
-  });
-  const imageUrl = result.taskInfo?.images?.[0]?.imageUrl ?? '';
-  return {
-    success: true,
-    message: 'gRouter generated an image',
-    details: { Model: inputs.model, 'Image URL': imageUrl },
-  };
-}
-
-async function testFal(
-  inputs: Record<string, string>,
-  configs: Record<string, string>
-): Promise<TestResult> {
-  const missing = need(configs, ['fal_api_key']);
-  if (missing) return { success: false, message: missing };
-
-  const provider = new FalProvider({ apiKey: configs.fal_api_key });
-  const result = await provider.generate({
-    params: {
-      mediaType: AIMediaType.IMAGE,
-      model: inputs.model,
-      prompt: inputs.prompt,
+      options: {
+        duration: 5,
+        resolution: '2K',
+        aspect_ratio: 'adaptive',
+      },
     },
   });
   return {
     success: true,
-    message: 'Fal accepted the request',
+    message: 'gRouter accepted the video request',
     details: { 'Task ID': result.taskId, Status: result.taskStatus },
   };
 }

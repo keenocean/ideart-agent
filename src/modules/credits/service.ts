@@ -219,23 +219,37 @@ export async function consume(params: {
 // --- Revoke (restore credits from a consumed record) ---
 
 export async function revoke(consumeCreditId: string) {
-  const [consumeRecord] = await db()
-    .select()
-    .from(credit)
-    .where(
-      and(
-        eq(credit.id, consumeCreditId),
-        eq(credit.transactionType, CreditTransactionType.CONSUME),
-        eq(credit.status, CreditStatus.ACTIVE)
-      )
-    )
-    .limit(1);
-
-  if (!consumeRecord || !consumeRecord.consumedDetail) return;
-
-  const items = JSON.parse(consumeRecord.consumedDetail);
-
   await db().transaction(async (tx: any) => {
+    const [consumeRecord] = await tx
+      .select()
+      .from(credit)
+      .where(
+        and(
+          eq(credit.id, consumeCreditId),
+          eq(credit.transactionType, CreditTransactionType.CONSUME),
+          eq(credit.status, CreditStatus.ACTIVE)
+        )
+      )
+      .limit(1);
+
+    if (!consumeRecord?.consumedDetail) return;
+
+    // Claim the reversal before restoring any grants. Only one concurrent
+    // failure/cancel request can change ACTIVE → DELETED, so credits cannot be
+    // returned twice even when terminal task updates race.
+    const claimResult = await tx
+      .update(credit)
+      .set({ status: CreditStatus.DELETED })
+      .where(
+        and(
+          eq(credit.id, consumeCreditId),
+          eq(credit.transactionType, CreditTransactionType.CONSUME),
+          eq(credit.status, CreditStatus.ACTIVE)
+        )
+      );
+    if (affectedRows(claimResult) !== 1) return;
+
+    const items = JSON.parse(consumeRecord.consumedDetail);
     // Atomic increment per source grant — no read-modify-write race.
     for (const item of items) {
       await tx
@@ -245,13 +259,24 @@ export async function revoke(consumeCreditId: string) {
         })
         .where(eq(credit.id, item.creditId));
     }
-
-    // Mark consumption record as deleted
-    await tx
-      .update(credit)
-      .set({ status: CreditStatus.DELETED })
-      .where(eq(credit.id, consumeCreditId));
   });
+}
+
+/** Normalize update counts from libsql/D1, postgres.js, and mysql2. */
+function affectedRows(result: any): number {
+  const candidates = [
+    result?.rowsAffected,
+    result?.rowCount,
+    result?.affectedRows,
+    result?.count,
+    result?.meta?.changes,
+    result?.[0]?.affectedRows,
+    result?.[0]?.rowCount,
+  ];
+  const value = candidates.find((candidate) =>
+    Number.isFinite(Number(candidate))
+  );
+  return value === undefined ? 0 : Number(value);
 }
 
 // --- Auto-grant for new user ---

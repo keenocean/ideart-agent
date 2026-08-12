@@ -1,4 +1,4 @@
-import type { PendingAttachment } from '@/lib/agent';
+import { mediaTypeForAttachment, type PendingAttachment } from '@/lib/agent';
 import type { AgentComposerSettings } from '@/lib/agent-settings';
 
 /**
@@ -53,16 +53,30 @@ export function buildAgentMessage(
   const uploaded = attachments.filter(
     (item) => item.status === 'uploaded' && item.url
   );
-  const base = text.trim() || 'Please edit the attached image.';
+  const base =
+    text.trim() ||
+    'Please create a video using the attached media and choose the most appropriate role for each item.';
   if (uploaded.length === 0) return base;
 
-  const refs = uploaded
-    .map((item, index) => `- image ${index + 1}: ${item.url}`)
+  const counts = { image: 0, audio: 0, video: 0 };
+  const media = uploaded
+    .map((item) => {
+      const type = mediaTypeForAttachment(item);
+      counts[type] += 1;
+      return `- ${type} ${counts[type]}: ${item.url}`;
+    })
     .join('\n');
-  return `${base}\n\n${ATTACHED_IMAGES_HEADING}\n${refs}`;
+
+  return `${base}\n\n${ATTACHED_MEDIA_HEADING}\n${media}`;
 }
 
+export const ATTACHED_MEDIA_HEADING = 'Attached media:';
+// Legacy headings remain readable so old conversations still render cleanly.
 export const ATTACHED_IMAGES_HEADING = 'Attached images:';
+export const ATTACHED_FRAMES_HEADING = 'Attached frames:';
+export const ATTACHED_REFERENCE_IMAGES_HEADING = 'Attached reference images:';
+export const ATTACHED_AUDIO_HEADING = 'Attached reference audio:';
+export const ATTACHED_VIDEOS_HEADING = 'Attached videos:';
 
 /**
  * The agent needs the attachment URLs inline in the message text (that's how
@@ -72,19 +86,75 @@ export const ATTACHED_IMAGES_HEADING = 'Attached images:';
 export function splitAttachedImages(content: string): {
   text: string;
   images: string[];
+  audios: string[];
+  videos: string[];
 } {
-  const at = content.lastIndexOf(`\n\n${ATTACHED_IMAGES_HEADING}\n`);
-  if (at === -1) return { text: content, images: [] };
-
-  const block = content.slice(at + ATTACHED_IMAGES_HEADING.length + 3);
-  const images: string[] = [];
-  for (const line of block.split('\n')) {
-    const match = line.match(/^- image \d+: (\S+)$/);
-    if (!match) return { text: content, images: [] };
-    images.push(match[1]);
+  const headings = [
+    ATTACHED_MEDIA_HEADING,
+    ATTACHED_IMAGES_HEADING,
+    ATTACHED_FRAMES_HEADING,
+    ATTACHED_REFERENCE_IMAGES_HEADING,
+    ATTACHED_AUDIO_HEADING,
+    ATTACHED_VIDEOS_HEADING,
+  ] as const;
+  const starts = headings
+    .map((heading) => content.lastIndexOf(`\n\n${heading}\n`))
+    .filter((index) => index >= 0);
+  if (starts.length === 0) {
+    return { text: content, images: [], audios: [], videos: [] };
   }
-  if (images.length === 0) return { text: content, images: [] };
-  return { text: content.slice(0, at), images };
+
+  const at = Math.min(...starts);
+  const block = content.slice(at + 2);
+  const images: string[] = [];
+  const audios: string[] = [];
+  const videos: string[] = [];
+  let section: 'media' | 'image' | 'audio' | 'video' | null = null;
+  for (const line of block.split('\n')) {
+    if (line === ATTACHED_MEDIA_HEADING) {
+      section = 'media';
+      continue;
+    }
+    if (
+      line === ATTACHED_IMAGES_HEADING ||
+      line === ATTACHED_FRAMES_HEADING ||
+      line === ATTACHED_REFERENCE_IMAGES_HEADING
+    ) {
+      section = 'image';
+      continue;
+    }
+    if (line === ATTACHED_AUDIO_HEADING) {
+      section = 'audio';
+      continue;
+    }
+    if (line === ATTACHED_VIDEOS_HEADING) {
+      section = 'video';
+      continue;
+    }
+    if (!line) continue;
+    const match = line.match(
+      /^- (image|audio|video|first frame|last frame|reference image|reference audio|reference video)(?: \d+)?: (\S+)$/
+    );
+    if (!match || !section) {
+      return { text: content, images: [], audios: [], videos: [] };
+    }
+    const lineType = match[1].includes('audio')
+      ? 'audio'
+      : match[1].includes('video')
+        ? 'video'
+        : 'image';
+    const mediaType = section === 'media' ? lineType : section;
+    (mediaType === 'image'
+      ? images
+      : mediaType === 'audio'
+        ? audios
+        : videos
+    ).push(match[2]);
+  }
+  if (images.length === 0 && audios.length === 0 && videos.length === 0) {
+    return { text: content, images: [], audios: [], videos: [] };
+  }
+  return { text: content.slice(0, at), images, audios, videos };
 }
 
 // Pull `![alt](data:image/...;base64,...)` out of arbitrary text.
@@ -155,12 +225,13 @@ export interface StoredMessage {
 export interface ChatHistoryData {
   chat?: { id: string; title: string; updatedAt: string } | null;
   messages?: StoredMessage[];
+  run?: { active: boolean };
 }
 
 export interface InitialTurnPayload {
   prompt?: string;
   settings?: AgentComposerSettings;
-  /** Images already uploaded by the landing composer. */
+  /** Media already uploaded or selected by the landing composer. */
   attachments?: PendingAttachment[];
 }
 

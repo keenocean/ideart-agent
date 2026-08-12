@@ -1,131 +1,167 @@
-/** The image backends an admin can route generation through. */
-export type ImageProviderName = 'fal' | 'replicate' | 'grouter';
+/** The video backends an admin can route generation through. */
+export type VideoProviderName = 'grouter' | 'fal' | 'replicate';
 
 export interface AgentGenerationSettings {
-  /** Picker key (`gpt-image-2`) — the concrete provider model id is resolved
-   *  server-side, once the active provider is known. */
+  /** Picker key (`minimax-h3`) — resolved to a provider model server-side. */
   modelName?: string;
   aspectRatio?: string;
   resolution?: string;
+  /** Clip length in seconds. */
+  duration?: number;
   creditCost?: number;
 }
 
 export const AUTO_ASPECT_RATIO = 'auto';
+export const ADAPTIVE_ASPECT_RATIO = 'adaptive';
 export const AUTO_RESOLUTION = 'auto';
-export const DEFAULT_RESOLUTION = AUTO_RESOLUTION;
+export const DEFAULT_RESOLUTION = '2K';
+export const DEFAULT_DURATION = 5;
 
 /**
- * The models offered in the composer, each mapped to the id every supported
- * provider knows it by. Switching the admin's default provider therefore
- * doesn't change what the user picked — only which id we send.
- *
- * `grouter` ids are route names inside the gateway, which the admin defines;
- * these are the sensible defaults and `grouter_model_map` overrides them —
- * one route serves both directions there, since the gateway resolves the edit
- * upstream model itself. Where a provider serves generation and editing from
- * one id, both fields carry the same value.
- *
- * Credit prices are set against each model's real upstream cost, on the
- * standard ruler of 200 credits per US dollar (the $10 top-up rate). Plans
- * hand out credits more cheaply than that — Ultra yearly works out to ~304
- * credits per dollar — so a heavy subscriber on the top tier is subsidised.
- * That is deliberate; what isn't acceptable is a price below cost at every
- * tier, which is what nano-banana-pro's old 30 credits was.
+ * Video Agent uses the same public catalog as shipany-video-lite. Keep model
+ * capabilities, defaults, provider routes and prices aligned with that app so
+ * a setting selected in the composer has the same meaning in both products.
  */
 export const AGENT_MODEL_OPTIONS = [
   {
-    value: 'gpt-image-2',
-    label: 'GPT Image 2',
-    // Upstream $0.22. Credits sell at 200 per US dollar at the standard
-    // rate, so 50 credits is $0.25 — see the note above the list.
-    credits: 50,
+    value: 'minimax-h3',
+    label: 'MiniMax H3',
+    creditsPerSecond: 110,
+    autoBillingSeconds: 5,
+    resolutionCreditMultipliers: {
+      '768P': 0.75,
+      '2K': 1,
+      '4K': 1.5,
+    },
+    durations: [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+    defaultDuration: 5,
+    durationMin: 5,
+    durationMax: 15,
+    supportsAutoDuration: false,
+    resolutions: ['768P', '2K', '4K'],
+    defaultResolution: '2K',
+    aspectRatios: ['adaptive', '21:9', '16:9', '4:3', '1:1', '3:4', '9:16'],
+    defaultAspectRatio: 'adaptive',
+    audio: false,
+    maxImages: 1,
     providers: {
+      grouter: {
+        model: 'minimax-h3',
+        imageModel: 'minimax-h3',
+      },
       fal: {
-        model: 'openai/gpt-image-2',
-        editModel: 'openai/gpt-image-2/edit',
+        model: 'fal-ai/minimax/hailuo-2.3/standard/text-to-video',
+        imageModel: 'fal-ai/minimax/hailuo-2.3/standard/image-to-video',
       },
       replicate: {
-        model: 'openai/gpt-image-2',
-        editModel: 'openai/gpt-image-2',
+        model: 'minimax/hailuo-2.3',
+        imageModel: 'minimax/hailuo-2.3',
       },
-      grouter: { model: 'gpt-image-2', editModel: 'gpt-image-2' },
     },
   },
   {
-    value: 'nano-banana-pro',
-    label: 'Nano Banana Pro',
-    // Upstream $0.30 — the priciest of the three, despite the name reading
-    // like a step up from nano-banana-2 rather than from gpt-image-2.
-    credits: 70,
-    providers: {
-      fal: {
-        model: 'fal-ai/nano-banana-pro',
-        editModel: 'fal-ai/nano-banana-pro/edit',
-      },
-      replicate: {
-        model: 'google/nano-banana-pro',
-        editModel: 'google/nano-banana-pro',
-      },
-      grouter: { model: 'nano-banana-pro', editModel: 'nano-banana-pro' },
+    value: 'seedance-2-5',
+    label: 'Seedance 2.5',
+    creditsPerSecond: 200,
+    autoBillingSeconds: 5,
+    resolutionCreditMultipliers: {
+      '480p': 0.75,
+      '720p': 1,
     },
-  },
-  {
-    value: 'nano-banana-2',
-    label: 'Nano Banana 2',
-    // Upstream $0.16, the cheapest of the three — which is why it's the
-    // default a new account starts on.
-    credits: 40,
+    durations: [
+      4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23,
+      24, 25, 26, 27, 28, 29, 30,
+    ],
+    defaultDuration: 5,
+    durationMin: 4,
+    durationMax: 30,
+    supportsAutoDuration: false,
+    resolutions: ['480p', '720p'],
+    defaultResolution: '720p',
+    aspectRatios: ['auto', '21:9', '16:9', '4:3', '1:1', '3:4', '9:16'],
+    defaultAspectRatio: 'auto',
+    audio: true,
+    maxImages: 2,
     providers: {
+      grouter: {
+        model: 'seedance-2.5',
+        imageModel: 'seedance-2.5',
+      },
       fal: {
-        model: 'fal-ai/nano-banana-2',
-        editModel: 'fal-ai/nano-banana-2/edit',
+        model: 'bytedance/seedance-2.5/text-to-video',
+        imageModel: 'bytedance/seedance-2.5/image-to-video',
       },
-      replicate: {
-        model: 'google/nano-banana-2',
-        editModel: 'google/nano-banana-2',
-      },
-      grouter: { model: 'nano-banana-2', editModel: 'nano-banana-2' },
+      // shipany-video-lite deliberately leaves this unsupported instead of
+      // silently substituting an older Seedance model.
+      replicate: null,
     },
-  },
-] as const;
-
-export const AGENT_ASPECT_RATIOS = [
-  AUTO_ASPECT_RATIO,
-  '1:1',
-  '4:3',
-  '3:4',
-  '16:9',
-  '9:16',
-  '21:9',
-  '9:21',
-] as const;
-
-export const AGENT_RESOLUTIONS = [
-  {
-    value: AUTO_RESOLUTION,
-    label: 'Auto',
-  },
-  {
-    value: '1k',
-    label: '1K',
-  },
-  {
-    value: '2k',
-    label: '2K',
-  },
-  {
-    value: '4k',
-    label: '4K',
   },
 ] as const;
 
 export type AgentModelOptionValue =
   (typeof AGENT_MODEL_OPTIONS)[number]['value'];
 
+export const AGENT_DURATIONS = [
+  4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
+  25, 26, 27, 28, 29, 30,
+] as const;
+
+export const AGENT_ASPECT_RATIOS = [
+  AUTO_ASPECT_RATIO,
+  ADAPTIVE_ASPECT_RATIO,
+  '21:9',
+  '16:9',
+  '4:3',
+  '1:1',
+  '3:4',
+  '9:16',
+] as const;
+
+export const AGENT_RESOLUTIONS = [
+  { value: '768P', label: '768P' },
+  { value: '2K', label: '2K' },
+  { value: '4K', label: '4K' },
+  { value: '480p', label: '480p' },
+  { value: '720p', label: '720p' },
+] as const;
+
 export interface AgentComposerSettings {
   modelOption: AgentModelOptionValue;
   aspectRatio: string;
   resolution: string;
+  duration: number;
+}
+
+export function modelOptionFor(value: string | undefined) {
+  return AGENT_MODEL_OPTIONS.find((item) => item.value === value);
+}
+
+export function isModelOptionValue(
+  value: string | undefined
+): value is AgentModelOptionValue {
+  return !!modelOptionFor(value);
+}
+
+export function durationsForModel(
+  value: string | undefined
+): readonly number[] {
+  return modelOptionFor(value)?.durations ?? [DEFAULT_DURATION];
+}
+
+export function aspectRatiosForModel(
+  value: string | undefined
+): readonly string[] {
+  return modelOptionFor(value)?.aspectRatios ?? [ADAPTIVE_ASPECT_RATIO];
+}
+
+export function resolutionsForModel(
+  value: string | undefined
+): readonly string[] {
+  return modelOptionFor(value)?.resolutions ?? [DEFAULT_RESOLUTION];
+}
+
+export function isAutoAspectRatio(value: string): boolean {
+  return value === AUTO_ASPECT_RATIO || value === ADAPTIVE_ASPECT_RATIO;
 }
 
 export function isAspectRatioValue(value: unknown): value is string {
@@ -136,101 +172,172 @@ export function isResolutionValue(value: unknown): value is string {
   return AGENT_RESOLUTIONS.some((item) => item.value === value);
 }
 
-export function defaultComposerSettings(): AgentComposerSettings {
+export function isDurationValue(value: unknown): value is number {
+  return (
+    typeof value === 'number' &&
+    Number.isFinite(value) &&
+    AGENT_DURATIONS.some((seconds) => seconds === value)
+  );
+}
+
+/** Match video-lite: continuous integer duration, clamped to model bounds. */
+export function normalizeDurationForModel(
+  modelKey: string | undefined,
+  value: unknown
+): number {
+  const option = modelOptionFor(modelKey);
+  if (!option) return DEFAULT_DURATION;
+  const requested =
+    typeof value === 'number' && Number.isFinite(value)
+      ? Math.round(value)
+      : option.defaultDuration;
+  return Math.min(option.durationMax, Math.max(option.durationMin, requested));
+}
+
+/** Reset values that are invalid for the newly selected model. */
+export function settingsForModel(
+  settings: AgentComposerSettings,
+  modelKey: AgentModelOptionValue
+): AgentComposerSettings {
+  const option = modelOptionFor(modelKey);
+  if (!option) return defaultComposerSettings();
+
+  // video-lite resets all controls to the new model's defaults when the
+  // picker changes, even when an old value happens to be supported by both.
+  if (settings.modelOption !== modelKey) {
+    return {
+      modelOption: modelKey,
+      duration: option.defaultDuration,
+      aspectRatio: option.defaultAspectRatio,
+      resolution: option.defaultResolution,
+    };
+  }
+
   return {
-    // The cheapest model by default: a new account's 200-credit grant buys
-    // five images here, and the first couple usually go on getting the
-    // prompt right. Anyone can switch in the composer.
-    modelOption: 'nano-banana-2',
-    aspectRatio: AUTO_ASPECT_RATIO,
-    resolution: DEFAULT_RESOLUTION,
+    modelOption: modelKey,
+    duration: normalizeDurationForModel(modelKey, settings.duration),
+    aspectRatio: (option.aspectRatios as readonly string[]).includes(
+      settings.aspectRatio
+    )
+      ? settings.aspectRatio
+      : option.defaultAspectRatio,
+    resolution: (option.resolutions as readonly string[]).includes(
+      settings.resolution
+    )
+      ? settings.resolution
+      : option.defaultResolution,
+  };
+}
+
+export function defaultComposerSettings(): AgentComposerSettings {
+  const option = AGENT_MODEL_OPTIONS[0];
+  return {
+    modelOption: option.value,
+    aspectRatio: option.defaultAspectRatio,
+    resolution: option.defaultResolution,
+    duration: option.defaultDuration,
   };
 }
 
 export function resolveGenerationSettings(
   settings: AgentComposerSettings
 ): AgentGenerationSettings {
-  const modelOption = AGENT_MODEL_OPTIONS.find(
-    (item) => item.value === settings.modelOption
-  );
-  const creditCost = modelOption?.credits;
+  const normalized = settingsForModel(settings, settings.modelOption);
   return {
-    modelName: modelOption?.value,
-    aspectRatio:
-      settings.aspectRatio && settings.aspectRatio !== AUTO_ASPECT_RATIO
-        ? settings.aspectRatio
-        : undefined,
-    resolution:
-      settings.resolution && settings.resolution !== AUTO_RESOLUTION
-        ? settings.resolution
-        : undefined,
-    creditCost,
+    modelName: normalized.modelOption,
+    aspectRatio: normalized.aspectRatio,
+    resolution: normalized.resolution,
+    duration: normalized.duration,
+    creditCost: creditsForGeneration(
+      normalized.modelOption,
+      normalized.duration,
+      normalized.resolution
+    ),
   };
 }
 
-/**
- * What one image on this model costs, resolved from the catalog.
- *
- * The server calls this instead of reading the `creditCost` the composer
- * sends: the request body is the user's to write, and a client-supplied
- * price would let anyone mint free images.
- */
-export function creditsForModelOption(modelKey: string | undefined): number {
-  const option = AGENT_MODEL_OPTIONS.find((item) => item.value === modelKey);
-  // Unknown key: fall back to the priciest model rather than the cheapest,
-  // so a bad request can never buy an image below cost.
-  return (
-    option?.credits ?? Math.max(...AGENT_MODEL_OPTIONS.map((i) => i.credits))
+/** Validate settings from the API request against the server catalog. */
+export function normalizeClientGenerationSettings(
+  settings: AgentGenerationSettings | undefined
+): AgentGenerationSettings | null {
+  const defaults = defaultComposerSettings();
+  const modelOption = settings?.modelName ?? defaults.modelOption;
+  if (!isModelOptionValue(modelOption)) return null;
+
+  return resolveGenerationSettings(
+    settingsForModel(
+      {
+        modelOption,
+        aspectRatio: settings?.aspectRatio ?? defaults.aspectRatio,
+        resolution: settings?.resolution ?? defaults.resolution,
+        duration:
+          typeof settings?.duration === 'number'
+            ? settings.duration
+            : defaults.duration,
+      },
+      modelOption
+    )
   );
 }
 
-/**
- * Friendly name for a model id recorded on a past generation.
- *
- * What gets stored is the provider's id (`fal-ai/nano-banana-2`), not the
- * picker key, so match on either and fall back to the raw id — an image made
- * by a model that has since left the catalog still deserves a label.
- */
+/** Same price formula and resolution multipliers as shipany-video-lite. */
+export function creditsForGeneration(
+  modelKey: string | undefined,
+  durationSeconds?: number,
+  resolution?: string
+): number {
+  const option = modelOptionFor(modelKey);
+  const highestRate = Math.max(
+    ...AGENT_MODEL_OPTIONS.map((item) => item.creditsPerSecond)
+  );
+  const seconds = option
+    ? normalizeDurationForModel(option.value, durationSeconds)
+    : Number.isFinite(durationSeconds) && Number(durationSeconds) > 0
+      ? Math.round(Number(durationSeconds))
+      : DEFAULT_DURATION;
+  const rate = option?.creditsPerSecond ?? highestRate;
+  const multiplier = option
+    ? ((option.resolutionCreditMultipliers as Record<string, number>)[
+        resolution ?? option.defaultResolution
+      ] ?? 1)
+    : 1;
+  return Math.ceil((rate * seconds * multiplier) / 10) * 10;
+}
+
+/** Friendly name for a picker key or a provider id recorded on a task. */
 export function labelForGeneratedModel(modelId: string): string {
   const option = AGENT_MODEL_OPTIONS.find(
     (item) =>
       item.value === modelId ||
       Object.values(item.providers).some(
-        (ids) => ids.model === modelId || ids.editModel === modelId
-      )
+        (ids) =>
+          ids !== null && (ids.model === modelId || ids.imageModel === modelId)
+      ) ||
+      (item.value === 'minimax-h3' &&
+        modelId.startsWith('fal-ai/minimax/hailuo-2.3/'))
   );
   return option?.label ?? modelId;
 }
 
 export function labelForModelOption(value: string) {
-  return (
-    AGENT_MODEL_OPTIONS.find((item) => item.value === value)?.label || 'Auto'
-  );
+  return modelOptionFor(value)?.label || 'Auto';
 }
 
-/** Is this a picker key (`gpt-image-2`) rather than a raw provider id? */
-export function isModelOptionValue(value: string | undefined): boolean {
-  if (!value) return false;
-  return AGENT_MODEL_OPTIONS.some((item) => item.value === value);
-}
-
-/**
- * The id `provider` knows this model by. `overrides` remaps picker key →
- * provider id (used for gRouter, whose route names the admin chooses);
- * returns undefined when the model isn't mapped for that provider.
- */
+/** Resolve the exact provider route used by video-lite. */
 export function providerModelFor(
   modelKey: string | undefined,
-  provider: ImageProviderName,
-  kind: 'generate' | 'edit',
-  overrides?: Record<string, string>
+  provider: VideoProviderName,
+  kind: 'generate' | 'animate',
+  resolution?: string
 ): string | undefined {
-  if (!modelKey) return undefined;
-  const override = overrides?.[modelKey];
-  if (override) return override;
-
-  const option = AGENT_MODEL_OPTIONS.find((item) => item.value === modelKey);
-  const ids = option?.providers?.[provider];
+  const option = modelOptionFor(modelKey);
+  if (!option) return undefined;
+  if (provider === 'fal' && option.value === 'minimax-h3') {
+    const tier = resolution === '768P' ? 'standard' : 'pro';
+    const mode = kind === 'animate' ? 'image-to-video' : 'text-to-video';
+    return `fal-ai/minimax/hailuo-2.3/${tier}/${mode}`;
+  }
+  const ids = option.providers[provider];
   if (!ids) return undefined;
-  return kind === 'edit' ? ids.editModel : ids.model;
+  return kind === 'animate' ? ids.imageModel : ids.model;
 }

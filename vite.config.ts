@@ -54,29 +54,6 @@ function workersDbProvider(): string {
 const workersDb = isCloudflareBuild ? workersDbProvider() : '';
 const keepPostgres = workersDb === 'postgresql' || workersDb === 'postgres';
 
-// Dev-only: the vite dev server routes non-`Accept: text/html` requests with
-// file extensions (e.g. an <img> loading /api/imgany/files/....png) into the
-// static middleware, which 404s before the TanStack server route runs.
-// Spoof the accept header for agent workspace file requests so they fall
-// through to the router. Production (nitro) matches these routes natively.
-function agentFilesDevPassthrough() {
-  return {
-    name: 'agent-files-dev-passthrough',
-    configureServer(server: {
-      middlewares: {
-        use: (fn: (req: any, res: any, next: () => void) => void) => void;
-      };
-    }) {
-      server.middlewares.use((req, _res, next) => {
-        if (req.url?.startsWith('/api/imgany/files/')) {
-          req.headers.accept = 'text/html';
-        }
-        next();
-      });
-    },
-  };
-}
-
 export default defineConfig({
   server: {
     port: 3000,
@@ -132,7 +109,6 @@ export default defineConfig({
         },
       ],
     }),
-    agentFilesDevPassthrough(),
     tanstackStart({
       srcDirectory: 'src',
     }),

@@ -11,7 +11,13 @@ import {
 import { getBalance } from '@/modules/credits/service';
 import { getCurrentSubscription } from '@/modules/subscriptions/service';
 import { isAgentSessionId } from '@/lib/agent';
-import type { AgentGenerationSettings } from '@/lib/agent-settings';
+import {
+  normalizeClientGenerationSettings,
+  type AgentGenerationSettings,
+} from '@/lib/agent-settings';
+import { enforceMinIntervalRateLimit } from '@/lib/rate-limit';
+
+const MAX_AGENT_MESSAGE_CHARS = 50_000;
 
 interface ChatRequest {
   sessionId: string;
@@ -20,6 +26,12 @@ interface ChatRequest {
 }
 
 async function POST({ request }: { request: Request }) {
+  const limited = enforceMinIntervalRateLimit(request, {
+    intervalMs: 2000,
+    keyPrefix: 'agent-chat',
+  });
+  if (limited) return limited;
+
   const auth = getAuth();
   const session = await auth.api.getSession({ headers: request.headers });
   if (!session?.user) {
@@ -37,13 +49,23 @@ async function POST({ request }: { request: Request }) {
   if (!body?.sessionId || !body?.message) {
     return new Response('sessionId and message are required', { status: 400 });
   }
+  if (body.message.length > MAX_AGENT_MESSAGE_CHARS) {
+    return new Response('message is too long', { status: 413 });
+  }
   if (!isAgentSessionId(body.sessionId)) {
     return new Response('invalid sessionId', { status: 400 });
   }
 
+  const generationSettings = normalizeClientGenerationSettings(body.settings);
+  if (!generationSettings) {
+    return new Response('unsupported video model', { status: 400 });
+  }
+
   // Gate on credits before spending anything.
   const verdict = checkCredits({
-    modelName: body.settings?.modelName,
+    modelName: generationSettings.modelName,
+    duration: generationSettings.duration,
+    resolution: generationSettings.resolution,
     balance: await getBalance(userId),
   });
   if (!verdict.allowed) {
@@ -109,6 +131,20 @@ async function POST({ request }: { request: Request }) {
     }
   };
 
+  const markPendingToolsCanceled = () => {
+    const result = JSON.stringify({
+      status: 'canceled',
+      message: 'Generation stopped by the user.',
+    });
+    for (const round of [...rounds, current]) {
+      for (const part of round) {
+        if (part.type === 'tool_call' && part.result === undefined) {
+          part.result = result;
+        }
+      }
+    }
+  };
+
   const persistRounds = async () => {
     if (current.length > 0) {
       rounds.push(current);
@@ -132,10 +168,23 @@ async function POST({ request }: { request: Request }) {
   };
 
   const encoder = new TextEncoder();
+  const runController = new AbortController();
+  if (request.signal.aborted) runController.abort();
+  else {
+    request.signal.addEventListener('abort', () => runController.abort(), {
+      once: true,
+    });
+  }
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       const emit = (evt: { type: string; data?: Record<string, unknown> }) => {
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify(evt)}\n\n`));
+        try {
+          controller.enqueue(
+            encoder.encode(`data: ${JSON.stringify(evt)}\n\n`)
+          );
+        } catch {
+          // The client has already stopped reading the stream.
+        }
       };
 
       try {
@@ -143,8 +192,8 @@ async function POST({ request }: { request: Request }) {
           sessionId: body.sessionId,
           userId,
           message: body.message,
-          settings: body.settings,
-          signal: request.signal,
+          settings: generationSettings,
+          signal: runController.signal,
         })) {
           switch (evt.type) {
             case 'content': {
@@ -188,14 +237,24 @@ async function POST({ request }: { request: Request }) {
           }
         }
       } catch (err: any) {
-        emit({
-          type: 'error',
-          data: { message: String(err?.message ?? err) },
-        });
+        if (!runController.signal.aborted) {
+          emit({
+            type: 'error',
+            data: { message: String(err?.message ?? err) },
+          });
+        }
       } finally {
+        if (runController.signal.aborted) markPendingToolsCanceled();
         await persistRounds();
-        controller.close();
+        try {
+          controller.close();
+        } catch {
+          // Already canceled by the response consumer.
+        }
       }
+    },
+    cancel() {
+      runController.abort();
     },
   });
 

@@ -6,11 +6,11 @@ import { Images, Sparkles } from 'lucide-react';
 import { Link, useRouter } from '@/core/i18n/navigation';
 import { storedToMessages, type ChatHistoryData } from '@/lib/agent-chat';
 import { apiGet } from '@/lib/api-client';
+import { mediaNameFromUrl } from '@/lib/media';
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
 import {
   ChatTranscript,
-  imageNameFromUrl,
   useTranscriptImages,
 } from '@/components/agent/chat-transcript';
 import { PreviewPane } from '@/components/agent/preview-pane';
@@ -64,7 +64,7 @@ function SharedChatView() {
   const {
     open: previewOpen,
     setOpen,
-    clearImage,
+    clearMedia,
     setImages,
   } = usePreviewPane();
 
@@ -87,7 +87,7 @@ function SharedChatView() {
       previewImages.map((img) => ({
         src: img.src,
         alt: img.alt,
-        name: imageNameFromUrl(img.src) || img.alt,
+        name: mediaNameFromUrl(img.src) || img.alt,
       }))
     );
     return () => setImages([]);
@@ -116,7 +116,7 @@ function SharedChatView() {
             variant="ghost"
             size="icon"
             onClick={() => {
-              clearImage();
+              clearMedia();
               setOpen(true);
             }}
             aria-label={m['agent.preview.open_gallery']()}

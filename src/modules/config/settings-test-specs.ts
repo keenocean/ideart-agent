@@ -191,25 +191,6 @@ export const testSpecs: Record<string, TestSpec> = {
       },
     ],
   },
-  grouter: {
-    group: 'grouter',
-    fields: [
-      {
-        name: 'model',
-        label: 'Model',
-        type: 'text',
-        defaultValue: 'gpt-image-2',
-        required: true,
-      },
-      {
-        name: 'prompt',
-        label: 'Prompt',
-        type: 'textarea',
-        defaultValue: 'a small red cube, product photography',
-        required: true,
-      },
-    ],
-  },
   replicate: {
     group: 'replicate',
     fields: [
@@ -217,14 +198,16 @@ export const testSpecs: Record<string, TestSpec> = {
         name: 'model',
         label: 'Model',
         type: 'text',
-        defaultValue: 'black-forest-labs/flux-schnell',
+        // Running this test queues a real render and the account is billed.
+        defaultValue: 'minimax/hailuo-2.3',
         required: true,
       },
       {
         name: 'prompt',
         label: 'Prompt',
         type: 'textarea',
-        defaultValue: 'a small red cube, product photography',
+        defaultValue:
+          'a red paper boat drifting across still water, slow push in',
         required: true,
       },
     ],
@@ -236,14 +219,36 @@ export const testSpecs: Record<string, TestSpec> = {
         name: 'model',
         label: 'Model',
         type: 'text',
-        defaultValue: 'fal-ai/flux/schnell',
+        // Match the MiniMax route used by the public model catalog.
+        defaultValue: 'fal-ai/minimax/hailuo-2.3/standard/text-to-video',
         required: true,
       },
       {
         name: 'prompt',
         label: 'Prompt',
         type: 'textarea',
-        defaultValue: 'a small red cube, product photography',
+        defaultValue:
+          'a red paper boat drifting across still water, slow push in',
+        required: true,
+      },
+    ],
+  },
+  grouter: {
+    group: 'grouter',
+    fields: [
+      {
+        name: 'model',
+        label: 'Model',
+        type: 'text',
+        defaultValue: 'minimax-h3',
+        required: true,
+      },
+      {
+        name: 'prompt',
+        label: 'Prompt',
+        type: 'textarea',
+        defaultValue:
+          'a red paper boat drifting across still water, slow push in',
         required: true,
       },
     ],

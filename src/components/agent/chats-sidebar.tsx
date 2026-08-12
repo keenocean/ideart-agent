@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  Images,
+  Clapperboard,
   Loader2,
   MessagesSquare,
   MoreHorizontal,
@@ -59,7 +59,7 @@ interface ChatListData {
 // Other views (the chat page after a turn completes, the rename dialog)
 // fire this event so the sidebar refetches without threading a callback
 // through props.
-const CHATS_CHANGED_EVENT = 'image-agent:chats-changed';
+const CHATS_CHANGED_EVENT = 'video-agent:chats-changed';
 
 /** Recent chats shown inline; the rest live on /chats. */
 const SIDEBAR_CHAT_LIMIT = 10;
@@ -152,7 +152,7 @@ export function ChatsSidebar() {
                     tooltip={m['agent.nav.library']()}
                     isActive={pathname.endsWith('/library')}
                   >
-                    <Images />
+                    <Clapperboard />
                     <span>{m['agent.nav.library']()}</span>
                   </SidebarMenuButton>
                 </Link>

@@ -121,7 +121,31 @@ export function dropRun(sessionId: string) {
 }
 
 export function stopRun(sessionId: string) {
-  runs.get(sessionId)?.controller?.abort();
+  const run = runs.get(sessionId);
+  // Stop the visible tool spinner even when this transcript was restored
+  // from history and no longer has the original browser AbortController.
+  // The chat stop endpoint persists the same terminal result server-side.
+  updateMessages(sessionId, (messages) =>
+    messages.map((message) =>
+      message.role === 'tool-group'
+        ? {
+            ...message,
+            tools: message.tools.map((tool) =>
+              tool.result === undefined
+                ? {
+                    ...tool,
+                    result: JSON.stringify({
+                      status: 'canceled',
+                      message: 'Generation stopped by the user.',
+                    }),
+                  }
+                : tool
+            ),
+          }
+        : message
+    )
+  );
+  run?.controller?.abort();
 }
 
 export function useAgentRun(sessionId: string): AgentRun {

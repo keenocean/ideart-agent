@@ -3,15 +3,14 @@ import {
   ChevronDown,
   ChevronRight,
   FileText,
+  Film,
   FolderOpen,
-  ImageIcon,
   Loader2,
   PenLine,
   Search,
   ShieldCheck,
   Sparkles,
   Terminal,
-  Wand2,
   Wrench,
   type LucideIcon,
 } from 'lucide-react';
@@ -25,16 +24,21 @@ import {
   type ToolCall,
   type ToolGroupMessage,
 } from '@/lib/agent-chat';
+import {
+  isDisplayableMediaUrl,
+  isVideoUrl,
+  mediaNameFromUrl,
+} from '@/lib/media';
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
 import { usePreviewPane } from '@/components/agent/preview-pane-context';
 
 /**
  * The chat transcript — message bubbles, tool activity rows and generated
- * images. Shared by the live session page and the admin-only /share view, so
+ * clips. Shared by the live session page and the admin-only /share view, so
  * both render a conversation identically.
  */
-export interface InlineImage {
+export interface InlineMedia {
   alt: string;
   src: string;
 }
@@ -74,35 +78,26 @@ function splitDataImages(
   return out;
 }
 
-// Image extensions our renderer treats as displayable.
-const IMAGE_EXT_RE = /\.(?:png|jpe?g|gif|webp|svg)\b/i;
-
-// Pull image URLs out of a tool-result payload. The agent's text reply does
-// not always re-embed what it just made, so the picture is surfaced from the
+// Pull media URLs out of a tool-result payload. The agent's text reply does
+// not always re-mention what it just made, so the clip is surfaced from the
 // result itself and attached to the next bubble.
-function extractToolResultFiles(result: string): InlineImage[] {
+function extractToolResultFiles(result: string): InlineMedia[] {
   const seen = new Set<string>();
-  const imgs: InlineImage[] = [];
+  const files: InlineMedia[] = [];
 
   try {
     const payload = JSON.parse(result);
-    if (!Array.isArray(payload?.files)) return imgs;
+    if (!Array.isArray(payload?.files)) return files;
     for (const file of payload.files) {
-      if (typeof file !== 'string' || !isDisplayableImageUrl(file)) continue;
+      if (typeof file !== 'string' || !isDisplayableMediaUrl(file)) continue;
       if (seen.has(file)) continue;
       seen.add(file);
-      imgs.push({ alt: file.split('/').pop() || '', src: file });
+      files.push({ alt: file.split('/').pop() || '', src: file });
     }
   } catch {
     // A result that isn't JSON carries no files.
   }
-  return imgs;
-}
-
-function isDisplayableImageUrl(url: string) {
-  if (url.startsWith('data:image/')) return true;
-  if (/^https?:\/\//i.test(url)) return IMAGE_EXT_RE.test(url);
-  return IMAGE_EXT_RE.test(url);
+  return files;
 }
 
 // react-markdown's defaultUrlTransform drops `data:` URLs. Allow image
@@ -114,23 +109,24 @@ function agentUrlTransform(url: string, key: string): string {
 }
 
 /**
- * Images in a conversation: what the user uploaded, plus what the tools
- * produced — the latter belong on the *next* agent reply so they read as part
- * of the assistant's answer.
+ * The media in a conversation: the stills the user uploaded, plus the clips
+ * the tools produced — the latter belong on the *next* agent reply so they
+ * read as part of the assistant's answer.
  * `surfacedSrcs` lets that bubble suppress duplicate inline copies the model
  * may have re-embedded; `previewImages` feeds the preview pane.
  */
 export function useTranscriptImages(messages: Message[], sessionId: string) {
   return useMemo(() => {
-    const attached = new Map<string, InlineImage[]>();
+    const attached = new Map<string, InlineMedia[]>();
     const surfaced = new Set<string>();
-    const preview = new Map<string, InlineImage>();
-    let pending: InlineImage[] = [];
+    const preview = new Map<string, InlineMedia>();
+    let pending: InlineMedia[] = [];
     for (const msg of messages) {
       // What the user sent counts too — the strip in the preview pane is the
-      // whole conversation's images in the order they appeared.
+      // whole conversation's reference media in the order it appeared.
       if (msg.role === 'user') {
-        for (const src of splitAttachedImages(msg.content).images) {
+        const references = splitAttachedImages(msg.content);
+        for (const src of [...references.images, ...references.videos]) {
           if (!preview.has(src)) preview.set(src, { alt: '', src });
         }
         continue;
@@ -161,7 +157,7 @@ export function useTranscriptImages(messages: Message[], sessionId: string) {
       surfacedSrcs: surfaced,
       previewImages: Array.from(preview.values()).map((img) => ({
         ...img,
-        alt: img.alt || imageNameFromUrl(img.src),
+        alt: img.alt || mediaNameFromUrl(img.src),
       })),
     };
   }, [messages, sessionId]);
@@ -177,7 +173,7 @@ export function ChatTranscript({
   messages: Message[];
   streaming?: boolean;
   sessionId: string;
-  attachedImages: Map<string, InlineImage[]>;
+  attachedImages: Map<string, InlineMedia[]>;
   surfacedSrcs: Set<string>;
 }) {
   return (
@@ -215,7 +211,7 @@ function MessageBlock({
   sessionId,
 }: {
   message: Message;
-  attachedImages?: InlineImage[];
+  attachedImages?: InlineMedia[];
   surfacedSrcs: Set<string>;
   sessionId: string;
 }) {
@@ -240,29 +236,58 @@ function MessageBlock({
 }
 
 function UserBubble({ content }: { content: string }) {
-  const { openImage } = usePreviewPane();
-  const { text, images } = useMemo(
+  const { openMedia } = usePreviewPane();
+  const { text, images, audios, videos } = useMemo(
     () => splitAttachedImages(content),
     [content]
   );
+  const media = [...images, ...videos];
   return (
     <div className="flex min-w-0 flex-col items-end gap-1.5 overflow-hidden">
-      {images.length > 0 && (
+      {media.length > 0 && (
         <div className="flex max-w-[85%] flex-wrap justify-end gap-1.5">
-          {images.map((src, i) => (
+          {media.map((src, i) => (
             <button
               key={`${src}-${i}`}
               type="button"
-              onClick={() => openImage({ src, alt: `image ${i + 1}` })}
+              onClick={() =>
+                openMedia({
+                  src,
+                  alt: `${isVideoUrl(src) ? 'video' : 'image'} ${i + 1}`,
+                })
+              }
               className="border-border bg-background overflow-hidden rounded-md border"
             >
-              <img
-                src={src}
-                alt={`image ${i + 1}`}
-                loading="lazy"
-                className="max-h-40 w-auto max-w-full object-contain"
-              />
+              {isVideoUrl(src) ? (
+                <video
+                  src={src}
+                  muted
+                  playsInline
+                  preload="metadata"
+                  className="h-40 w-auto max-w-full object-cover"
+                />
+              ) : (
+                <img
+                  src={src}
+                  alt={`image ${i + 1}`}
+                  loading="lazy"
+                  className="max-h-40 w-auto max-w-full object-contain"
+                />
+              )}
             </button>
+          ))}
+        </div>
+      )}
+      {audios.length > 0 && (
+        <div className="border-border bg-background flex max-w-[85%] flex-col gap-1.5 rounded-lg border p-2">
+          {audios.map((src, index) => (
+            <audio
+              key={`${src}-${index}`}
+              src={src}
+              controls
+              preload="metadata"
+              className="h-9 max-w-full"
+            />
           ))}
         </div>
       )}
@@ -282,7 +307,7 @@ function AgentBubble({
   sessionId,
 }: {
   content: string;
-  attachedImages?: InlineImage[];
+  attachedImages?: InlineMedia[];
   surfacedSrcs: Set<string>;
   sessionId: string;
 }) {
@@ -294,7 +319,7 @@ function AgentBubble({
         {hasAttached && (
           <div className="mb-2 flex min-w-0 flex-wrap gap-2 overflow-hidden">
             {attachedImages!.map((img, i) => (
-              <AgentImage
+              <AgentMedia
                 key={i}
                 src={img.src}
                 alt={img.alt}
@@ -326,6 +351,18 @@ function toolPresentation(
   tc: ToolCall,
   running: boolean
 ): { icon: LucideIcon; label: string } {
+  const resultStatus = (() => {
+    if (!tc.result) return '';
+    try {
+      const status = JSON.parse(tc.result)?.status;
+      return typeof status === 'string' ? status : '';
+    } catch {
+      return '';
+    }
+  })();
+  const canceled = resultStatus === 'canceled';
+  const failed = resultStatus === 'error';
+  const interrupted = resultStatus === 'interrupted';
   const args = (() => {
     try {
       const parsed = JSON.parse(tc.arguments);
@@ -345,21 +382,33 @@ function toolPresentation(
   };
   const name = tc.name.toLowerCase();
 
-  // Image tools are the slow ones, so their label tracks progress instead of
-  // claiming the work is already done.
-  if (name.includes('generate_image'))
+  // Rendering is the slow step — minutes, not seconds — so the label tracks
+  // progress instead of claiming the work is already done.
+  if (name.includes('generate_video'))
     return {
       icon: Sparkles,
-      label: running
-        ? m['agent.chat.tool_generating_image']()
-        : m['agent.chat.tool_generated_image'](),
+      label: canceled
+        ? m['agent.chat.generation_stopped']()
+        : interrupted
+          ? m['agent.chat.generation_interrupted']()
+          : failed
+            ? m['agent.chat.generation_failed']()
+            : running
+              ? m['agent.chat.tool_generating_video']()
+              : m['agent.chat.tool_generated_video'](),
     };
-  if (name.includes('edit_image'))
+  if (name.includes('animate_image'))
     return {
-      icon: Wand2,
-      label: running
-        ? m['agent.chat.tool_editing_image']()
-        : m['agent.chat.tool_edited_image'](),
+      icon: Film,
+      label: canceled
+        ? m['agent.chat.generation_stopped']()
+        : interrupted
+          ? m['agent.chat.generation_interrupted']()
+          : failed
+            ? m['agent.chat.generation_failed']()
+            : running
+              ? m['agent.chat.tool_animating_image']()
+              : m['agent.chat.tool_animated_image'](),
     };
   if (name.includes('bash') || name.includes('shell') || name.includes('exec'))
     return {
@@ -396,8 +445,8 @@ function toolPresentation(
         target: str('path', 'dir', 'directory') || '.',
       }),
     };
-  if (name.includes('image') || name.includes('photo'))
-    return { icon: ImageIcon, label: tc.name };
+  if (name.includes('video') || name.includes('clip'))
+    return { icon: Film, label: tc.name };
 
   const rest = Object.values(args)
     .filter((v) => typeof v === 'string' || typeof v === 'number')
@@ -539,7 +588,7 @@ function MarkdownContent({
           if (suppressInlineImages) return null;
           if (surfacedSrcs?.has(src)) return null;
           return (
-            <AgentImage
+            <AgentMedia
               key={i}
               src={src}
               alt={p.alt}
@@ -562,7 +611,7 @@ function MarkdownContent({
                 if (surfacedSrcs?.has(url)) return null;
                 if (suppressInlineImages) return null;
                 return (
-                  <AgentImage
+                  <AgentMedia
                     src={url}
                     alt={alt || ''}
                     loading="lazy"
@@ -597,7 +646,13 @@ function MarkdownContent({
   );
 }
 
-function AgentImage({
+/**
+ * One piece of media in the transcript. A still is a button that opens the
+ * preview pane; a clip plays in place, because wrapping a player in a button
+ * would make every press of ▶ also throw the pane open. The clip gets its own
+ * corner control for that instead.
+ */
+function AgentMedia({
   src,
   alt,
   className,
@@ -608,18 +663,37 @@ function AgentImage({
   className?: string;
   loading?: 'eager' | 'lazy';
 }) {
-  const { openImage } = usePreviewPane();
+  const { openMedia } = usePreviewPane();
+  const open = () =>
+    openMedia({ src, alt, name: mediaNameFromUrl(src) || alt });
+
+  if (isVideoUrl(src)) {
+    return (
+      <div className="group relative block max-w-full overflow-hidden rounded-md">
+        <video
+          src={src}
+          controls
+          playsInline
+          preload="metadata"
+          aria-label={alt || undefined}
+          className={className}
+        />
+        <button
+          type="button"
+          onClick={open}
+          title={m['agent.preview.open_video']()}
+          className="absolute top-3 right-3 rounded-full bg-black/55 px-2 py-1 text-[11px] font-medium text-white opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+        >
+          {m['agent.preview.open_video']()}
+        </button>
+      </div>
+    );
+  }
 
   return (
     <button
       type="button"
-      onClick={() =>
-        openImage({
-          src,
-          alt,
-          name: imageNameFromUrl(src) || alt,
-        })
-      }
+      onClick={open}
       className="group relative block max-w-full cursor-zoom-in overflow-hidden rounded-md text-left"
       title={m['agent.preview.open_image']()}
     >
@@ -629,20 +703,4 @@ function AgentImage({
       </span>
     </button>
   );
-}
-
-export function imageNameFromUrl(src: string) {
-  try {
-    const url = new URL(src, window.location.origin);
-    const path = url.searchParams.get('path') || url.pathname;
-    return decodeURIComponent(path.split('/').filter(Boolean).pop() || '');
-  } catch {
-    return (
-      src
-        .split('/')
-        .filter(Boolean)
-        .pop()
-        ?.replace(/[?#].*$/, '') || ''
-    );
-  }
 }

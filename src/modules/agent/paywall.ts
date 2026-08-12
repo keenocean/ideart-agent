@@ -1,11 +1,11 @@
-import { creditsForModelOption } from '@/lib/agent-settings';
+import { creditsForGeneration } from '@/lib/agent-settings';
 
 /**
  * Whether a turn can go ahead, and what to say when it can't.
  *
  * Kept apart from the route so the rule can be exercised directly: the tool
  * call refuses on its own, but only after a full LLM turn has been paid for
- * and the user has watched the agent promise an image it cannot deliver.
+ * and the user has watched the agent promise a clip it cannot deliver.
  */
 export interface CreditVerdict {
   allowed: boolean;
@@ -15,9 +15,17 @@ export interface CreditVerdict {
 
 export function checkCredits(params: {
   modelName?: string;
+  /** Clip length in seconds; the catalog owns each model's valid choices. */
+  duration?: number;
+  /** Model-specific resolution multipliers match shipany-video-lite. */
+  resolution?: string;
   balance: number;
 }): CreditVerdict {
-  const required = creditsForModelOption(params.modelName);
+  const required = creditsForGeneration(
+    params.modelName,
+    params.duration,
+    params.resolution
+  );
   return {
     allowed: params.balance >= required,
     required,

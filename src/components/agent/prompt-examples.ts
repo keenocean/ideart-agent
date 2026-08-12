@@ -1,10 +1,4 @@
-import {
-  LayoutTemplate,
-  Palette,
-  PenTool,
-  Sparkles,
-  type LucideIcon,
-} from 'lucide-react';
+import { Film, type LucideIcon } from 'lucide-react';
 
 import { tDynamic } from '@/core/i18n/dynamic';
 
@@ -12,11 +6,9 @@ export interface PromptExample {
   key: string;
   title: string;
   prompt: string;
-  /** Optional thumbnail; falls back to a gradient tile when absent. */
-  image?: string;
-  /** The "before" picture(s), attached to the composer when the example is
-   *  picked, so the prompt has something to work on. A try-on case brings
-   *  two: the person and the garment. */
+  /** Generated example clip copied from shipany-video-lite. */
+  video?: string;
+  /** Optional generated opening frame for image-to-video examples. */
   sourceImage?: string;
   sourceImages?: string[];
   swatch: string;
@@ -29,125 +21,121 @@ export interface PromptCategory {
   examples: PromptExample[];
 }
 
-// Gradient placeholders stand in until real sample thumbnails are dropped in
-// (set `image` on an example to use a picture instead).
 const SWATCHES = [
-  'from-violet-200 via-indigo-200 to-sky-200',
-  'from-rose-200 via-pink-200 to-orange-200',
-  'from-amber-200 via-yellow-200 to-lime-200',
-  'from-emerald-200 via-teal-200 to-cyan-200',
+  'from-amber-200 via-orange-200 to-rose-200',
+  'from-orange-200 via-amber-100 to-yellow-200',
+  'from-stone-300 via-amber-200 to-orange-200',
+  'from-rose-200 via-orange-200 to-amber-200',
 ];
 
-/**
- * Real before/after samples, keyed by example. `image` is the result shown in
- * the grid; `sourceImage` is the original it was made from. Examples without
- * an entry keep their gradient tile.
- */
-const SAMPLES: Record<
-  string,
-  { image: string; sourceImage?: string; sourceImages?: string[] }
-> = {
-  // Logo and cover design are text-to-image, so most have no "before"; only
-  // the moodboard case works from a reference picture.
-  'logo-1': { image: '/imgs/examples/logo-1.webp' },
-  'logo-2': { image: '/imgs/examples/logo-2.webp' },
-  'logo-3': {
-    image: '/imgs/examples/logo-3.webp',
-    sourceImage: '/imgs/examples/logo-3-before.webp',
+/** Same generated showcase and ordering as shipany-video-lite. */
+const SHOWCASE = [
+  {
+    key: 'monster_bakery',
+    slug: 'monster-bakery',
+    video: '/videos/showcase/generated/monster-bakery.mp4',
+    sourceImage: '/images/showcase/generated/monster-bakery.png',
   },
-  'logo-4': { image: '/imgs/examples/logo-4.webp' },
-  'cover-1': { image: '/imgs/examples/cover-1.webp' },
-  'cover-2': { image: '/imgs/examples/cover-2.webp' },
-  'cover-3': { image: '/imgs/examples/cover-3.webp' },
-  'cover-4': { image: '/imgs/examples/cover-4.webp' },
-  'makeup-1': {
-    image: '/imgs/examples/makeup-1-after.webp',
-    // Two sources: the person and the garment — the composer attaches both.
-    sourceImages: [
-      '/imgs/examples/makeup-1-before.webp',
-      '/imgs/examples/makeup-1-before-2.webp',
-    ],
+  {
+    key: 'web_acrobat',
+    slug: 'web-acrobat',
+    video: '/videos/showcase/generated/web-acrobat.mp4',
   },
-  'makeup-2': {
-    image: '/imgs/examples/makeup-2-after.webp',
-    sourceImage: '/imgs/examples/makeup-2-before.webp',
+  {
+    key: 'paper_dragon',
+    slug: 'paper-dragon',
+    video: '/videos/showcase/generated/paper-dragon.mp4',
   },
-  'makeup-3': {
-    image: '/imgs/examples/makeup-3-after.webp',
-    sourceImage: '/imgs/examples/makeup-3-before.webp',
+  {
+    key: 'glacier_titan',
+    slug: 'glacier-titan',
+    video: '/videos/showcase/generated/glacier-titan.mp4',
   },
-  'makeup-4': {
-    image: '/imgs/examples/makeup-4-after.webp',
-    sourceImage: '/imgs/examples/makeup-4-before.webp',
+  {
+    key: 'airglide',
+    slug: 'airglide',
+    video: '/videos/showcase/generated/airglide-remake.mp4',
   },
-  // The style samples share two source portraits, both generated rather than
-  // photographed: a template ships to other people's sites, so a recognisable
-  // face in the demo becomes their problem too.
-  'style-1': {
-    image: '/imgs/examples/style-1-after.webp',
-    sourceImage: '/imgs/examples/style-source-a.webp',
+  {
+    key: 'poppies',
+    slug: 'poppies',
+    video: '/videos/showcase/generated/desert-poppies-remake.mp4',
   },
-  'style-2': {
-    image: '/imgs/examples/style-2-after.webp',
-    sourceImage: '/imgs/examples/style-source-b.webp',
+  {
+    key: 'monster_commuter',
+    slug: 'monster-commuter',
+    video: '/videos/showcase/generated/monster-commuter.mp4',
+    sourceImage: '/images/showcase/generated/monster-commuter.png',
   },
-  'style-3': {
-    image: '/imgs/examples/style-3-after.webp',
-    sourceImage: '/imgs/examples/style-source-a.webp',
+  {
+    key: 'dragon',
+    slug: 'new-york-dragon',
+    video: '/videos/showcase/generated/new-york-dragon-remake.mp4',
   },
-  'style-4': {
-    image: '/imgs/examples/style-4-after.webp',
-    sourceImage: '/imgs/examples/style-source-b.webp',
+  {
+    key: 'koi_train',
+    slug: 'koi-train',
+    video: '/videos/showcase/generated/porcelain-koi-train.mp4',
+    sourceImage: '/images/showcase/generated/porcelain-koi-train.png',
   },
-};
+  {
+    key: 'conservatory',
+    slug: 'conservatory',
+    video: '/videos/showcase/generated/night-conservatory.mp4',
+    sourceImage: '/images/showcase/generated/night-conservatory.png',
+  },
+  {
+    key: 'rain_market',
+    slug: 'rain-market',
+    video: '/videos/showcase/generated/rain-puddle-market.mp4',
+  },
+  {
+    key: 'orb',
+    slug: 'london-orb',
+    video: '/videos/showcase/generated/london-orb-remake.mp4',
+  },
+  {
+    key: 'tidal',
+    slug: 'tidal-library',
+    video: '/videos/showcase/generated/tidal-library.mp4',
+  },
+  {
+    key: 'laundromat',
+    slug: 'laundromat',
+    video: '/videos/showcase/generated/sailcloth-laundromat.mp4',
+  },
+  {
+    key: 'ship',
+    slug: 'storm-ship',
+    video: '/videos/showcase/generated/storm-ship-remake.mp4',
+  },
+  {
+    key: 'asteroids',
+    slug: 'asteroids',
+    video: '/videos/showcase/generated/asteroids-remake.mp4',
+  },
+  {
+    key: 'woman',
+    slug: 'woman',
+    video: '/videos/showcase/woman.mp4',
+  },
+] as const;
 
-const CATEGORY_ICONS: Record<string, LucideIcon> = {
-  style: Palette,
-  makeup: Sparkles,
-  cover: LayoutTemplate,
-  logo: PenTool,
-};
-
-const CATEGORY_KEYS = ['style', 'makeup', 'cover', 'logo'] as const;
-
-// Upper bound for the scan below, not a required count — a category ends at
-// its first missing translation.
-const MAX_ITEMS_PER_CATEGORY = 8;
-
-/**
- * How many examples a category actually has. `tDynamic` echoes the key back
- * when there is no message for it, which is what marks the end — so dropping
- * an example is an edit to messages/*.json, not to this file.
- */
-function itemCount(cat: string): number {
-  let count = 0;
-  while (count < MAX_ITEMS_PER_CATEGORY) {
-    const key = `landing.examples.${cat}.item_${count + 1}_title`;
-    if (tDynamic(key) === key) break;
-    count += 1;
-  }
-  return count;
-}
-
-/**
- * The example browser's content: a handful of broad categories, each with a
- * few concrete scenarios whose prompt drops straight into the composer.
- * Reads i18n, so call it during render.
- */
+/** Reads translations at render time, matching the rest of the Agent UI. */
 export function promptCategories(): PromptCategory[] {
-  return CATEGORY_KEYS.map((cat) => ({
-    key: cat,
-    icon: CATEGORY_ICONS[cat],
-    title: tDynamic(`landing.examples.${cat}.title`),
-    examples: Array.from({ length: itemCount(cat) }, (_, i) => {
-      const key = `${cat}-${i + 1}`;
-      return {
-        key,
-        title: tDynamic(`landing.examples.${cat}.item_${i + 1}_title`),
-        prompt: tDynamic(`landing.examples.${cat}.item_${i + 1}_prompt`),
-        swatch: SWATCHES[i % SWATCHES.length],
-        ...SAMPLES[key],
-      };
-    }),
-  }));
+  return [
+    {
+      key: 'showcase',
+      icon: Film,
+      title: tDynamic('video.clone.prompts.eyebrow'),
+      examples: SHOWCASE.map((item, index) => ({
+        key: item.slug,
+        title: tDynamic(`video.clone.prompts.${item.key}`),
+        prompt: tDynamic(`video.clone.prompts.${item.key}_text`),
+        video: item.video,
+        sourceImage: 'sourceImage' in item ? item.sourceImage : undefined,
+        swatch: SWATCHES[index % SWATCHES.length],
+      })),
+    },
+  ];
 }

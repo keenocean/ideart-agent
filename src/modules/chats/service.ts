@@ -9,6 +9,7 @@ import {
   type ChatMessage,
 } from '@/config/db/schema';
 import { getUuid } from '@/lib/hash';
+import { isDisplayableMediaUrl } from '@/lib/media';
 
 // Stored payload shape for `chat.parts` and `chat_message.parts` (JSON text).
 // `text` carries plain content, `tool_call` carries a single tool invocation
@@ -56,13 +57,20 @@ function firstText(parts: StoredPart[]): string {
 }
 
 /**
- * The composer appends the uploaded image URLs to the message so the agent
+ * The composer appends uploaded reference URLs to the message so the agent
  * can act on them (see `buildAgentMessage`). They're machine plumbing — drop
  * them from anything a human reads, like the chat title or list preview.
  */
 function withoutAttachedImages(s: string): string {
-  const at = s.indexOf('\n\nAttached images:\n');
-  return at === -1 ? s : s.slice(0, at);
+  const starts = [
+    s.indexOf('\n\nAttached media:\n'),
+    s.indexOf('\n\nAttached images:\n'),
+    s.indexOf('\n\nAttached frames:\n'),
+    s.indexOf('\n\nAttached reference images:\n'),
+    s.indexOf('\n\nAttached reference audio:\n'),
+    s.indexOf('\n\nAttached videos:\n'),
+  ].filter((index) => index >= 0);
+  return starts.length === 0 ? s : s.slice(0, Math.min(...starts));
 }
 
 /** Truncate to a sensible preview length without splitting graphemes too aggressively. */
@@ -160,6 +168,58 @@ export async function appendMessage(
   return row;
 }
 
+/**
+ * Resolve unfinished tool rows when a chat run is stopped outside the
+ * original SSE request (for example after a refresh or dropped connection).
+ */
+export async function cancelPendingToolCalls(
+  chatId: string,
+  userId: string
+): Promise<number> {
+  const rows = await db()
+    .select()
+    .from(chatMessage)
+    .where(
+      and(
+        eq(chatMessage.chatId, chatId),
+        eq(chatMessage.userId, userId),
+        eq(chatMessage.status, CHAT_STATUS_ACTIVE),
+        eq(chatMessage.role, 'assistant')
+      )
+    );
+
+  const canceledResult = JSON.stringify({
+    status: 'canceled',
+    message: 'Generation stopped by the user.',
+  });
+  let count = 0;
+
+  for (const row of rows) {
+    const parts = decodeParts(row.parts);
+    let changed = false;
+    const next = parts.map((part) => {
+      if (part.type !== 'tool_call' || part.result !== undefined) return part;
+      changed = true;
+      count += 1;
+      return { ...part, result: canceledResult };
+    });
+    if (!changed) continue;
+
+    await db()
+      .update(chatMessage)
+      .set({ parts: encodeParts(next) })
+      .where(and(eq(chatMessage.id, row.id), eq(chatMessage.userId, userId)));
+  }
+
+  if (count > 0) {
+    await db()
+      .update(chat)
+      .set({ updatedAt: new Date() })
+      .where(and(eq(chat.id, chatId), eq(chat.userId, userId)));
+  }
+  return count;
+}
+
 export interface ChatListItem {
   id: string;
   title: string;
@@ -251,16 +311,9 @@ export async function listChats(
   return { items, total };
 }
 
-const IMAGE_EXT_RE = /\.(?:png|jpe?g|gif|webp|svg)\b/i;
-
-function isDisplayableImageUrl(url: string) {
-  if (url.startsWith('data:image/')) return true;
-  return IMAGE_EXT_RE.test(url);
-}
-
 function fileNameFromUrl(src: string) {
   try {
-    const url = new URL(src, 'https://image-agent.local');
+    const url = new URL(src, 'https://video-agent.local');
     const path = url.searchParams.get('path') || url.pathname;
     return decodeURIComponent(path.split('/').filter(Boolean).pop() || '');
   } catch {
@@ -297,7 +350,7 @@ function extractGeneratedImagesFromResult(
   const seen = new Set<string>();
   const images: string[] = [];
   const push = (src: string) => {
-    if (!isDisplayableImageUrl(src)) return;
+    if (!isDisplayableMediaUrl(src)) return;
     if (seen.has(src)) return;
     seen.add(src);
     images.push(src);
@@ -328,11 +381,11 @@ export interface GeneratedImagePage {
 }
 
 /**
- * One page of the user's generated images, newest first.
+ * One page of the user's generated media, newest first.
  *
- * Images live inside message payloads rather than a table of their own, so
- * the page is taken over *messages* and the images they carry are flattened
- * out — a message with three images contributes three. Page sizes therefore
+ * Files live inside message payloads rather than a table of their own, so
+ * the page is taken over *messages* and the media they carry are flattened
+ * out — a message with three clips contributes three. Page sizes therefore
  * wobble a little, which is why this is a "load more" cursor rather than
  * numbered pages.
  *
@@ -361,7 +414,7 @@ export async function listGeneratedImages(
         eq(chat.userId, userId),
         eq(chat.status, CHAT_STATUS_ACTIVE),
         eq(chatMessage.status, CHAT_STATUS_ACTIVE),
-        // Only tool results carry images; the filter runs in SQL so pages of
+        // Only tool results carry generated media; this runs in SQL so pages of
         // plain conversation don't come back empty.
         like(chatMessage.parts, '%"tool_call"%'),
         ...(cursor
@@ -390,7 +443,7 @@ export async function listGeneratedImages(
         const dedupeKey = `${row.chatId}:${src}`;
         if (seen.has(dedupeKey)) continue;
         seen.add(dedupeKey);
-        const name = fileNameFromUrl(src) || 'image';
+        const name = fileNameFromUrl(src) || 'clip';
         items.push({
           id: `${row.id}:${items.length}`,
           src,

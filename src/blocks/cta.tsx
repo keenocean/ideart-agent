@@ -11,7 +11,7 @@ export function CTA() {
       <div className="border-border from-primary/10 via-card to-card relative mx-auto max-w-4xl overflow-hidden rounded-lg border bg-gradient-to-br px-6 py-16 text-center sm:px-12 sm:py-20">
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-x-0 -top-40 -z-0 h-[400px] bg-[radial-gradient(50%_50%_at_50%_50%,oklch(0.72_0.16_45_/_0.25),transparent_70%)]"
+          className="pointer-events-none absolute inset-x-0 -top-40 -z-0 h-[400px] bg-[radial-gradient(50%_50%_at_50%_50%,oklch(0.63_0.23_348_/_0.22),transparent_70%)]"
         />
         <div className="relative">
           <h2 className="text-foreground text-3xl font-bold tracking-[-0.02em] sm:text-5xl">
