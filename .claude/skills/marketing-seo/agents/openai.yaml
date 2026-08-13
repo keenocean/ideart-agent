@@ -1,0 +1,7 @@
+interface:
+  display_name: "Marketing SEO"
+  short_description: "Own public marketing-page SEO from research to release"
+  default_prompt: "Use $marketing-seo to add or update this public marketing page and own its research, implementation, release decision, and verification."
+
+policy:
+  allow_implicit_invocation: true

@@ -428,6 +428,7 @@ it when the task matches:
 | `new-page`          | New dashboard page with API wiring + nav entry                                                                                      |
 | `new-static-page`   | Static MDX page (legal, about, etc.)                                                                                                |
 | `generate-image`    | AI-generate a decorative image for a page/block                                                                                     |
+| `marketing-seo`     | Agent-owned lifecycle for adding, updating, renaming, publishing, or monitoring public tool/model/marketing pages                   |
 | `security-scan`     | **Before every git commit** — secrets, vulns, ignore gaps                                                                           |
 | `launch-audit`      | Whole-project sweep on one axis — responsive, light/dark theme, SEO, performance (Lighthouse), or security; run `all` before deploy |
 | `sync-upstream`     | Pull latest template updates; local changes win on conflict                                                                         |

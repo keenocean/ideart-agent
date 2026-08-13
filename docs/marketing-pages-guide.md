@@ -46,12 +46,14 @@ Runtime
 | Page shells    | 是           | ToolDetailPage、ModelDetailPage、DirectoryPage |
 | Project blocks | 视项目重写   | HomeHero、案例、品牌内容、专属教程             |
 
-经验目标是：普通详情页约 70% 公共骨架、30% 页面内容和变体；重点 SEO 页面可以有更多专属内容。
+普通详情页可把约 70% 公共骨架、30% 页面内容和变体作为内部设计启发，不把比例当作硬性验收指标；重点 SEO 页面可以有更多专属内容。
 
 ## 2. 推荐目录
 
 ```text
 src/
+├── lib/
+│   └── seo.ts
 ├── components/marketing/
 │   ├── section-heading.tsx
 │   ├── directory-card-grid.tsx
@@ -89,37 +91,54 @@ src/
 
 ## 3. Catalog 设计
 
-### 3.1 发布状态与能力状态分离
+### 3.1 发布、收录与能力状态分离
 
 ```ts
 type Publication = 'listed' | 'unlisted' | 'hidden';
 type Availability = 'live' | 'beta' | 'coming-soon';
+type Indexing = 'index' | 'noindex';
 
-type MarketingPlacement = {
-  homeFeatured?: boolean;
-  homeOrder?: number;
-  directoryOrder: number;
+type MarketingVisibility =
+  | {
+      publication: 'listed';
+      indexing: Indexing;
+      placement: {
+        homeFeatured?: boolean;
+        homeOrder?: number;
+        directoryOrder: number;
+      };
+    }
+  | {
+      publication: 'unlisted' | 'hidden';
+      indexing?: never;
+      placement?: never;
+    };
+
+type MarketingDefinitionBase = MarketingVisibility & {
+  availability: Availability;
 };
 ```
 
 发布语义：
 
-| 状态                 | 详情页 | 首页/目录 | Sitemap | Robots  | Workbench        |
-| -------------------- | ------ | --------- | ------- | ------- | ---------------- |
-| listed + live        | 200    | 显示      | 收录    | index   | 可运行           |
-| listed + beta        | 200    | 显示 Beta | 收录    | index   | 可运行并显示限制 |
-| listed + coming-soon | 200    | 可显示    | 收录    | index   | 禁用             |
-| unlisted             | 200    | 不显示    | 不收录  | noindex | 按能力状态       |
-| hidden               | 404    | 不显示    | 不收录  | —       | 无               |
+| 状态                 | 详情页 | 首页/目录 | Sitemap                           | Robots                           | Workbench                  |
+| -------------------- | ------ | --------- | --------------------------------- | -------------------------------- | -------------------------- |
+| listed + live        | 200    | 显示      | 仅显式 index 时收录               | 按 indexing                      | 按部署就绪度运行           |
+| listed + beta        | 200    | 显示 Beta | 仅显式 index 时收录               | 按 indexing                      | 按部署就绪度运行并显示限制 |
+| listed + coming-soon | 200    | 可显示    | 仅有实质预发布内容且显式 index 时 | 默认 noindex，内容审核后可 index | 禁用                       |
+| unlisted             | 200    | 不显示    | 不收录                            | noindex,follow                   | 按能力与部署就绪度         |
+| hidden               | 404    | 不显示    | 不收录                            | —                                | 无                         |
 
-首页、目录、Related、Sitemap 和 llms 文档必须共用 selector，不能分别维护发布列表。
+`publication`、`availability` 和 `indexing` 分别表达发现性、产品生命周期和搜索收录，不能互相代替。coming-soon 空壳页保持 noindex；只有已经提供稳定、独特、可帮助用户的预发布内容时才允许 index。
+
+首页、目录、Related、Sitemap 和 llms 文档必须共享同一个 selector 模块和状态语义，但使用与消费场景匹配的命名投影：`selectHomeEntries`、`selectDirectoryEntries`、`selectRelatedEntries`、`selectIndexableEntries`、`selectLlmsEntries`。Related 只返回显式引用、存在、非自身且 listed 的目标；Sitemap 只返回 indexable canonical 页面。
 
 ### 3.2 Catalog 只描述营销映射
 
 工具定义可以包含：
 
 - slug
-- publication / availability
+- publication / availability / indexing
 - 首页和目录排序
 - 关联工具
 - 素材标识
@@ -131,7 +150,7 @@ type MarketingPlacement = {
 
 - slug
 - runtime model key
-- publication / availability
+- publication / availability / indexing
 - 首页和目录排序
 - 关联模型
 - 页面变体和案例标识
@@ -145,7 +164,16 @@ Catalog 不得成为以下信息的权威来源：
 - 任意 Skill 名称
 - 模型分辨率、时长等运行时约束
 
-这些信息应从 `src/lib/agent-settings.ts` 或服务端 Catalog 派生，并在服务端再次验证。
+这些信息应从 `src/lib/agent-settings.ts` 或服务端 Catalog 派生，并在服务端再次验证。模型引用按模态区分：图片使用 `AgentImageModelOptionValue`，视频使用 `AgentModelOptionValue`，不创建模糊两套约束的通用 key。
+
+### 3.3 产品状态与部署就绪度分离
+
+`availability: 'live'` 表示产品契约已经发布，不保证当前部署已经配置好 Provider、模型路由和对象存储。Workbench 必须读取服务端派生的安全能力快照，只向客户端返回 `executable` 和可公开原因，不返回凭据或内部模型映射。
+
+- Reference-to-video 需要 gRouter、对应模型路由和对象存储。
+- 一般视频生成也需要至少一个受支持 Provider 和对象存储。
+- 瞬时就绪度只控制 Workbench，不改变 publication/indexing 或 Sitemap，避免 SEO URL 随配置或故障抖动。
+- 上线前，目标生产环境中每个 listed/live Workbench 都必须通过能力预检；未就绪则降级状态或阻止发布。
 
 ## 4. 共享生成入口
 
@@ -167,10 +195,16 @@ Catalog 不得成为以下信息的权威来源：
 ```ts
 type GenerationPreset = {
   initialPrompt?: string;
-  mediaMode?: 'auto' | 'image' | 'video';
-  modelKey?: AgentModelKey;
-  requiredInput?: 'none' | 'image' | 'video' | 'media';
-  settings?: SafeComposerSettings;
+  target:
+    | { mediaMode: 'auto'; modelKey?: never }
+    | { mediaMode: 'image'; modelKey?: AgentImageModelOptionValue }
+    | { mediaMode: 'video'; modelKey?: AgentModelOptionValue };
+  settings?: Partial<AgentComposerSettings>;
+  inputPolicy?: {
+    minimum: number;
+    maximum?: number;
+    accepts: readonly AttachmentMediaType[];
+  };
   locks?: {
     mediaMode?: boolean;
     model?: boolean;
@@ -179,21 +213,29 @@ type GenerationPreset = {
 ```
 
 - 首页使用 default preset，不覆盖用户已有合法设置。
-- 工具页可以锁定 mediaMode 和 requiredInput。
-- 模型页可以锁定 modelKey。
+- 工具页可以锁定 mediaMode 和 input policy。
+- 模型页使用与 image/video modality 匹配的 modelKey。
 - 所有 preset 必须通过现有 normalization。
+- 设置优先级固定为 runtime defaults → 合法持久化设置 → 页面 default 补缺 → 页面 locked 覆盖 → normalization。
+- 工具/模型页的设置修改默认只作用于本次 handoff；用户显式保存为默认值后才能写全局 localStorage。
+- input policy 只表达入口规则，`maximum` 只能收紧、不能放宽 runtime 上限；真实模型/operation 上限继续从 runtime 派生并由服务端验证。
 - preset 不得修改积分、Provider、系统 Prompt 或工具权限。
 
 工具执行适配器保留两种方式：
 
 ```ts
+const DEDICATED_TOOL_OPERATIONS = [] as const; // 当前没有专用 operation
+type DedicatedToolOperation = (typeof DEDICATED_TOOL_OPERATIONS)[number];
+
 type ToolExecution =
   | { kind: 'agent-preset'; preset: GenerationPreset }
   | { kind: 'dedicated-api'; operation: DedicatedToolOperation };
 ```
 
 - 生成式图片、视频和编辑任务进入 Chat。
-- 未来确定性抠图、压缩、格式转换等工具可以留在当前页调用专用 API。
+- 当前初始 Catalog 只能使用 `agent-preset`。未来确定性抠图、压缩、格式转换等工具先实现并验证服务端 operation，再把 literal 加入白名单，之后才允许留在当前页调用专用 API。
+
+认证回跳必须使用一个共享的纯函数 sanitizer。Agent/App guard、sign-in、sign-up、verify-email 和 OAuth 均接受同站相对 callback，拒绝外部 URL、协议相对 URL、编码绕过和认证页循环；已登录分支也必须尊重合法 callback。首轮 prompt/settings/skill/attachments 只有在服务端接受 turn 后才从 sessionStorage 删除。OAuth 没有可用凭据或合法回调域时以 mock/contract test 验证，只有环境具备条件时才要求真实 provider smoke。
 
 ## 5. 页面公共骨架与差异化
 
@@ -303,22 +345,107 @@ type DetailPageVariant = {
 
 共享 React 组件不会造成 SEO 问题。搜索引擎读取的是最终 HTML，关键是页面是否提供独特、准确、对用户有价值的内容。
 
-每个 listed 页面至少应有自己的：
+SEO 实现分为三层：内容与搜索意图决定页面是否值得 index，统一 route head 契约决定爬虫和分享平台读到什么，状态矩阵与上线监测负责证明它持续正确。不能用补齐标签掩盖薄内容或重叠页面。
 
-- title 和 meta description
-- 唯一 H1
-- 清晰的任务/模型介绍
-- 真实 Workbench 预设
-- 独特案例和 Prompt
-- 能力、适用场景与限制
-- 相关页面内链
-- canonical 和 hreflang
-- Open Graph 图片
-- Breadcrumb JSON-LD
+### 7.1 搜索意图与发布门槛
 
-结构化数据必须与页面上真实可见的内容一致。不要为了 Rich Results 生成页面没有展示的 FAQ、价格或评价。
+每个准备 `index` 的页面必须先建立按语言区分的 SEO 内容 brief：
 
-### 7.1 Blog 内容层
+- 主要搜索意图、query cluster 和用户决策阶段
+- 次要问题与正文必须覆盖的主题
+- canonical target，以及与相邻页面的内容边界
+- 来自首页、目录、Blog、related cards 的内链来源和 anchor 策略
+- 独特案例、Prompt、能力证据、限制和内容审核状态
+
+工具页回答“如何完成某项任务”，模型页回答“该模型是否适合某场景”。例如通用 AI 图片生成器与 GPT Image 2、通用 text/image-to-video 与具体视频模型页面不能用近似标题和正文争夺同一查询。
+
+新增 listed 页面默认 `indexing: 'noindex'`。只有以下条件全部满足后才切换为 `index`：
+
+- SSR HTML 有唯一 H1、实质正文、真实案例/Prompt、能力和限制。
+- 搜索意图明确，和相邻页面不存在未解释的关键词蚕食。
+- 关键页面能从首页、目录、Blog 或 related cards 通过描述性 anchor 到达。
+- route metadata、sitemap 和状态矩阵测试通过。
+- 当前语言是真实本地化内容，而不只是补齐 message key。
+
+`alternates` 只记录具备实质内容且允许 index 的真实语言版本，并为每种语言保存准确的 locale-free canonical path；翻译缺失或仍为 noindex 时不要输出对应 hreflang。显式 path 也能兼容未来不同语言使用不同 slug。
+
+### 7.2 统一 route head 契约
+
+`src/lib/seo.ts` 作为唯一 metadata 构造入口，统一输出 TanStack Router 的 `head.meta`、`head.links` 和 `head.scripts`。路由不分别手写 canonical、hreflang、Open Graph 或 JSON-LD。
+
+```ts
+type SeoHeadInput = {
+  title: string;
+  description: string;
+  path: string;
+  locale: (typeof locales)[number];
+  alternates: readonly {
+    locale: (typeof locales)[number];
+    path: string;
+  }[];
+  indexing: 'index' | 'noindex';
+  image?: {
+    src: string;
+    alt: string;
+    width: number;
+    height: number;
+    type?: string;
+  };
+  breadcrumbs?: readonly SeoBreadcrumb[];
+  faq?: readonly SeoFaq[];
+};
+```
+
+动态路由的 loader 先读取 locale、解析 definition 和内容；hidden/未知 slug 在生成 head 前 `throw notFound()`。loader 只返回可序列化数据，route `head({ loaderData })` 再调用 `buildSeoHead(loaderData.seo)`。React 值、message functions 和 server-only 对象不得进入 loaderData。
+
+根路由维护站点级默认项；子路由维护页面级 title、description、URL 和图片。最终 head 中每种页面级标签只保留一份，不依赖覆盖顺序制造重复项。
+
+### 7.3 Canonical、hreflang、robots 与 sitemap
+
+- 唯一内容页使用 self-referencing canonical：英文保持 locale-free URL，中文使用 `/zh`，中文不得 canonical 到英文。
+- canonical 和 alternate 使用基于生产 `VITE_APP_URL` 的绝对 HTTPS URL，去掉 hash 和追踪参数，并遵守统一 trailing-slash 规则。分页、筛选等功能参数必须有显式 index/canonical 策略，不能由通用 helper 一律删除。
+- hreflang 只在当前页及目标语言页均可索引时输出，并包含当前页自身；同组页面必须 reciprocal。只有 baseLocale 版本真实存在时才输出指向它的 `x-default`。
+- noindex 页面可保留 self-canonical，但不进入 sitemap。不要用 robots.txt 屏蔽 noindex URL，否则爬虫看不到 noindex 指令。
+- `robots.txt` 保持公开 canonical 页面可抓取、屏蔽私有 app/admin/API 路径，并输出唯一的绝对 sitemap 地址。
+- sitemap 只输出 `selectIndexableEntries` 的 canonical URL；`lastmod` 使用真实内容更新时间，没有可靠值时省略，禁止写构建时间。Google 会忽略 `priority` 和 `changefreq`，不要把它们当作优化手段。
+- 已发布 slug 变更必须维护 `legacySlug → 301 canonical target`；永久删除使用明确 410 或经过评审的替代跳转。
+- hidden 页面返回 404，不生成实体 metadata。
+- `llms.txt` 和 `llms-full.txt` 是实验性发现端点，不是搜索引擎标准或发布阻塞项；只输出 `selectLlmsEntries` 允许公开发现的内容，并返回 `X-Robots-Tag: noindex`，同时保留缓存、体积和转义边界。
+
+### 7.4 Open Graph 与 Twitter Card
+
+- 工具、模型、首页和目录页使用 `og:type=website`；Blog 使用 `article`。
+- 页面输出 localized title/description、`og:url`、站点名、图片 URL/alt/width/height/type、`og:locale` 和真实 alternate locales。
+- 维护类型安全的 app locale → Open Graph locale 映射（当前项目如 `en → en_US`、`zh → zh_CN`），不要把 Paraglide 的短 locale code 原样写进 `og:locale`。
+- `og:url` 必须等于当前语言 canonical；Twitter 输出 `summary_large_image`、title、description、image 和 image alt，并复用同一数据源。
+- 图片必须是公开、绝对、返回 200 的 URL。优先使用 1200×630 专属图，没有时回退到经过验证的站点默认图；禁止 localhost、需认证或缺失资源。
+- 没有稳定、公开、适合分享的视频时不输出 `og:video`。Open Graph 优化分享呈现，不构成排名保证。
+
+### 7.5 Structured data
+
+- 根路由维护真实的 `WebSite`/`Organization`。
+- 目录和详情页的 `BreadcrumbList` 必须与可见 breadcrumb 一致。
+- 只有页面完整展示来自同一内容源的对应问答时才输出 `FAQPage`；它是可选语义增强，不承诺普通商业站点获得 FAQ 富结果。
+- Blog 使用与可见文章一致的 `BlogPosting`。
+- 不得虚构 `Product`、`SoftwareApplication`、价格、评分、评价或不存在的 AI 模型 schema。只有业务事实和 Google 必填字段都满足时才引入相应类型。
+- JSON-LD 必须在 SSR HTML 中输出、可解析，并通过共享 serializer 将 `<` 转义为 `\u003c`，防止 `</script>` 注入。现有 root 与 Blog 的局部 serializer 应迁移到 `src/lib/seo.ts`。
+
+代表性页面使用 Rich Results Test 或 Schema Validator 验证；通过表示语法和资格满足规则，不保证搜索结果一定展示富结果。
+
+### 7.6 技术状态矩阵
+
+| 页面状态                       | HTTP | robots         | canonical | hreflang                         | sitemap | JSON-LD                    |
+| ------------------------------ | ---- | -------------- | --------- | -------------------------------- | ------- | -------------------------- |
+| listed + index                 | 200  | index,follow   | self      | 有译文时互返；可用时含 x-default | 是      | 与可见内容一致             |
+| listed + noindex               | 200  | noindex,follow | self      | —                                | 否      | 可选，但必须与可见内容一致 |
+| unlisted                       | 200  | noindex,follow | self      | —                                | 否      | 可选，但必须与可见内容一致 |
+| hidden / 未知 slug             | 404  | —              | —         | —                                | 否      | 不生成实体数据             |
+| coming-soon + 实质内容 + index | 200  | index,follow   | self      | 有译文时互返；可用时含 x-default | 是      | 只描述已公开事实           |
+| coming-soon + 空壳/待审核      | 200  | noindex,follow | self      | —                                | 否      | 不输出误导性功能声明       |
+
+route head、SSR smoke 和 sitemap 必须共同遵守这张矩阵，禁止各自维护另一套解释。
+
+### 7.7 Blog 内容层
 
 Blog 以 SEO 为第一目标，正文只从数据库读取：
 
@@ -337,13 +464,14 @@ Blog 以 SEO 为第一目标，正文只从数据库读取：
 
 1. 在 Admin → Posts 创建对应语言的数据库文章并设为 `published`。
 2. 填写标题、唯一描述、封面、作者、分类和完整正文。
-3. 确认封面资源使用外部对象存储 URL；只有真实存在的译文才声明对应 hreflang。
+3. 确认封面资源使用外部对象存储 URL；只有真实存在且允许 index 的译文才声明对应 hreflang。
 4. 验证 SSR 文章页、canonical、结构化数据、sitemap、`llms.txt` 与 `llms-full.txt`。
 
 SEO 发布门槛：
 
 - 只有标题和一段替换文案的页面不得 listed。
 - 没有真实运行能力的页面必须标记 beta/coming-soon。
+- coming-soon 空壳页必须 noindex；只有通过内容审核的实质预发布页才允许 index 并进入 Sitemap。
 - 同一内容只保留一个 canonical URL。
 - unlisted 页面输出 `noindex,follow`。
 - hidden 页面返回 404。
@@ -352,7 +480,18 @@ SEO 发布门槛：
 
 - [Google SEO Starter Guide](https://developers.google.com/search/docs/fundamentals/seo-starter-guide)
 - [Creating helpful, reliable, people-first content](https://developers.google.com/search/docs/fundamentals/creating-helpful-content)
+- [TanStack Router document head management](https://tanstack.com/router/latest/docs/guide/document-head-management)
+- [Canonical URL guidance](https://developers.google.com/search/docs/crawling-indexing/consolidate-duplicate-urls)
+- [Block indexing with noindex](https://developers.google.com/search/docs/crawling-indexing/block-indexing)
 - [Breadcrumb structured data](https://developers.google.com/search/docs/appearance/structured-data/breadcrumb)
+- [Structured data general guidelines](https://developers.google.com/search/docs/appearance/structured-data/sd-policies)
+- [Software app structured data](https://developers.google.com/search/docs/appearance/structured-data/software-app)
+- [Build and submit a sitemap](https://developers.google.com/search/docs/crawling-indexing/sitemaps/build-sitemap)
+- [Localized versions and hreflang](https://developers.google.com/search/docs/specialty/international/localized-versions)
+- [FAQ rich result availability](https://developers.google.com/search/blog/2023/08/howto-faq-changes)
+- [Open Graph protocol](https://ogp.me/)
+- [llms.txt proposal](https://llmstxt.org/)
+- [Core Web Vitals](https://web.dev/articles/vitals)
 
 ## 8. Cloudflare Worker 体积控制
 
@@ -360,7 +499,8 @@ SEO 发布门槛：
 
 ### 8.1 资源放置
 
-- 图片、视频、字体放 `public/` 或 Workers Static Assets。
+- 小型图片、视频、字体放 `public/` 或 Workers Static Assets；单文件必须小于 Cloudflare 的 25 MiB 限制。
+- 更大的示例视频放 R2/S3，并使用优化 poster，不能依赖 Worker Static Assets 部署。
 - 不把大图片转为 Base64 写入 TS/JSON。
 - 不把完整视频或大型案例数据 import 到 Worker 全局模块。
 - Blog 正文固定存入 D1/Postgres 等外部数据层，不随 Worker 代码部署；大封面和媒体固定放 R2/S3。
@@ -400,28 +540,40 @@ npx wrangler deploy --outdir bundled --dry-run
 - [Cloudflare Static Assets](https://developers.cloudflare.com/workers/static-assets/)
 - [Static Assets billing and limitations](https://developers.cloudflare.com/workers/static-assets/billing-and-limitations/)
 
+### 8.2 浏览器侧性能
+
+Worker gzip 体积只衡量服务端部署包，不能代替浏览器 route JS 和首屏资源预算。实现前记录首页与代表性详情页的 route client JS gzip、Lighthouse 和网络瀑布，再据此设定回归阈值；新增页面不得出现未解释的显著增长。
+
+- H1、核心正文、能力/限制和关键内链必须出现在 SSR HTML。
+- 上传器、案例画廊、Skill 面板和 below-fold 重交互按路由或交互懒加载。
+- 图片提供固有尺寸、响应式来源和准确 alt；视频首屏使用轻量 poster，避免自动下载非必要媒体。
+- 检查公共 shell 是否意外把全部页面专属 Block 打入每条路由。
+- Lighthouse 以 LCP ≤ 2.5s、CLS ≤ 0.1 为实验室目标；上线后监测真实用户 75 分位 INP ≤ 200ms。
+
 ## 9. 新增工具页流程
 
 1. 确认运行时真实支持该能力。
 2. 选择 `agent-preset` 或 `dedicated-api`。
-3. 在 Tool Catalog 注册 slug、状态、placement、related 和 variant。
-4. 添加中英文文案和真实案例。
-5. 若需要，添加专属 Block；否则使用共享模板。
-6. 添加 preset/能力一致性测试。
-7. 验证首页、目录、Related、Sitemap、llms 的显示规则。
-8. 验证生成入口、登录回跳和输入要求。
-9. 运行 test/build/Cloudflare dry-run/视觉检查。
+3. 在 `docs/marketing-pages-seo-map.md` 建立中英文搜索意图/query map、内链来源和与其他工具/模型页的边界；新条目先注册为 noindex。
+4. 在 Tool Catalog 注册 slug、publication/availability/indexing、placement、related 和 variant。
+5. 添加中英文文案、真实案例、内链来源和专属 OG 图片或已验证的默认图。
+6. 若需要，添加专属 Block；否则使用共享模板。
+7. 添加 modality-safe preset、input policy、runtime 能力和 DeploymentReadiness 一致性测试。
+8. 验证统一 route head、Home/Directory/Related/Indexable/llms selectors 和技术状态矩阵。
+9. 验证生成入口和登录/注册/验证/OAuth callback contract/已登录回跳；真实 OAuth smoke 只在已配置合法回调域时要求。
+10. 内容与技术门槛全部通过后才切换为 index，并运行 test/typecheck/format/build、SSR/SEO smoke、Cloudflare dry-run 和视觉/性能检查。
 
 ## 10. 新增模型页流程
 
 1. 先将模型完整接入 runtime Catalog、Provider、计费和工具 allowlist。
 2. 在 Model Catalog 引用已有 runtime key。
-3. 注册 slug、状态、placement、related 和 variant。
-4. 从 runtime Catalog 派生规格，不复制业务数据。
-5. 添加模型特有案例、Prompt 指南、适用场景和限制。
-6. 添加 runtime key 一致性测试。
-7. 验证锁定模型 Workbench 只显示受支持参数。
-8. 运行 test/build/Cloudflare dry-run/视觉检查。
+3. 在 `docs/marketing-pages-seo-map.md` 建立中英文搜索意图/query map、内链来源和与通用工具/其他模型页的边界；新条目先注册为 noindex。
+4. 注册 slug、publication/availability/indexing、placement、related 和 variant。
+5. 从 runtime Catalog 派生规格，不复制业务数据。
+6. 添加模型特有案例、Prompt 指南、适用场景、限制、内链来源和专属 OG 图片或已验证的默认图。
+7. 添加 image/video modality 与 runtime key 一致性测试。
+8. 验证统一 route head、锁定模型 Workbench 支持参数和目标部署能力预检。
+9. 内容与技术门槛全部通过后才切换为 index，并运行 test/typecheck/format/build、SSR/SEO smoke、Cloudflare dry-run 和视觉/性能检查。
 
 ## 11. 新项目复用流程
 
@@ -431,7 +583,7 @@ npx wrangler deploy --outdir bundled --dry-run
 - 动态 tools/models routes
 - Catalog 类型与 selectors
 - GenerationEntry 接口
-- SEO、Sitemap 和 llms 生成器
+- `src/lib/seo.ts`、Sitemap 和实验性 llms 生成器
 
 新项目主要替换：
 
@@ -443,18 +595,81 @@ npx wrangler deploy --outdir bundled --dry-run
 
 ## 12. 发布检查清单
 
-- [ ] 页面实体的 publication/availability 正确
-- [ ] 首页、目录、Related、Sitemap 使用相同 selector
-- [ ] listed 页面有实质性独特内容
-- [ ] 模型规格来自 runtime Catalog
+- [ ] 页面实体的 publication/availability/indexing/placement 组合合法
+- [ ] 首页、目录、Related、Sitemap、llms 使用同一 selector 模块中的正确命名投影
+- [ ] 每个 indexable 页面有按语言审核的搜索意图/query map、页面边界、内链来源和实质性独特内容
+- [ ] 模型规格来自 runtime Catalog，modelKey 与 image/video modality 一致
+- [ ] listed/live Workbench 在目标部署通过 Provider、模型路由和存储能力预检
 - [ ] 页面 preset 不能修改积分、Provider 或权限
+- [ ] 工具/模型页设置默认不污染全局 localStorage
 - [ ] Background Remover 等 beta 能力有清晰限制
-- [ ] title、description、H1、canonical、hreflang 完整
-- [ ] Breadcrumb 与结构化数据和可见内容一致
+- [ ] 统一 helper 输出唯一 title、description、robots、canonical、hreflang、OG/Twitter，生产值不含 localhost
+- [ ] canonical 为当前语言 self URL；hreflang 只引用真实且可索引的译文、存在时 reciprocal，x-default 只指向真实 base locale 页面
+- [ ] 追踪参数不进入 canonical；分页和筛选参数有显式 index/canonical 策略
+- [ ] `og:url` 等于 canonical；OG/Twitter 图片是公开、绝对、返回 200 且带尺寸/alt 的 URL
+- [ ] Breadcrumb 与结构化数据和可见内容一致；没有虚构价格、评分、评价或 schema
+- [ ] 代表性 JSON-LD 通过 Rich Results Test 或 Schema Validator
+- [ ] JSON-LD 由共享 serializer 安全 SSR 输出并可解析
+- [ ] sitemap 仅包含 canonical/indexable URL，lastmod 为真实内容时间或省略
+- [ ] robots.txt 允许公开 canonical 页面、屏蔽私有路径并声明 sitemap；noindex URL 未被屏蔽，llms 端点返回 `X-Robots-Tag: noindex`
+- [ ] 已发布 slug 变更有测试覆盖的 301/410 策略
 - [ ] 中英文 message key 一致
 - [ ] 图片、视频请求无 404
+- [ ] Static Assets 单文件小于 25 MiB；更大媒体来自 R2/S3
 - [ ] 390px 和 1440px 布局正常
 - [ ] light/dark、en/zh、登录/匿名均验证
 - [ ] `pnpm test` 通过
+- [ ] `pnpm exec tsc --noEmit` 和 `pnpm format:check` 通过
 - [ ] `pnpm build` 通过
+- [ ] en/zh SSR 的 200/404、noindex、canonical、hreflang、x-default smoke 通过
+- [ ] SSR HTML 含 H1、核心正文和关键内链；route client JS 与首屏资源相对基线无未解释增长
+- [ ] Lighthouse 移动端无显著回归；LCP/CLS 达标，上线后监测真实用户 INP
 - [ ] Cloudflare dry-run 未突破内部体积预算
+
+## 13. 上线后 SEO 运营
+
+代码交付完成不代表页面已经被搜索引擎正确收录。生产发布后还需要：
+
+1. 抓取代表性 en/zh URL，复核实际响应状态、rendered HTML、metadata、JSON-LD、sitemap 和 redirects。
+2. 在 Google Search Console 提交 sitemap，并用 URL Inspection 检查首页、目录、工具、模型和 Blog 代表页。
+3. 在第 7 天和第 30 天记录索引状态、Google 选择的 canonical、抓取错误、查询/落地页分布和关键词蚕食。
+4. 监测真实用户 Core Web Vitals，按证据调整内容、内链与性能。
+
+如果没有 Search Console 或生产权限，交付清单必须明确 owner、计划日期、记录位置和未验证项，不能把“已生成 sitemap”写成“已收录”。
+
+## 14. Agent-native SEO 操作方式
+
+项目级 `/marketing-seo` Skill 是工具页、模型页和其他公开营销页的默认 SEO owner。以下请求即使没有显式提到 SEO，也应触发该 Skill：
+
+- 新增或大幅更新工具页、模型页、目录页或落地页
+- 修改页面能力、案例、FAQ、slug、publication 或 indexing
+- 发布、下线、重命名或合并公开页面
+- 检查某个营销页是否应该收录
+- 生产发布后的索引、查询、canonical 或流量复查
+
+标准执行链路：
+
+```text
+能力与事实核查
+  → 按语言研究搜索意图
+  → 更新 docs/marketing-pages-seo-map.md
+  → 以 noindex 实现或更新页面
+  → 验证内容、SSR、metadata、sitemap 与性能
+  → Agent 给出 index / noindex / blocked 决策
+  → 获得授权时完成生产与 Search Console 操作
+  → 第 7/30 天复查并记录证据
+```
+
+Agent 不把 canonical、hreflang、schema、sitemap 或 indexing 选择交给不熟悉 SEO 的用户。只有产品事实无法从 Runtime/可信来源发现、业务定位存在实质分叉或外部系统写操作尚未授权时才请求输入；其余安全、可逆工作继续完成。
+
+Skill 使用“通用内核 + 项目适配器”，避免把某个工具、模型或 slug 写进执行规则。权威文件：
+
+- `.claude/skills/marketing-seo/SKILL.md`：框架无关的自主执行流程与停止条件
+- `.claude/skills/marketing-seo/references/release-contract.md`：框架无关的信任顺序、技术矩阵与发布门槛
+- `.claude/skills/marketing-seo/references/shipany-tanstack.md`：本仓库的 Routes/Blocks/Components、Catalog、Paraglide 和验证命令适配
+- `.claude/skills/marketing-seo/assets/seo-map-entry.md`：SEO Map 条目模板
+- `.claude/skills/marketing-seo/assets/seo-release-report.md`：最终证据报告模板
+
+具体页面名称只能存在于页面数据、SEO Map 或 Skill 的离线评测样本中；评测样本不属于运行时指令，也不会成为白名单、分支规则或默认结论。
+
+`launch-audit seo` 继续负责全站横向扫描；`marketing-seo` 负责单个营销实体从创建到上线后监测的纵向生命周期，两者互补而不重复。
