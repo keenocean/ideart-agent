@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   createAgentTools,
   durationSeconds,
+  guardGenerationRetries,
   normalizeProviderAspectRatio,
   pickVideoProvider,
   providerOptionsFor,
@@ -33,6 +34,36 @@ describe('createAgentTools', () => {
         settings: { mediaMode: 'video' },
       }).map((tool) => tool.name)
     ).toEqual(['generate_video', 'animate_image']);
+  });
+
+  it('does not execute another generation after a same-turn failure', async () => {
+    let calls = 0;
+    const [tool] = guardGenerationRetries([
+      {
+        name: 'generate_image',
+        description: 'test generator',
+        inputSchema: { type: 'object', properties: {} },
+        async call() {
+          calls += 1;
+          return {
+            type: 'tool_result' as const,
+            tool_use_id: '',
+            content: JSON.stringify({
+              status: 'error',
+              message: 'upstream failed',
+            }),
+          };
+        },
+      },
+    ]);
+
+    const first = await tool.call({}, { cwd: '/' });
+    const second = await tool.call({}, { cwd: '/' });
+
+    expect(calls).toBe(1);
+    expect(first.content).toContain('upstream failed');
+    expect(second.content).toContain('Do not retry');
+    expect(second.is_error).toBe(true);
   });
 });
 

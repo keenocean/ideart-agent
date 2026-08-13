@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { EvoLinkProvider } from './evolink';
 import { AIMediaType, AITaskStatus } from './types';
@@ -14,6 +14,34 @@ function response(payload: unknown, ok = true, status = 200): Response {
 }
 
 describe('EvoLinkProvider', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('invokes the Workers global fetch without a provider receiver', async () => {
+    const workersFetch = vi.fn(function (this: unknown) {
+      if (this !== undefined) {
+        throw new TypeError('Illegal invocation');
+      }
+      return Promise.resolve(
+        response({ id: 'task-image-workers', status: 'pending', type: 'image' })
+      );
+    });
+    vi.stubGlobal('fetch', workersFetch);
+    const provider = new EvoLinkProvider({ apiKey: TEST_API_KEY });
+
+    const result = await provider.generate({
+      params: {
+        mediaType: AIMediaType.IMAGE,
+        model: 'gpt-image-2',
+        prompt: 'a red cube',
+      },
+    });
+
+    expect(result.taskId).toBe('task-image-workers');
+    expect(workersFetch).toHaveBeenCalledOnce();
+  });
+
   it('submits normalized image input with Bearer authentication', async () => {
     const request = vi.fn(
       async (_input: string | URL | Request, _init?: RequestInit) =>

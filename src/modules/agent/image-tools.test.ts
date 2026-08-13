@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { DEFAULT_IMAGE_MODEL } from '@/lib/agent-settings';
 
@@ -7,6 +7,58 @@ import {
   imageProviderOptionsForProvider,
   pickImageProvider,
 } from './image-provider';
+import { readGeneratedImage } from './image-tools';
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+describe('readGeneratedImage', () => {
+  it('follows a validated redirect with Workers-compatible manual mode', async () => {
+    const request = vi.fn(
+      async (input: string | URL | Request, _init?: RequestInit) => {
+        const url = String(input);
+        if (url === 'https://files.example.com/generated') {
+          return new Response(null, {
+            status: 302,
+            headers: { location: 'https://cdn.example.com/generated.png' },
+          });
+        }
+        return new Response(new Uint8Array([1, 2, 3]), {
+          headers: { 'content-type': 'image/png' },
+        });
+      }
+    );
+    vi.stubGlobal('fetch', request);
+
+    const image = await readGeneratedImage(
+      'https://files.example.com/generated'
+    );
+
+    expect(image.body).toEqual(Buffer.from([1, 2, 3]));
+    expect(image.contentType).toBe('image/png');
+    expect(request).toHaveBeenCalledTimes(2);
+    for (const [, init] of request.mock.calls) {
+      expect(init?.redirect).toBe('manual');
+    }
+  });
+
+  it('rejects redirects to private addresses', async () => {
+    const request = vi.fn(
+      async () =>
+        new Response(null, {
+          status: 302,
+          headers: { location: 'http://127.0.0.1/private.png' },
+        })
+    );
+    vi.stubGlobal('fetch', request);
+
+    await expect(
+      readGeneratedImage('https://files.example.com/generated')
+    ).rejects.toThrow('unsupported image reference');
+    expect(request).toHaveBeenCalledOnce();
+  });
+});
 
 describe('pickImageProvider', () => {
   it('returns null when no image provider is configured', () => {

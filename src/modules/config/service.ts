@@ -1,6 +1,7 @@
 import { eq } from 'drizzle-orm';
 
 import { db } from '@/core/db';
+import { createD1PrimarySession } from '@/core/db/d1';
 import { envConfigs } from '@/config';
 import { config } from '@/config/db/schema';
 import { decryptSecret, encryptSecret, isEncryptedSecret } from '@/lib/crypto';
@@ -79,6 +80,11 @@ const PROTECTED_CONFIG_KEYS: ReadonlySet<string> = new Set([
   'db_schema',
   'db_singleton_enabled',
   'db_max_connections',
+]);
+
+/** Server-only values that must never cross the public config API. */
+const PRIVATE_PUBLIC_CONFIG_KEYS: ReadonlySet<string> = new Set([
+  'agent_system_prompt',
 ]);
 
 /**
@@ -169,6 +175,44 @@ export async function saveConfigs(configs: ConfigMap) {
 export async function getConfig(name: string): Promise<string | undefined> {
   const configs = await getAllConfigs();
   return configs[name];
+}
+
+/**
+ * Read one database-backed value without the one-hour application cache.
+ * Agent Prompt reads use this path so a save is visible to every isolate on
+ * the next accepted turn.
+ */
+export async function getConfigLatest(
+  name: string
+): Promise<string | undefined> {
+  if (!envConfigs.database_url && envConfigs.database_provider !== 'd1') {
+    return undefined;
+  }
+
+  let value: string | null | undefined;
+  if (envConfigs.database_provider === 'd1') {
+    const row = await createD1PrimarySession()
+      .prepare('SELECT value FROM config WHERE name = ? LIMIT 1')
+      .bind(name)
+      .first<{ value: string | null }>();
+    value = row?.value;
+  } else {
+    const [row] = await db()
+      .select({ value: config.value })
+      .from(config)
+      .where(eq(config.name, name))
+      .limit(1);
+    value = row?.value;
+  }
+
+  if (value === null || value === undefined) return undefined;
+  if (!isEncryptedSecret(value)) return value;
+
+  const plain = await decryptSecret(value);
+  if (plain === null) {
+    throw new Error(`[config] failed to decrypt latest value for "${name}"`);
+  }
+  return plain;
 }
 
 /**
@@ -296,7 +340,12 @@ export function filterPublicConfigs(
 ): ConfigMap {
   const result: ConfigMap = {};
   for (const key of publicKeys) {
-    if (PROTECTED_CONFIG_KEYS.has(key) || isSecretConfigKey(key)) continue;
+    if (
+      PROTECTED_CONFIG_KEYS.has(key) ||
+      PRIVATE_PUBLIC_CONFIG_KEYS.has(key) ||
+      isSecretConfigKey(key)
+    )
+      continue;
     if (key in configs) {
       result[key] = configs[key];
     }

@@ -32,6 +32,9 @@ import { summarizeProviderError } from './provider-error';
 const IMAGE_POLL_INTERVAL_MS = 2000;
 const IMAGE_POLL_TIMEOUT_MS = 180_000;
 const MAX_IMAGE_BYTES = 50 * 1024 * 1024;
+const MAX_IMAGE_REDIRECTS = 3;
+
+class ImageRedirectError extends Error {}
 
 interface ImageToolContext {
   userId: string;
@@ -106,7 +109,51 @@ async function readResponseBody(
   );
 }
 
-async function readGeneratedImage(url: string): Promise<{
+function redirectedImageUrl(location: string, currentUrl: string): string {
+  let redirected: string;
+  try {
+    redirected = new URL(location, currentUrl).toString();
+  } catch {
+    throw new ImageRedirectError('image download returned an invalid redirect');
+  }
+  if (!/^https?:\/\//i.test(redirected)) {
+    throw new ImageRedirectError(`unsupported image reference: ${redirected}`);
+  }
+  try {
+    return resolveReferenceImage(redirected);
+  } catch (error) {
+    throw new ImageRedirectError(
+      error instanceof Error ? error.message : String(error)
+    );
+  }
+}
+
+async function fetchGeneratedImage(url: string): Promise<{
+  response: Response;
+  finalUrl: string;
+}> {
+  let currentUrl = resolveReferenceImage(url);
+  for (let redirects = 0; ; redirects++) {
+    const response = await fetch(currentUrl, { redirect: 'manual' });
+    if (response.status < 300 || response.status >= 400) {
+      return { response, finalUrl: currentUrl };
+    }
+
+    const location = response.headers.get('location');
+    if (!location) {
+      throw new ImageRedirectError(
+        `image download redirect (${response.status}) has no location`
+      );
+    }
+    if (redirects >= MAX_IMAGE_REDIRECTS) {
+      throw new ImageRedirectError('image download exceeded 3 redirects');
+    }
+    await response.body?.cancel();
+    currentUrl = redirectedImageUrl(location, currentUrl);
+  }
+}
+
+export async function readGeneratedImage(url: string): Promise<{
   body: Buffer;
   contentType: string;
   extension: string;
@@ -131,7 +178,7 @@ async function readGeneratedImage(url: string): Promise<{
   let lastError: unknown;
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
-      const response = await fetch(downloadUrl, { redirect: 'error' });
+      const { response, finalUrl } = await fetchGeneratedImage(downloadUrl);
       if (!response.ok) {
         const text = await response.text().catch(() => '');
         throw new Error(
@@ -157,13 +204,14 @@ async function readGeneratedImage(url: string): Promise<{
       }
       const contentType = responseType.startsWith('image/')
         ? responseType
-        : contentTypeForUrl(url);
+        : contentTypeForUrl(finalUrl);
       return {
         body,
         contentType,
         extension: extensionForContentType(contentType),
       };
     } catch (error) {
+      if (error instanceof ImageRedirectError) throw error;
       lastError = error;
       if (attempt < 3) await sleep(attempt * 800);
     }

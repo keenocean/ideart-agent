@@ -1,7 +1,15 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
-import { ChevronDown, FlaskConical, Minus, Plus, Save } from 'lucide-react';
+import {
+  ChevronDown,
+  FlaskConical,
+  Minus,
+  Plus,
+  RotateCcw,
+  Save,
+  Sparkles,
+} from 'lucide-react';
 import { toast } from 'sonner';
 
 import {
@@ -14,6 +22,7 @@ import { getTestSpec } from '@/modules/config/settings-test-specs';
 import { apiGet, apiPost } from '@/lib/api-client';
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
+import { AgentPromptGeneratorDialog } from '@/components/admin/agent-prompt-generator-dialog';
 import { SettingsTestDialog } from '@/components/admin/settings-test-dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -47,6 +56,7 @@ function AdminSettingsPage() {
   const [activeTab, setActiveTab] = useState('general');
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [testingGroup, setTestingGroup] = useState<string | null>(null);
+  const [promptGeneratorOpen, setPromptGeneratorOpen] = useState(false);
   const [customRows, setCustomRows] = useState<
     { key: string; value: string }[]
   >([]);
@@ -300,6 +310,11 @@ function AdminSettingsPage() {
                         configs[setting.name] ?? setting.defaultValue ?? ''
                       }
                       onChange={(v) => handleChange(setting.name, v)}
+                      onGeneratePrompt={
+                        setting.name === 'agent_system_prompt'
+                          ? () => setPromptGeneratorOpen(true)
+                          : undefined
+                      }
                     />
                   ))}
                 </CardContent>
@@ -329,6 +344,12 @@ function AdminSettingsPage() {
           )}
         />
       )}
+
+      <AgentPromptGeneratorDialog
+        open={promptGeneratorOpen}
+        onOpenChange={setPromptGeneratorOpen}
+        onGenerated={(prompt) => handleChange('agent_system_prompt', prompt)}
+      />
     </div>
   );
 }
@@ -346,6 +367,7 @@ function SettingField({
   tip,
   value,
   onChange,
+  onGeneratePrompt,
 }: {
   setting: Setting;
   label: string;
@@ -353,6 +375,7 @@ function SettingField({
   tip?: string;
   value: string;
   onChange: (value: string) => void;
+  onGeneratePrompt?: () => void;
 }) {
   if (setting.type === 'switch') {
     return (
@@ -398,17 +421,62 @@ function SettingField({
   }
 
   if (setting.type === 'textarea') {
+    const bytes = new TextEncoder().encode(value).byteLength;
     return (
       <div className="space-y-2">
-        <Label htmlFor={setting.name}>{label}</Label>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <Label htmlFor={setting.name}>{label}</Label>
+          {setting.name === 'agent_system_prompt' && (
+            <div className="flex flex-wrap items-center gap-1">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 gap-1.5"
+                onClick={onGeneratePrompt}
+              >
+                <Sparkles className="size-3.5" />
+                {m['admin.settings.agent_prompt.generate_button']()}
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 gap-1.5"
+                onClick={() => onChange('')}
+              >
+                <RotateCcw className="size-3.5" />
+                {m['admin.settings.agent_prompt.use_default']()}
+              </Button>
+            </div>
+          )}
+        </div>
         <textarea
           id={setting.name}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
-          rows={3}
-          className="border-input placeholder:text-muted-foreground focus-visible:ring-ring flex w-full rounded-md border bg-transparent px-3 py-2 text-sm focus-visible:ring-1 focus-visible:outline-none"
+          rows={setting.rows ?? 3}
+          maxLength={setting.maxLength}
+          className={cn(
+            'border-input placeholder:text-muted-foreground focus-visible:ring-ring flex w-full rounded-md border bg-transparent px-3 py-2 text-sm focus-visible:ring-1 focus-visible:outline-none',
+            setting.monospace && 'font-mono'
+          )}
         />
+        {setting.name === 'agent_system_prompt' && (
+          <p
+            className={cn(
+              'text-muted-foreground text-right text-xs',
+              bytes > 20 * 1024 && 'text-destructive'
+            )}
+          >
+            {m['admin.settings.agent_prompt.count']({
+              characters: value.length,
+              bytes,
+              maxBytes: 20 * 1024,
+            })}
+          </p>
+        )}
         <FieldTip text={tip} />
       </div>
     );

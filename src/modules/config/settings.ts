@@ -15,6 +15,9 @@ export interface Setting {
   group: string;
   tab: string;
   defaultValue?: string;
+  rows?: number;
+  maxLength?: number;
+  monospace?: boolean;
 }
 
 export interface SettingGroup {
@@ -879,6 +882,19 @@ export function getSettings(): Setting[] {
       tip: 'Model id as the chosen provider names it. Required for OpenAI-compatible endpoints (OpenRouter and friends name models differently).',
       group: 'agent_llm',
       tab: 'ai',
+    },
+    {
+      name: 'agent_system_prompt',
+      title: 'Agent System Prompt',
+      type: 'textarea',
+      placeholder:
+        'Leave blank to use the project default Agent System Prompt.',
+      tip: 'Controls the editable business instructions only. Core security rules and the actual tool allowlist remain enforced by code. Maximum 20 KiB UTF-8.',
+      group: 'agent_llm',
+      tab: 'ai',
+      rows: 14,
+      maxLength: 20 * 1024,
+      monospace: true,
     },
 
     // ─── AI / Image generation ───────────────────────────────────────

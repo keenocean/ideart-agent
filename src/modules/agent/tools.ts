@@ -51,6 +51,46 @@ export interface AgentToolContext {
   settings?: AgentGenerationSettings;
 }
 
+function isFailedGenerationResult(
+  result: Awaited<ReturnType<ToolDefinition['call']>>
+): boolean {
+  if (result.is_error || typeof result.content !== 'string')
+    return !!result.is_error;
+  try {
+    const payload = JSON.parse(result.content);
+    return payload?.status === 'error' || payload?.status === 'canceled';
+  } catch {
+    return false;
+  }
+}
+
+/** Keep one failed provider call from turning into repeated billed attempts. */
+export function guardGenerationRetries(
+  tools: ToolDefinition[]
+): ToolDefinition[] {
+  let generationFailed = false;
+  return tools.map((tool) => ({
+    ...tool,
+    async call(input, context) {
+      if (generationFailed) {
+        return {
+          type: 'tool_result',
+          tool_use_id: '',
+          content: JSON.stringify({
+            status: 'error',
+            message:
+              'A generation already failed in this turn. Do not retry it; explain the original error to the user.',
+          }),
+          is_error: true,
+        };
+      }
+      const result = await tool.call(input, context);
+      if (isFailedGenerationResult(result)) generationFailed = true;
+      return result;
+    },
+  }));
+}
+
 // Video renders are minutes, not seconds — a 10s clip on a busy queue
 // regularly runs past five minutes, so the window is far wider than the
 // image agent's was and the poll is correspondingly lazier.
@@ -930,9 +970,15 @@ export function createAgentTools(ctx: AgentToolContext): ToolDefinition[] {
     },
   });
 
-  if (ctx.settings?.mediaMode === 'image') return [createImageTool(ctx)];
-  if (ctx.settings?.mediaMode === 'video') {
-    return [generateVideo, animateImage];
+  if (ctx.settings?.mediaMode === 'image') {
+    return guardGenerationRetries([createImageTool(ctx)]);
   }
-  return [createImageTool(ctx), generateVideo, animateImage];
+  if (ctx.settings?.mediaMode === 'video') {
+    return guardGenerationRetries([generateVideo, animateImage]);
+  }
+  return guardGenerationRetries([
+    createImageTool(ctx),
+    generateVideo,
+    animateImage,
+  ]);
 }

@@ -1,6 +1,10 @@
 import { createAgent } from '@codeany/open-agent-sdk';
 
-import { getAllConfigs } from '@/modules/config/service';
+import { CORE_AGENT_GUARDRAILS } from '@/core/agent/guardrails';
+import { applyAgentPromptVariables } from '@/core/agent/prompt-config';
+import { envConfigs } from '@/config';
+import { DEFAULT_AGENT_SYSTEM_PROMPT } from '@/config/agent';
+import { getAllConfigs, getConfigLatest } from '@/modules/config/service';
 import type { AgentGenerationSettings } from '@/lib/agent-settings';
 import {
   normalizeAnthropicBaseUrl,
@@ -25,36 +29,44 @@ export interface AgentStreamEvent {
   data?: Record<string, unknown>;
 }
 
-const SYSTEM_PROMPT = `You are Ideart, an AI image-and-video generation assistant. You help users create still images and video clips through conversation.
+const AGENT_SYSTEM_PROMPT_CONFIG_KEY = 'agent_system_prompt';
+const DEFAULT_TOOL_NAMES = [
+  'generate_image',
+  'generate_video',
+  'animate_image',
+] as const;
 
-Rules:
-- Understand the requested output medium first. Call generate_image for a still image; generate_video for text-to-video; or animate_image when a still image should become a moving video.
-- generate_image also handles image editing, restyling, and combining. Pass source images as reference_images in the order the prompt refers to them.
-- "Attached media" lists what the user supplied, not how it must be used. You decide the correct tool parameters from the user's words and the conversation; do not ask them to classify uploads as frames or references when their intent is reasonably inferable.
-- For an attached image: use generate_image reference_images when the user asks for a still-image edit, restyle, variation, or composition. Use animate_image when they ask to animate it, make it move, or explicitly call images the first/opening and last/ending frames. Preserve attachment order. Use generate_video reference_images when an image should guide a video's character, object, composition, or style instead of becoming its opening frame.
-- Pass attached audio and video to generate_video as reference_audios and reference_videos when they should guide sound, rhythm, motion, subject, or visual direction.
-- Legacy messages may use "Attached frames", "Attached images", or parameter-specific reference headings; honor those explicit roles.
-- Write generation prompts in English, enriching still-image prompts with style, composition, lighting, and detail, and video prompts with subject, action, camera movement, lens, lighting, pacing, and mood. Never change the user's intent.
-- A clip is one shot, not a montage. If the user describes a sequence, either pick the strongest single shot or generate the shots one at a time, saying which is which.
-- Reply to the user in the language they used.
-- Generation can take a few minutes. Call the selected tool once and wait for it; never retry a call that has not returned yet.
-- The only valid image model key is gpt-image-2. Leave the model argument empty unless the user explicitly asks for it.
-- The only valid video model keys are minimax-h3, seedance-2-5, and seedance-2-0. Leave the model argument empty unless the user explicitly asks to switch.
-- After generate_image returns files, the chat already shows the image. Reference it as a markdown image, e.g. ![image](<url>), without pasting a raw URL.
-- After a video tool returns files, the chat already shows the clip with a player. Reference it as a markdown link, e.g. [clip](<url>), and never embed a video URL as a markdown image.
-- If a tool returns an error, explain it briefly and suggest what the user can do (e.g. top up credits, shorten the clip, try a simpler prompt). Never invent file paths.`;
+export function buildAgentSystemPrompt(
+  settings: AgentGenerationSettings | undefined,
+  businessPrompt = DEFAULT_AGENT_SYSTEM_PROMPT,
+  toolNames: readonly string[] = DEFAULT_TOOL_NAMES
+) {
+  const availableTools = [...toolNames].join(', ') || 'none';
+  const resolvedBusinessPrompt = applyAgentPromptVariables(businessPrompt, {
+    app_name: envConfigs.app_name,
+    agent_name: 'Ideart',
+    available_tools: availableTools,
+  });
+  return [
+    CORE_AGENT_GUARDRAILS,
+    resolvedBusinessPrompt,
+    `Effective tool policy:\n- Available tools for this turn: ${availableTools}.\n- No other tool is authorized.`,
+    mediaModeInstruction(settings),
+  ].join('\n\n');
+}
 
 export interface RunAgentTurnParams {
   sessionId: string;
   userId: string;
   message: string;
+  persistedUserMessageId: string;
   settings?: AgentGenerationSettings;
   signal?: AbortSignal;
 }
 
 type LlmProvider = 'openai' | 'anthropic';
 
-interface LlmSetup {
+export interface LlmSetup {
   provider: LlmProvider;
   apiKey: string;
   baseURL?: string;
@@ -70,7 +82,7 @@ interface LlmSetup {
  * choice rather than being guessed from the URL — an OpenAI-compatible
  * gateway can live on any host.
  */
-function resolveLlm(configs: Record<string, string>): LlmSetup | null {
+export function resolveLlm(configs: Record<string, string>): LlmSetup | null {
   const openaiKey = configs.openai_api_key?.trim();
   const anthropicKey = configs.anthropic_api_key?.trim();
   const preference = configs.default_llm_provider?.trim() || 'auto';
@@ -118,7 +130,14 @@ export async function isAgentConfigured(): Promise<boolean> {
 export async function* runAgentTurn(
   params: RunAgentTurnParams
 ): AsyncGenerator<AgentStreamEvent> {
-  const { sessionId, userId, message, settings, signal } = params;
+  const {
+    sessionId,
+    userId,
+    message,
+    persistedUserMessageId,
+    settings,
+    signal,
+  } = params;
 
   const configs = await getAllConfigs();
   const llm = resolveLlm(configs);
@@ -147,10 +166,50 @@ export async function* runAgentTurn(
     return;
   }
 
+  let businessPrompt = DEFAULT_AGENT_SYSTEM_PROMPT;
+  try {
+    const configuredPrompt = await getConfigLatest(
+      AGENT_SYSTEM_PROMPT_CONFIG_KEY
+    );
+    if (configuredPrompt?.trim()) businessPrompt = configuredPrompt;
+  } catch (error) {
+    console.error('[agent prompt] latest read failed', error);
+    yield {
+      type: 'error',
+      data: {
+        message: 'The Agent configuration is temporarily unavailable.',
+      },
+    };
+    yield { type: 'done' };
+    return;
+  }
+
   // Stateless: the transcript comes from the database and goes back to it
   // (the chat route persists each round), so the SDK never reads or writes
   // session files — there's no disk to write to on Workers.
-  const history = await loadAgentHistory(sessionId, userId);
+  const history = await loadAgentHistory(
+    sessionId,
+    userId,
+    persistedUserMessageId
+  );
+
+  const tools = createAgentTools({ userId, sessionId, settings });
+  let systemPrompt: string;
+  try {
+    systemPrompt = buildAgentSystemPrompt(
+      settings,
+      businessPrompt,
+      tools.map((tool) => tool.name)
+    );
+  } catch (error) {
+    console.error('[agent prompt] invalid database override', error);
+    yield {
+      type: 'error',
+      data: { message: 'The configured Agent System Prompt is invalid.' },
+    };
+    yield { type: 'done' };
+    return;
+  }
 
   const agent = createAgent({
     model: llm.model,
@@ -160,8 +219,8 @@ export async function* runAgentTurn(
     sessionId,
     history,
     persistSession: false,
-    systemPrompt: `${SYSTEM_PROMPT}\n\n${mediaModeInstruction(settings)}`,
-    tools: createAgentTools({ userId, sessionId, settings }),
+    systemPrompt,
+    tools,
     maxTurns: 12,
     permissionMode: 'bypassPermissions',
     abortSignal: signal,
@@ -241,7 +300,7 @@ export async function* runAgentTurn(
   yield { type: 'done' };
 }
 
-function withGenerationSettings(
+export function withGenerationSettings(
   message: string,
   settings: AgentGenerationSettings | undefined
 ) {
@@ -259,7 +318,7 @@ function withGenerationSettings(
     '',
     'UI generation settings:',
     settings.mediaMode === 'image'
-      ? '- The user explicitly selected still-image output. You must call generate_image; do not produce a video.'
+      ? '- Image output is selected. If the user explicitly requests an image result, call generate_image; otherwise answer without calling a tool.'
       : settings.mediaMode === 'video'
         ? '- The user explicitly selected video output. You must call generate_video or animate_image; do not produce a still image.'
         : '- Output mode is Auto. Infer whether the user wants a still image or a video from their request.',
@@ -301,7 +360,7 @@ function withGenerationSettings(
 
 function mediaModeInstruction(settings: AgentGenerationSettings | undefined) {
   if (settings?.mediaMode === 'image') {
-    return 'Composer output mode: IMAGE. Only generate_image is available. Always generate or edit one still image, even if the wording could otherwise be interpreted as video.';
+    return 'Composer output mode: IMAGE. Only generate_image is available. Selecting Image mode alone is not a request to generate.';
   }
   if (settings?.mediaMode === 'video') {
     return 'Composer output mode: VIDEO. Only video tools are available. Use animate_image for a supplied opening frame when appropriate; otherwise use generate_video.';

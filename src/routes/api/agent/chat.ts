@@ -86,7 +86,7 @@ async function POST({ request }: { request: Request }) {
     userId,
     seedMessage: body.message,
   });
-  await appendMessage({
+  const userMessage = await appendMessage({
     chatId: body.sessionId,
     userId,
     role: 'user',
@@ -195,6 +195,7 @@ async function POST({ request }: { request: Request }) {
           sessionId: body.sessionId,
           userId,
           message: body.message,
+          persistedUserMessageId: userMessage.id,
           settings: generationSettings,
           signal: runController.signal,
         })) {

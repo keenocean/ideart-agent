@@ -17,11 +17,12 @@ import { getChatWithMessages, type StoredPart } from '@/modules/chats/service';
  */
 export async function loadAgentHistory(
   chatId: string,
-  userId: string
+  userId: string,
+  excludeMessageId?: string
 ): Promise<NormalizedMessageParam[]> {
   const chat = await getChatWithMessages(chatId, userId);
   if (!chat) return [];
-  return mapRowsToHistory(chat.messages);
+  return mapRowsToHistory(chat.messages, excludeMessageId);
 }
 
 /**
@@ -30,11 +31,18 @@ export async function loadAgentHistory(
  * or worse, silently accepts with the tool results detached from their calls.
  */
 export function mapRowsToHistory(
-  rows: Array<{ role: 'user' | 'assistant'; parts: StoredPart[] }>
+  rows: Array<{
+    id?: string;
+    role: 'user' | 'assistant';
+    parts: StoredPart[];
+  }>,
+  excludeMessageId?: string
 ): NormalizedMessageParam[] {
   const history: NormalizedMessageParam[] = [];
 
   for (const row of rows) {
+    if (excludeMessageId && row.id === excludeMessageId) continue;
+
     if (row.role === 'user') {
       const text = textOf(row.parts);
       if (text) history.push({ role: 'user', content: text });

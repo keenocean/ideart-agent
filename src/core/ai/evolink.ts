@@ -96,8 +96,12 @@ export class EvoLinkProvider implements AIProvider {
     ).replace(/\/+$/g, '');
   }
 
-  private get request(): EvoLinkFetch {
-    return this.configs.fetch ?? fetch;
+  private request(
+    input: string | URL | Request,
+    init?: RequestInit
+  ): Promise<Response> {
+    const configuredFetch = this.configs.fetch;
+    return configuredFetch ? configuredFetch(input, init) : fetch(input, init);
   }
 
   private getUuid(): string {

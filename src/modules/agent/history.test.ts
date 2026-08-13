@@ -29,6 +29,26 @@ describe('mapRowsToHistory', () => {
     ]);
   });
 
+  it('excludes only the persisted current user turn from replay', () => {
+    const rows: Array<Row & { id: string }> = [
+      { id: 'previous-user', role: 'user', parts: [text('draw a cat')] },
+      {
+        id: 'previous-assistant',
+        role: 'assistant',
+        parts: [text('what style?')],
+      },
+      { id: 'current-user', role: 'user', parts: [text('draw a cat')] },
+    ];
+
+    expect(mapRowsToHistory(rows, 'current-user')).toEqual([
+      { role: 'user', content: 'draw a cat' },
+      {
+        role: 'assistant',
+        content: [{ type: 'text', text: 'what style?' }],
+      },
+    ]);
+  });
+
   it('splits a tool call into tool_use and a following tool_result', () => {
     const rows: Row[] = [
       { role: 'user', parts: [text('draw a cat')] },
