@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { createFileRoute } from '@tanstack/react-router';
 import { ArrowDown } from 'lucide-react';
 import { toast } from 'sonner';
@@ -32,6 +39,7 @@ import {
   type AgentGenerationSettings,
 } from '@/lib/agent-settings';
 import { apiGet, apiPatch, apiPost } from '@/lib/api-client';
+import { ChatAutoScroll } from '@/lib/chat-scroll';
 import { mediaNameFromUrl } from '@/lib/media';
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
@@ -119,6 +127,9 @@ function ChatSessionPage() {
   const [attachments, setAttachments] = useState<PendingAttachment[]>([]);
   const attachmentsRef = useRef<PendingAttachment[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const transcriptRef = useRef<HTMLDivElement>(null);
+  const autoScrollRef = useRef(new ChatAutoScroll());
+  const autoScrollSessionId = useRef(sessionId);
   const [atBottom, setAtBottom] = useState(true);
   const initialPromptHandled = useRef(false);
   const lastSessionId = useRef(sessionId);
@@ -139,13 +150,41 @@ function ChatSessionPage() {
     const el = scrollRef.current;
     if (!el) return;
     const onScroll = () => {
-      const distance = el.scrollHeight - el.scrollTop - el.clientHeight;
-      setAtBottom(distance < 40);
+      setAtBottom(autoScrollRef.current.updateFromViewport(el));
     };
     el.addEventListener('scroll', onScroll);
     onScroll();
     return () => el.removeEventListener('scroll', onScroll);
   }, []);
+
+  // Message deltas change the transcript without producing a scroll event.
+  // Keep following while the reader is already at the bottom, but respect an
+  // intentional scroll into older messages.
+  useLayoutEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    if (autoScrollSessionId.current !== sessionId) {
+      autoScrollSessionId.current = sessionId;
+      autoScrollRef.current.reset();
+    }
+    if (autoScrollRef.current.sync(el)) setAtBottom(true);
+  }, [messages, streaming, sessionId]);
+
+  // Images, tool details, the mobile keyboard, and an expanding composer can
+  // change layout without changing the message array. Observe both sides of
+  // the scroll viewport so the latest message remains fully visible.
+  useEffect(() => {
+    const el = scrollRef.current;
+    const transcript = transcriptRef.current;
+    if (!el || !transcript || typeof ResizeObserver === 'undefined') return;
+
+    const observer = new ResizeObserver(() => {
+      if (autoScrollRef.current.sync(el)) setAtBottom(true);
+    });
+    observer.observe(el);
+    observer.observe(transcript);
+    return () => observer.disconnect();
+  }, [sessionId]);
 
   // Switching to a different chat resets only what belongs to this view —
   // composer draft, title, preview pane. The other chat's turn keeps running
@@ -165,6 +204,7 @@ function ChatSessionPage() {
     setRenameValue(nextTitle);
     setValue('');
     setAttachments([]);
+    autoScrollRef.current.reset();
     setAtBottom(true);
     setPreviewOpen(false);
     clearPreviewImage();
@@ -274,6 +314,8 @@ function ChatSessionPage() {
       // the user message) — the caller uses it to drop its retry copy.
       onAccepted?: () => void
     ) => {
+      autoScrollRef.current.followLatest();
+      setAtBottom(true);
       void startRun({
         sessionId,
         text,
@@ -508,7 +550,9 @@ function ChatSessionPage() {
   function scrollToBottom() {
     const el = scrollRef.current;
     if (!el) return;
-    el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+    autoScrollRef.current.followLatest();
+    setAtBottom(true);
+    autoScrollRef.current.sync(el, 'smooth');
   }
 
   async function commitRename() {
@@ -585,13 +629,15 @@ function ChatSessionPage() {
         ref={scrollRef}
         className="relative min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-4 py-6"
       >
-        <ChatTranscript
-          messages={messages}
-          streaming={streaming}
-          sessionId={sessionId}
-          attachedImages={attachedImages}
-          surfacedSrcs={surfacedSrcs}
-        />
+        <div ref={transcriptRef}>
+          <ChatTranscript
+            messages={messages}
+            streaming={streaming}
+            sessionId={sessionId}
+            attachedImages={attachedImages}
+            surfacedSrcs={surfacedSrcs}
+          />
+        </div>
 
         {!atBottom && (
           <button

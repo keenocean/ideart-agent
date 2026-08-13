@@ -1,4 +1,4 @@
-import { createAgent } from '@codeany/open-agent-sdk';
+import { createAgent } from '@keenocean/open-agent-sdk';
 
 import { buildAgentPrompt } from '@/core/agent/prompt-builder';
 import { promptByteLength } from '@/core/agent/prompt-config';
@@ -265,8 +265,10 @@ export async function* runAgentTurn(
     maxTurns: prepared.maxTurns,
     permissionMode: 'bypassPermissions',
     abortSignal: signal,
+    includePartialMessages: true,
   });
 
+  let streamedAssistantText = false;
   try {
     for await (const msg of agent.query(prepared.userMessage)) {
       if (signal?.aborted) break;
@@ -274,9 +276,19 @@ export async function* runAgentTurn(
         await assertTurnLeaseOwnership(prepared.leaseOwner);
       }
       switch (msg.type) {
+        case 'partial_message': {
+          if (msg.partial.type === 'text' && msg.partial.text) {
+            streamedAssistantText = true;
+            yield {
+              type: 'content',
+              data: { content: msg.partial.text },
+            };
+          }
+          break;
+        }
         case 'assistant': {
           for (const block of msg.message.content) {
-            if (block.type === 'text' && block.text) {
+            if (block.type === 'text' && block.text && !streamedAssistantText) {
               yield { type: 'content', data: { content: block.text } };
             } else if (block.type === 'tool_use') {
               yield {
@@ -289,6 +301,7 @@ export async function* runAgentTurn(
               };
             }
           }
+          streamedAssistantText = false;
           break;
         }
         case 'tool_result': {

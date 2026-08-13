@@ -16,7 +16,7 @@ const mocks = vi.hoisted(() => ({
   query: vi.fn(),
 }));
 
-vi.mock('@codeany/open-agent-sdk', () => ({
+vi.mock('@keenocean/open-agent-sdk', () => ({
   createAgent: mocks.createAgent,
 }));
 
@@ -42,7 +42,7 @@ vi.mock('./skills', () => ({
   buildSkillSystemPrompt: vi.fn(() => ''),
 }));
 
-describe('runAgentTurn history boundary', () => {
+describe('runAgentTurn', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.query.mockImplementation(() =>
@@ -82,10 +82,59 @@ describe('runAgentTurn history boundary', () => {
     expect(mocks.createAgent).toHaveBeenCalledWith(
       expect.objectContaining({
         history: [{ role: 'user', content: 'previous message' }],
+        includePartialMessages: true,
       })
     );
     expect(mocks.query).toHaveBeenCalledTimes(1);
     expect(mocks.query).toHaveBeenCalledWith('current message');
+    expect(events.at(-1)).toEqual({ type: 'done' });
+  });
+
+  it('forwards text partials without repeating the final assistant text', async () => {
+    mocks.query.mockImplementation(() =>
+      (async function* () {
+        yield {
+          type: 'partial_message',
+          partial: { type: 'text', text: 'Hello ' },
+        };
+        yield {
+          type: 'partial_message',
+          partial: { type: 'thinking', thinking: 'Internal reasoning' },
+        };
+        yield {
+          type: 'partial_message',
+          partial: { type: 'text', text: 'world' },
+        };
+        yield {
+          type: 'assistant',
+          message: {
+            role: 'assistant',
+            content: [{ type: 'text', text: 'Hello world' }],
+          },
+        };
+        yield {
+          type: 'result',
+          subtype: 'success',
+          is_error: false,
+          result: '',
+        };
+      })()
+    );
+
+    const events = [];
+    for await (const event of runAgentTurn({
+      sessionId: 'session-1',
+      userId: 'user-1',
+      message: 'current message',
+      persistedUserMessageId: 'message-current',
+    })) {
+      events.push(event);
+    }
+
+    expect(events.filter((event) => event.type === 'content')).toEqual([
+      { type: 'content', data: { content: 'Hello ' } },
+      { type: 'content', data: { content: 'world' } },
+    ]);
     expect(events.at(-1)).toEqual({ type: 'done' });
   });
 });
