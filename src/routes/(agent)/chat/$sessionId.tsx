@@ -27,7 +27,7 @@ import {
   useAgentRun,
 } from '@/lib/agent-runs';
 import {
-  defaultComposerSettings,
+  normalizeComposerSettings,
   resolveGenerationSettings,
   type AgentGenerationSettings,
 } from '@/lib/agent-settings';
@@ -104,7 +104,9 @@ function ChatSessionPage() {
           message.tools.some(
             (tool) =>
               tool.result === undefined &&
-              (tool.name === 'generate_video' || tool.name === 'animate_image')
+              (tool.name === 'generate_image' ||
+                tool.name === 'generate_video' ||
+                tool.name === 'animate_image')
           )
       ),
     [messages]
@@ -311,7 +313,8 @@ function ChatSessionPage() {
       const rawTurn = sessionStorage.getItem(turnKey);
       if (rawTurn) {
         const payload = JSON.parse(rawTurn) as InitialTurnPayload;
-        if (payload.settings) setComposerSettings(payload.settings);
+        const initialSettings = normalizeComposerSettings(payload.settings);
+        if (payload.settings) setComposerSettings(initialSettings);
         const initialAttachments = (payload.attachments ?? []).filter(
           (item) => item.status === 'uploaded' && item.url
         );
@@ -322,9 +325,7 @@ function ChatSessionPage() {
           send(
             payload.prompt ?? '',
             initialAttachments,
-            resolveGenerationSettings(
-              payload.settings ?? defaultComposerSettings()
-            ),
+            resolveGenerationSettings(initialSettings),
             () => sessionStorage.removeItem(turnKey)
           );
           return;

@@ -2,6 +2,7 @@ import {
   creditsForGeneration,
   creditsForImageGeneration,
   DEFAULT_IMAGE_MODEL,
+  type AgentMediaMode,
 } from '@/lib/agent-settings';
 
 /**
@@ -19,11 +20,14 @@ export interface CreditVerdict {
 }
 
 export function checkCredits(params: {
+  mediaMode?: AgentMediaMode;
   modelName?: string;
   /** Clip length in seconds; the catalog owns each model's valid choices. */
   duration?: number;
   /** Model-specific resolution multipliers match shipany-video-lite. */
   resolution?: string;
+  imageResolution?: string;
+  imageQuality?: string;
   balance: number;
 }): CreditVerdict {
   const videoRequired = creditsForGeneration(
@@ -33,10 +37,15 @@ export function checkCredits(params: {
   );
   const imageRequired = creditsForImageGeneration(
     DEFAULT_IMAGE_MODEL,
-    '1K',
-    'medium'
+    params.mediaMode === 'image' ? params.imageResolution : undefined,
+    params.mediaMode === 'image' ? params.imageQuality : undefined
   );
-  const required = Math.min(videoRequired, imageRequired);
+  const required =
+    params.mediaMode === 'image'
+      ? imageRequired
+      : params.mediaMode === 'video'
+        ? videoRequired
+        : Math.min(videoRequired, imageRequired);
   return {
     allowed: params.balance >= required,
     required,

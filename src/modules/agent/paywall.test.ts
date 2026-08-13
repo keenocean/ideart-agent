@@ -54,6 +54,42 @@ describe('checkCredits', () => {
     expect(verdict.allowed).toBe(true);
   });
 
+  it('requires the exact selected image settings in image mode', () => {
+    const required = creditsForImageGeneration(
+      DEFAULT_IMAGE_MODEL,
+      '4K',
+      'high'
+    );
+    const verdict = checkCredits({
+      mediaMode: 'image',
+      imageResolution: '4K',
+      imageQuality: 'high',
+      balance: required - 1,
+    });
+    expect(verdict).toEqual({
+      allowed: false,
+      required,
+      balance: required - 1,
+    });
+  });
+
+  it('requires the exact selected clip settings in video mode', () => {
+    const option = AGENT_MODEL_OPTIONS[0];
+    const required = creditsForGeneration(option.value, 10, '4K');
+    const verdict = checkCredits({
+      mediaMode: 'video',
+      modelName: option.value,
+      duration: 10,
+      resolution: '4K',
+      balance: required - 1,
+    });
+    expect(verdict).toEqual({
+      allowed: false,
+      required,
+      balance: required - 1,
+    });
+  });
+
   it('uses the highest rate for an unrecognised model', () => {
     const required = creditsForGeneration('free-please', 5);
     const verdict = checkCredits({

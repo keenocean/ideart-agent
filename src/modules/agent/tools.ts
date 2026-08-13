@@ -930,5 +930,9 @@ export function createAgentTools(ctx: AgentToolContext): ToolDefinition[] {
     },
   });
 
+  if (ctx.settings?.mediaMode === 'image') return [createImageTool(ctx)];
+  if (ctx.settings?.mediaMode === 'video') {
+    return [generateVideo, animateImage];
+  }
   return [createImageTool(ctx), generateVideo, animateImage];
 }

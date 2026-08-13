@@ -29,7 +29,14 @@ import { apiGet } from '@/lib/api-client';
 import { isVideoUrl } from '@/lib/media';
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
-import { ComposerControls } from '@/components/agent/composer-controls';
+import {
+  ComposerControls,
+  ComposerModeSelector,
+} from '@/components/agent/composer-controls';
+import {
+  ComposerImageModel,
+  ComposerImageSettings,
+} from '@/components/agent/composer-image-settings';
 import { ComposerSettings } from '@/components/agent/composer-settings';
 import { Button } from '@/components/ui/button';
 import {
@@ -270,20 +277,38 @@ export function ChatComposer({
               event.currentTarget.value = '';
             }}
           />
+          <ComposerModeSelector
+            settings={settings}
+            onChange={onSettingsChange}
+            disabled={disabled}
+          />
           {toolbarExtra}
         </div>
         {/* ml-auto keeps this group right-aligned after the row wraps. */}
         <div className="ml-auto flex shrink-0 items-center gap-1.5">
-          <ComposerControls
-            settings={settings}
-            onChange={onSettingsChange}
-            disabled={disabled}
-          />
-          <ComposerSettings
-            settings={settings}
-            onChange={onSettingsChange}
-            disabled={disabled}
-          />
+          {settings.mediaMode === 'image' ? (
+            <>
+              <ComposerImageModel />
+              <ComposerImageSettings
+                settings={settings}
+                onChange={onSettingsChange}
+                disabled={disabled}
+              />
+            </>
+          ) : (
+            <>
+              <ComposerControls
+                settings={settings}
+                onChange={onSettingsChange}
+                disabled={disabled}
+              />
+              <ComposerSettings
+                settings={settings}
+                onChange={onSettingsChange}
+                disabled={disabled}
+              />
+            </>
+          )}
           <Button
             type={running ? 'button' : 'submit'}
             size="icon"

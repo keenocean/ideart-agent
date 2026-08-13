@@ -160,7 +160,7 @@ export async function* runAgentTurn(
     sessionId,
     history,
     persistSession: false,
-    systemPrompt: SYSTEM_PROMPT,
+    systemPrompt: `${SYSTEM_PROMPT}\n\n${mediaModeInstruction(settings)}`,
     tools: createAgentTools({ userId, sessionId, settings }),
     maxTurns: 12,
     permissionMode: 'bypassPermissions',
@@ -249,29 +249,62 @@ function withGenerationSettings(
     !settings?.modelName &&
     !settings?.aspectRatio &&
     !settings?.resolution &&
-    !settings?.duration
+    !settings?.duration &&
+    !settings?.imageAspectRatio &&
+    !settings?.imageResolution &&
+    !settings?.imageQuality
   )
     return message;
   const lines = [
     '',
     'UI generation settings:',
+    settings.mediaMode === 'image'
+      ? '- The user explicitly selected still-image output. You must call generate_image; do not produce a video.'
+      : settings.mediaMode === 'video'
+        ? '- The user explicitly selected video output. You must call generate_video or animate_image; do not produce a still image.'
+        : '- Output mode is Auto. Infer whether the user wants a still image or a video from their request.',
     // The tools resolve this name to whatever id the active provider uses —
     // the agent should pass the name through, not invent a provider id.
-    settings.modelName
+    settings.mediaMode !== 'image' && settings.modelName
       ? `- The user picked the "${settings.modelName}" video model. Leave the \`model\` argument of generate_video/animate_image empty so it is used, unless the user explicitly asks for a different model.`
       : '',
-    settings.aspectRatio
+    settings.mediaMode !== 'image' && settings.aspectRatio
       ? `- Use aspect_ratio "${settings.aspectRatio}" when calling generate_video or animate_image unless the user explicitly asks for a different aspect ratio.`
       : '',
-    settings.duration
+    settings.mediaMode !== 'image' && settings.duration
       ? `- Generate ${settings.duration}-second clips unless the user explicitly asks for a different length.`
       : '',
-    settings.resolution
+    settings.mediaMode !== 'image' && settings.resolution
       ? `- Target ${settings.resolution} output. If the selected video model supports a resolution parameter, use it; otherwise incorporate "${settings.resolution}, sharp detail, clean motion" into the video prompt.`
       : '',
-    settings.creditCost
+    settings.mediaMode !== 'image' && settings.creditCost
       ? `- The selected model costs ${settings.creditCost} credits for a clip of this length.`
+      : '',
+    settings.mediaMode === 'image' && settings.imageModelName
+      ? `- The selected image model is "${settings.imageModelName}". Leave the \`model\` argument of generate_image empty so it is used.`
+      : '',
+    settings.mediaMode === 'image' && settings.imageAspectRatio
+      ? `- When calling generate_image, use aspect_ratio "${settings.imageAspectRatio}" unless the user explicitly asks for another ratio.`
+      : '',
+    settings.mediaMode === 'image' && settings.imageResolution
+      ? `- When calling generate_image, use resolution "${settings.imageResolution}" unless the user explicitly asks for another resolution.`
+      : '',
+    settings.mediaMode === 'image' && settings.imageQuality
+      ? `- When calling generate_image, use quality "${settings.imageQuality}" unless the user explicitly asks for another quality.`
+      : '',
+    settings.mediaMode === 'image' && settings.imageCreditCost
+      ? `- An image with the selected settings costs ${settings.imageCreditCost} credits.`
       : '',
   ].filter(Boolean);
   return `${message}\n\n${lines.join('\n')}`;
+}
+
+function mediaModeInstruction(settings: AgentGenerationSettings | undefined) {
+  if (settings?.mediaMode === 'image') {
+    return 'Composer output mode: IMAGE. Only generate_image is available. Always generate or edit one still image, even if the wording could otherwise be interpreted as video.';
+  }
+  if (settings?.mediaMode === 'video') {
+    return 'Composer output mode: VIDEO. Only video tools are available. Use animate_image for a supplied opening frame when appropriate; otherwise use generate_video.';
+  }
+  return 'Composer output mode: AUTO. Infer the intended medium and select the matching available tool.';
 }

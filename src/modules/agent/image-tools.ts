@@ -491,9 +491,21 @@ export function createImageTool(ctx: ImageToolContext): ToolDefinition {
         modelKey: requested,
         prompt,
         options: {
-          aspect_ratio: input.aspect_ratio,
-          resolution: input.resolution,
-          quality: input.quality,
+          aspect_ratio:
+            input.aspect_ratio ??
+            (ctx.settings?.mediaMode === 'image'
+              ? ctx.settings.imageAspectRatio
+              : undefined),
+          resolution:
+            input.resolution ??
+            (ctx.settings?.mediaMode === 'image'
+              ? ctx.settings.imageResolution
+              : undefined),
+          quality:
+            input.quality ??
+            (ctx.settings?.mediaMode === 'image'
+              ? ctx.settings.imageQuality
+              : undefined),
           ...(references.length > 0 ? { image_input: references } : {}),
         },
         signal: context.abortSignal,

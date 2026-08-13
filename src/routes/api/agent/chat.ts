@@ -63,9 +63,12 @@ async function POST({ request }: { request: Request }) {
 
   // Gate on credits before spending anything.
   const verdict = checkCredits({
+    mediaMode: generationSettings.mediaMode,
     modelName: generationSettings.modelName,
     duration: generationSettings.duration,
     resolution: generationSettings.resolution,
+    imageResolution: generationSettings.imageResolution,
+    imageQuality: generationSettings.imageQuality,
     balance: await getBalance(userId),
   });
   if (!verdict.allowed) {

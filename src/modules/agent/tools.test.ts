@@ -17,6 +17,23 @@ describe('createAgentTools', () => {
       )
     ).toEqual(['generate_image', 'generate_video', 'animate_image']);
   });
+
+  it('restricts tools when the composer explicitly selects a medium', () => {
+    expect(
+      createAgentTools({
+        userId: 'user-1',
+        sessionId: 'session-1',
+        settings: { mediaMode: 'image' },
+      }).map((tool) => tool.name)
+    ).toEqual(['generate_image']);
+    expect(
+      createAgentTools({
+        userId: 'user-1',
+        sessionId: 'session-1',
+        settings: { mediaMode: 'video' },
+      }).map((tool) => tool.name)
+    ).toEqual(['generate_video', 'animate_image']);
+  });
 });
 
 describe('resolveReferenceImage', () => {

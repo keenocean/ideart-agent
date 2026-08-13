@@ -236,7 +236,7 @@ export async function startRun({
   onSettled,
   onInsufficientCredits,
 }: StartRunOptions): Promise<void> {
-  const content = buildAgentMessage(text, attachments);
+  const content = buildAgentMessage(text, attachments, settings.mediaMode);
   if (!content || isRunning(sessionId)) return;
 
   const controller = new AbortController();

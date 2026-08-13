@@ -147,10 +147,14 @@ describe('composer model capabilities', () => {
 
   it('starts with the video-lite defaults', () => {
     expect(defaultComposerSettings()).toEqual({
+      mediaMode: 'auto',
       modelOption: 'minimax-h3',
       duration: 5,
       resolution: '2K',
       aspectRatio: 'adaptive',
+      imageAspectRatio: '1:1',
+      imageResolution: '1K',
+      imageQuality: 'medium',
     });
   });
 
@@ -178,6 +182,7 @@ describe('composer model capabilities', () => {
     expect(
       settingsForModel(
         {
+          ...defaultComposerSettings(),
           modelOption: 'seedance-2-5',
           duration: 30,
           resolution: '720p',
@@ -186,6 +191,7 @@ describe('composer model capabilities', () => {
         'minimax-h3'
       )
     ).toEqual({
+      ...defaultComposerSettings(),
       modelOption: 'minimax-h3',
       duration: 5,
       resolution: '2K',
@@ -197,48 +203,89 @@ describe('composer model capabilities', () => {
 describe('resolveGenerationSettings', () => {
   it('sends the picker key and explicit lite defaults', () => {
     expect(resolveGenerationSettings(defaultComposerSettings())).toEqual({
+      mediaMode: 'auto',
       modelName: 'minimax-h3',
       aspectRatio: 'adaptive',
       resolution: '2K',
       duration: 5,
       creditCost: creditsForGeneration('minimax-h3', 5, '2K'),
+      imageModelName: 'gpt-image-2',
+      imageAspectRatio: '1:1',
+      imageResolution: '1K',
+      imageQuality: 'medium',
+      imageCreditCost: creditsForImageGeneration(
+        DEFAULT_IMAGE_MODEL,
+        '1K',
+        'medium'
+      ),
     });
   });
 
   it('passes supported explicit settings through', () => {
     const settings = resolveGenerationSettings({
+      ...defaultComposerSettings(),
+      mediaMode: 'video',
       modelOption: 'seedance-2-5',
       aspectRatio: '16:9',
       resolution: '480p',
       duration: 8,
     });
     expect(settings).toEqual({
+      mediaMode: 'video',
       modelName: 'seedance-2-5',
       aspectRatio: '16:9',
       resolution: '480p',
       duration: 8,
       creditCost: creditsForGeneration('seedance-2-5', 8, '480p'),
+      imageModelName: 'gpt-image-2',
+      imageAspectRatio: '1:1',
+      imageResolution: '1K',
+      imageQuality: 'medium',
+      imageCreditCost: creditsForImageGeneration(
+        DEFAULT_IMAGE_MODEL,
+        '1K',
+        'medium'
+      ),
     });
   });
 
   it('does not trust client pricing or unsupported values', () => {
     expect(
       normalizeClientGenerationSettings({
+        mediaMode: 'image',
         modelName: 'seedance-2-5',
         duration: 99,
         resolution: '4K',
         aspectRatio: 'adaptive',
         creditCost: 0,
+        imageResolution: '4k',
+        imageQuality: 'HIGH',
+        imageCreditCost: 0,
       })
     ).toEqual({
+      mediaMode: 'image',
       modelName: 'seedance-2-5',
       duration: 30,
       aspectRatio: 'auto',
       resolution: '720p',
       creditCost: creditsForGeneration('seedance-2-5', 30, '720p'),
+      imageModelName: 'gpt-image-2',
+      imageAspectRatio: '1:1',
+      imageResolution: '4K',
+      imageQuality: 'high',
+      imageCreditCost: creditsForImageGeneration(
+        DEFAULT_IMAGE_MODEL,
+        '4K',
+        'high'
+      ),
     });
     expect(
       normalizeClientGenerationSettings({ modelName: 'free-video' })
+    ).toBeNull();
+    expect(
+      normalizeClientGenerationSettings({
+        mediaMode: 'audio' as 'auto',
+      })
     ).toBeNull();
   });
 });

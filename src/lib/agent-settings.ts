@@ -3,6 +3,8 @@ export type VideoProviderName = 'evolink' | 'grouter' | 'fal' | 'replicate';
 export type ImageProviderName = 'evolink' | 'grouter' | 'fal' | 'replicate';
 
 export interface AgentGenerationSettings {
+  /** Explicit output-medium choice from the composer. */
+  mediaMode?: AgentMediaMode;
   /** Picker key (`minimax-h3`) — resolved to a provider model server-side. */
   modelName?: string;
   aspectRatio?: string;
@@ -10,7 +12,16 @@ export interface AgentGenerationSettings {
   /** Clip length in seconds. */
   duration?: number;
   creditCost?: number;
+  /** Still-image settings are separate from the video catalog above. */
+  imageModelName?: AgentImageModelOptionValue;
+  imageAspectRatio?: string;
+  imageResolution?: string;
+  imageQuality?: string;
+  imageCreditCost?: number;
 }
+
+export const AGENT_MEDIA_MODES = ['auto', 'image', 'video'] as const;
+export type AgentMediaMode = (typeof AGENT_MEDIA_MODES)[number];
 
 export const AUTO_ASPECT_RATIO = 'auto';
 export const ADAPTIVE_ASPECT_RATIO = 'adaptive';
@@ -216,10 +227,18 @@ export const AGENT_RESOLUTIONS = [
 ] as const;
 
 export interface AgentComposerSettings {
+  mediaMode: AgentMediaMode;
   modelOption: AgentModelOptionValue;
   aspectRatio: string;
   resolution: string;
   duration: number;
+  imageAspectRatio: string;
+  imageResolution: string;
+  imageQuality: string;
+}
+
+export function isAgentMediaMode(value: unknown): value is AgentMediaMode {
+  return (AGENT_MEDIA_MODES as readonly unknown[]).includes(value);
 }
 
 export function modelOptionFor(value: string | undefined) {
@@ -360,6 +379,7 @@ export function settingsForModel(
   // picker changes, even when an old value happens to be supported by both.
   if (settings.modelOption !== modelKey) {
     return {
+      ...settings,
       modelOption: modelKey,
       duration: option.defaultDuration,
       aspectRatio: option.defaultAspectRatio,
@@ -368,6 +388,7 @@ export function settingsForModel(
   }
 
   return {
+    ...settings,
     modelOption: modelKey,
     duration: normalizeDurationForModel(modelKey, settings.duration),
     aspectRatio: (option.aspectRatios as readonly string[]).includes(
@@ -385,19 +406,56 @@ export function settingsForModel(
 
 export function defaultComposerSettings(): AgentComposerSettings {
   const option = AGENT_MODEL_OPTIONS[0];
+  const imageOption = imageModelOptionFor(DEFAULT_IMAGE_MODEL)!;
   return {
+    mediaMode: 'auto',
     modelOption: option.value,
     aspectRatio: option.defaultAspectRatio,
     resolution: option.defaultResolution,
     duration: option.defaultDuration,
+    imageAspectRatio: imageOption.defaultAspectRatio,
+    imageResolution: imageOption.defaultResolution,
+    imageQuality: imageOption.defaultQuality,
   };
+}
+
+/** Hydrate persisted or pre-upgrade composer state against today's catalog. */
+export function normalizeComposerSettings(
+  settings: Partial<AgentComposerSettings> | undefined
+): AgentComposerSettings {
+  const defaults = defaultComposerSettings();
+  const modelOption = isModelOptionValue(settings?.modelOption)
+    ? settings.modelOption
+    : defaults.modelOption;
+  return settingsForModel(
+    {
+      mediaMode: isAgentMediaMode(settings?.mediaMode)
+        ? settings.mediaMode
+        : defaults.mediaMode,
+      modelOption,
+      aspectRatio: isAspectRatioValue(settings?.aspectRatio)
+        ? settings.aspectRatio
+        : defaults.aspectRatio,
+      resolution: isResolutionValue(settings?.resolution)
+        ? settings.resolution
+        : defaults.resolution,
+      duration: isDurationValue(settings?.duration)
+        ? settings.duration
+        : defaults.duration,
+      imageAspectRatio: normalizeImageAspectRatio(settings?.imageAspectRatio),
+      imageResolution: normalizeImageResolution(settings?.imageResolution),
+      imageQuality: normalizeImageQuality(settings?.imageQuality),
+    },
+    modelOption
+  );
 }
 
 export function resolveGenerationSettings(
   settings: AgentComposerSettings
 ): AgentGenerationSettings {
-  const normalized = settingsForModel(settings, settings.modelOption);
+  const normalized = normalizeComposerSettings(settings);
   return {
+    mediaMode: normalized.mediaMode,
     modelName: normalized.modelOption,
     aspectRatio: normalized.aspectRatio,
     resolution: normalized.resolution,
@@ -407,6 +465,15 @@ export function resolveGenerationSettings(
       normalized.duration,
       normalized.resolution
     ),
+    imageModelName: DEFAULT_IMAGE_MODEL,
+    imageAspectRatio: normalizeImageAspectRatio(normalized.imageAspectRatio),
+    imageResolution: normalizeImageResolution(normalized.imageResolution),
+    imageQuality: normalizeImageQuality(normalized.imageQuality),
+    imageCreditCost: creditsForImageGeneration(
+      DEFAULT_IMAGE_MODEL,
+      normalized.imageResolution,
+      normalized.imageQuality
+    ),
   };
 }
 
@@ -415,12 +482,15 @@ export function normalizeClientGenerationSettings(
   settings: AgentGenerationSettings | undefined
 ): AgentGenerationSettings | null {
   const defaults = defaultComposerSettings();
+  const mediaMode = settings?.mediaMode ?? defaults.mediaMode;
+  if (!isAgentMediaMode(mediaMode)) return null;
   const modelOption = settings?.modelName ?? defaults.modelOption;
   if (!isModelOptionValue(modelOption)) return null;
 
   return resolveGenerationSettings(
     settingsForModel(
       {
+        mediaMode,
         modelOption,
         aspectRatio: settings?.aspectRatio ?? defaults.aspectRatio,
         resolution: settings?.resolution ?? defaults.resolution,
@@ -428,6 +498,15 @@ export function normalizeClientGenerationSettings(
           typeof settings?.duration === 'number'
             ? settings.duration
             : defaults.duration,
+        imageAspectRatio: normalizeImageAspectRatio(
+          settings?.imageAspectRatio ?? defaults.imageAspectRatio
+        ),
+        imageResolution: normalizeImageResolution(
+          settings?.imageResolution ?? defaults.imageResolution
+        ),
+        imageQuality: normalizeImageQuality(
+          settings?.imageQuality ?? defaults.imageQuality
+        ),
       },
       modelOption
     )
