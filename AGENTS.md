@@ -1,4 +1,4 @@
-# ShipAny Next — Agent Instructions
+# Ideart — Agent Instructions
 
 This is a **headless SaaS engine** — pre-wired business logic (payments, credits, subscriptions, auth, RBAC) with minimal UI. Users build their product pages on top of it.
 

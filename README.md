@@ -1,4 +1,4 @@
-# ShipAny Video Agent
+# Ideart
 
 A production-ready conversational AI video SaaS, built to rebrand and ship.
 Users describe a shot or attach source media; the agent decides how to use the

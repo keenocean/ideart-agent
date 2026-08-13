@@ -10,7 +10,7 @@ import {
   type AgentComposerSettings,
 } from '@/lib/agent-settings';
 
-const STORAGE_KEY = 'video-agent:composer-settings';
+const STORAGE_KEY = 'ideart-agent:composer-settings';
 
 function readStored(): AgentComposerSettings | null {
   try {

@@ -18,7 +18,7 @@ export const DEFAULT_RESOLUTION = '2K';
 export const DEFAULT_DURATION = 5;
 
 /**
- * Video Agent uses the same public catalog as shipany-video-lite. Keep model
+ * Ideart uses the same public catalog as shipany-video-lite. Keep model
  * capabilities, defaults, provider routes and prices aligned with that app so
  * a setting selected in the composer has the same meaning in both products.
  */

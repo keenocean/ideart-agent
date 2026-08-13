@@ -313,7 +313,7 @@ export async function listChats(
 
 function fileNameFromUrl(src: string) {
   try {
-    const url = new URL(src, 'https://video-agent.local');
+    const url = new URL(src, 'https://ideart-agent.local');
     const path = url.searchParams.get('path') || url.pathname;
     return decodeURIComponent(path.split('/').filter(Boolean).pop() || '');
   } catch {

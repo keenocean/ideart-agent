@@ -34,7 +34,7 @@ import {
   type VideoProviderName,
 } from '@/lib/agent-settings';
 
-// Tools Video Agent can call. They are the ONLY tools the agent gets:
+// Tools Ideart can call. They are the ONLY tools the agent gets:
 // no filesystem/bash base tools — so the agent loop can't touch anything
 // outside video generation.
 

@@ -59,7 +59,7 @@ interface ChatListData {
 // Other views (the chat page after a turn completes, the rename dialog)
 // fire this event so the sidebar refetches without threading a callback
 // through props.
-const CHATS_CHANGED_EVENT = 'video-agent:chats-changed';
+const CHATS_CHANGED_EVENT = 'ideart-agent:chats-changed';
 
 /** Recent chats shown inline; the rest live on /chats. */
 const SIDEBAR_CHAT_LIMIT = 10;

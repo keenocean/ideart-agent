@@ -1,7 +1,7 @@
 import { and, desc, eq, inArray, isNull, or } from 'drizzle-orm';
 
 import { db } from '@/core/db';
-import { aiTask } from '@/config/db/schema';
+import { aiTask, type AiTask } from '@/config/db/schema';
 import { consume, revoke } from '@/modules/credits/service';
 import { getUuid } from '@/lib/hash';
 
@@ -184,7 +184,9 @@ export async function getActiveTasksForSession(params: {
     )
     .orderBy(desc(aiTask.createdAt));
 
-  return rows.filter((task) => taskSessionId(task) === params.sessionId);
+  return rows.filter(
+    (task: AiTask) => taskSessionId(task) === params.sessionId
+  );
 }
 
 /**

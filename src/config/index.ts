@@ -1,5 +1,4 @@
-export const AUTH_SECRET_PLACEHOLDER =
-  'shipany-dev-secret-change-in-production';
+export const AUTH_SECRET_PLACEHOLDER = 'ideart-dev-secret-change-in-production';
 
 // Isomorphic env access:
 // - Public (client-visible) vars are VITE_-prefixed and read from
@@ -16,7 +15,7 @@ const publicEnv = (key: string) => metaEnv[key] ?? procEnv[key];
 export const envConfigs: Record<string, string> = {
   // App (public)
   app_url: publicEnv('VITE_APP_URL') ?? 'http://localhost:3000',
-  app_name: publicEnv('VITE_APP_NAME') ?? 'Video Agent',
+  app_name: publicEnv('VITE_APP_NAME') ?? 'Ideart',
   app_description:
     publicEnv('VITE_APP_DESCRIPTION') ??
     'Create and refine AI video clips through conversation.',

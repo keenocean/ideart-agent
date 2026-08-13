@@ -10,7 +10,7 @@ import {
 import { loadAgentHistory } from './history';
 import { createAgentTools } from './tools';
 
-// In-process runtime for the Video Agent chat, replacing the remote
+// In-process runtime for the Ideart chat, replacing the remote
 // FastClaw runtime the Next.js version proxied to. Each request creates a
 // fresh Agent seeded with the conversation replayed from the database, runs
 // one turn, and emits the same event shapes the old runtime streamed:
@@ -25,7 +25,7 @@ export interface AgentStreamEvent {
   data?: Record<string, unknown>;
 }
 
-const SYSTEM_PROMPT = `You are Video Agent, an AI video-generation assistant. You help users create video clips through conversation.
+const SYSTEM_PROMPT = `You are Ideart, an AI video-generation assistant. You help users create video clips through conversation.
 
 Rules:
 - Understand the user's intent, then call generate_video (text-to-video) or animate_image (when the user provides a still image to bring to life, or refers to one already in the conversation).
