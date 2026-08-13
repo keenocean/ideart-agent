@@ -1,0 +1,4 @@
+interface:
+  display_name: 'Video Ad Recreate'
+  short_description: 'Deconstruct a reference ad and rebuild its format'
+  default_prompt: 'Use $video-ad-recreate to analyze this reference ad and recreate its structure.'

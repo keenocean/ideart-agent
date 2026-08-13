@@ -22,6 +22,9 @@ src/paraglide/
 /.wrangler/
 wrangler.jsonc
 
+# Generated immutable Agent Skill releases (published to private R2)
+/.agent-skills/
+
 # claude code local state
 .claude/scheduled_tasks.lock
 
@@ -57,7 +60,6 @@ yarn-error.log*
 
 # database
 /data/
-/drizzle/
 src/config/db/schema.ts
 
 # npm (project uses pnpm)

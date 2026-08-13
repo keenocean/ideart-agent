@@ -2,11 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 
 import {
   defaultComposerSettings,
-  isAspectRatioValue,
-  isDurationValue,
   isModelOptionValue,
-  isResolutionValue,
-  settingsForModel,
+  normalizeComposerSettings,
   type AgentComposerSettings,
 } from '@/lib/agent-settings';
 
@@ -19,24 +16,7 @@ function readStored(): AgentComposerSettings | null {
     const parsed = JSON.parse(raw) as Partial<AgentComposerSettings>;
     // A model that's since been retired must not resurrect itself.
     if (!isModelOptionValue(parsed?.modelOption)) return null;
-    const defaults = defaultComposerSettings();
-    // Same for an aspect ratio, resolution or duration we no longer offer —
-    // otherwise the panel shows nothing selected and we keep sending a dead
-    // value. Duration matters most: it is what the render is priced on.
-    const candidate = {
-      ...defaults,
-      ...parsed,
-      aspectRatio: isAspectRatioValue(parsed.aspectRatio)
-        ? parsed.aspectRatio
-        : defaults.aspectRatio,
-      resolution: isResolutionValue(parsed.resolution)
-        ? parsed.resolution
-        : defaults.resolution,
-      duration: isDurationValue(parsed.duration)
-        ? parsed.duration
-        : defaults.duration,
-    } as AgentComposerSettings;
-    return settingsForModel(candidate, candidate.modelOption);
+    return normalizeComposerSettings(parsed);
   } catch {
     return null;
   }

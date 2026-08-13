@@ -1,11 +1,17 @@
-import { creditsForGeneration } from '@/lib/agent-settings';
+import {
+  creditsForGeneration,
+  creditsForImageGeneration,
+  DEFAULT_IMAGE_MODEL,
+  type AgentMediaMode,
+} from '@/lib/agent-settings';
 
 /**
  * Whether a turn can go ahead, and what to say when it can't.
  *
- * Kept apart from the route so the rule can be exercised directly: the tool
- * call refuses on its own, but only after a full LLM turn has been paid for
- * and the user has watched the agent promise a clip it cannot deliver.
+ * A multimodal chat cannot know which tool the LLM will select before the
+ * turn runs, so the gate requires enough for the cheapest valid operation.
+ * Each tool performs the exact server-authoritative charge before submitting
+ * upstream and returns a paywall error if the selected settings cost more.
  */
 export interface CreditVerdict {
   allowed: boolean;
@@ -14,18 +20,32 @@ export interface CreditVerdict {
 }
 
 export function checkCredits(params: {
+  mediaMode?: AgentMediaMode;
   modelName?: string;
   /** Clip length in seconds; the catalog owns each model's valid choices. */
   duration?: number;
   /** Model-specific resolution multipliers match shipany-video-lite. */
   resolution?: string;
+  imageResolution?: string;
+  imageQuality?: string;
   balance: number;
 }): CreditVerdict {
-  const required = creditsForGeneration(
+  const videoRequired = creditsForGeneration(
     params.modelName,
     params.duration,
     params.resolution
   );
+  const imageRequired = creditsForImageGeneration(
+    DEFAULT_IMAGE_MODEL,
+    params.mediaMode === 'image' ? params.imageResolution : undefined,
+    params.mediaMode === 'image' ? params.imageQuality : undefined
+  );
+  const required =
+    params.mediaMode === 'image'
+      ? imageRequired
+      : params.mediaMode === 'video'
+        ? videoRequired
+        : Math.min(videoRequired, imageRequired);
   return {
     allowed: params.balance >= required,
     required,

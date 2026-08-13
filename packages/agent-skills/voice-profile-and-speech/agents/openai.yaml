@@ -1,0 +1,4 @@
+interface:
+  display_name: 'Voice Profile and Speech'
+  short_description: 'Produce default or authorized-profile ad speech'
+  default_prompt: 'Use $voice-profile-and-speech to plan the voice and speech for this ad.'

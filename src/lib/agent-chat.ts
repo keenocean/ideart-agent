@@ -1,5 +1,8 @@
 import { mediaTypeForAttachment, type PendingAttachment } from '@/lib/agent';
-import type { AgentComposerSettings } from '@/lib/agent-settings';
+import type {
+  AgentComposerSettings,
+  AgentMediaMode,
+} from '@/lib/agent-settings';
 
 /**
  * The chat transcript's data model: message shapes, the reducers that fold
@@ -48,14 +51,19 @@ export function newId(prefix: string) {
 
 export function buildAgentMessage(
   text: string,
-  attachments: PendingAttachment[]
+  attachments: PendingAttachment[],
+  mediaMode: AgentMediaMode = 'auto'
 ) {
   const uploaded = attachments.filter(
     (item) => item.status === 'uploaded' && item.url
   );
-  const base =
-    text.trim() ||
-    'Please create a video using the attached media and choose the most appropriate role for each item.';
+  const fallback =
+    mediaMode === 'image'
+      ? 'Please create or edit one still image using the attached media.'
+      : mediaMode === 'video'
+        ? 'Please create a video using the attached media and choose the most appropriate role for each item.'
+        : 'Please create the most appropriate still image or video using the attached media.';
+  const base = text.trim() || fallback;
   if (uploaded.length === 0) return base;
 
   const counts = { image: 0, audio: 0, video: 0 };
@@ -231,6 +239,7 @@ export interface ChatHistoryData {
 export interface InitialTurnPayload {
   prompt?: string;
   settings?: AgentComposerSettings;
+  skillName?: string;
   /** Media already uploaded or selected by the landing composer. */
   attachments?: PendingAttachment[];
 }

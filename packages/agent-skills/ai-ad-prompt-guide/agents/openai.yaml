@@ -1,0 +1,4 @@
+interface:
+  display_name: 'AI Ad Prompt Guide'
+  short_description: 'Write production-ready prompts for AI ad media'
+  default_prompt: 'Use $ai-ad-prompt-guide to turn this brief into a reliable generation prompt.'

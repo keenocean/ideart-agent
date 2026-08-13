@@ -33,7 +33,9 @@ The skill is designed to be run **any number of times**. A repeat invocation aut
 2. **Final deploy confirmation** — always asked; deploy is irreversible.
 3. **(Optional) Admin credentials** — only asked on first deploy when no `super_admin` exists yet. User picks one of: `email password` (agent creates the account directly so user can log in immediately), `email` (promote an existing user — requires prior sign-up via web), or `skip` (assign later with `/deploy-cloudflare --admin-email=X --admin-password=Y` or `--admin=X`).
 
-Every other step (D1 create, schema migrations, RBAC seed, secrets, URL fixup) is automatic AND idempotent. So **"再发布一下" / "ship again"** = run `/deploy-cloudflare` again.
+Every other step (D1/R2 create, schema migrations, RBAC seed, Skill release,
+secrets, URL fixup) is automatic AND idempotent. So **"再发布一下" / "ship
+again"** = run `/deploy-cloudflare` again.
 
 ### Idempotency cheat sheet
 
@@ -45,7 +47,7 @@ Every other step (D1 create, schema migrations, RBAC seed, secrets, URL fixup) i
 | 4.5 RBAC seed | `SELECT COUNT(*) FROM role` ≥ 1 on remote D1 | Skip local-sqlite dance entirely |
 | 5 Secrets | `wrangler secret list` already contains the name | Skip per-secret upload (`--rotate-secrets` forces) |
 | 5.5 Production URL | `.env.production` `VITE_APP_URL` AND `wrangler.jsonc` `vars.VITE_APP_URL` are both consistent with routes (workers.dev + no routes, OR custom domain matching a routes pattern) | Skip the prompt (`--domain=X` overrides) |
-| 6 Deploy | (always runs) | Fresh `pnpm run cf:deploy` with the latest code/env |
+| 6 Skill release + deploy | R2 objects are immutable; repeated publish is safe | Publish/verify Skills, pin release, then run `pnpm run cf:deploy` |
 | 7 URL fix | Both `.env.production` AND `wrangler.jsonc` vars already match the deployed URL | Skip redeploy |
 | 9 Admin | `SELECT COUNT(*) FROM user_role ur JOIN role r ON r.id=ur.role_id WHERE r.name='super_admin'` ≥ 1 | Don't prompt (explicit `--admin*` flags still run) |
 
@@ -122,6 +124,9 @@ npx wrangler d1 list 2>&1 | grep -w "$DB_NAME"                                  
 grep -q 'REPLACE_WITH_OUTPUT_OF_WRANGLER_D1_CREATE' wrangler.jsonc && echo "database_id: placeholder"  # real UUID?
 npx wrangler deployments list --name "$WORKER" 2>&1 | head -5                    # ever deployed?
 
+SKILLS_BUCKET=$(node -e "const fs=require('fs');const s=fs.readFileSync('wrangler.jsonc','utf8');const m=s.match(/\"binding\"\s*:\s*\"AGENT_SKILLS\"[\\s\\S]*?\"bucket_name\"\s*:\s*\"([^\"]+)\"/);console.log(m?.[1]||'')")
+npx wrangler r2 bucket list 2>&1 | grep -w "$SKILLS_BUCKET"                       # private Skill bucket created?
+
 LOCAL_MIGRATIONS=$(node -e "console.log(require('./drizzle/meta/_journal.json').entries.length)" 2>/dev/null || echo 0)
 REMOTE_MIGRATIONS=$(npx wrangler d1 migrations list "$DB_NAME" --remote 2>&1 | grep -cE '[0-9]{4}_' || echo 0)
 
@@ -137,17 +142,21 @@ test -f .env.production && grep "^VITE_APP_URL=" .env.production | cut -d= -f2-
 Narrate the detection table (one line each: D1 / wrangler.jsonc / prior deploy / migrations N÷M / RBAC / secrets names / admin / run mode), then branch:
 
 - **First-time** if ANY core resource missing (no D1, placeholder `database_id`, or no prior deployment) → Phase 3.
-- **Incremental** otherwise → Phase 4 (to pick up any new migrations); later phases auto-skip.
+- **Incremental** otherwise → create/configure only the private Skill bucket
+  from Phase 3.4 when it is missing, then continue to Phase 4. Later phases
+  auto-skip.
 
 ## Phase 3: First-time setup — announce, pause once, then auto-execute
 
-**Skip entirely if:** Phase 2 found D1 + real database_id + prior deployment. Narrate and jump to Phase 4.
+**Skip Phases 3.1-3.3 if:** Phase 2 found D1 + real database_id + prior
+deployment. Still run Phase 3.4 when the private Skill bucket/binding is
+missing, then jump to Phase 4.
 
 ### 3.1 Show the plan and pause for a single OK
 
 > First-time Cloudflare setup. I'll do all of this in one shot — interject only if you want different names.
 >
-> **Resources to create:** Worker `<name from wrangler.jsonc>`, D1 `<database_name>`
+> **Resources to create:** Worker `<name from wrangler.jsonc>`, D1 `<database_name>`, private R2 `<worker-name>-agent-skills`
 > **Then:** push schema → seed RBAC → set secrets (AUTH_SECRET, CONFIG_ENCRYPTION_KEY, never shown) → ask for production URL → deploy (with confirmation) → fix baked URL if needed → optional admin setup.
 >
 > Reply `ok` or `rename worker=X db=Y`.
@@ -163,6 +172,20 @@ Capture the `database_id` UUID from stdout. Narrate: "D1 created: `<name>` (id: 
 ### 3.3 Populate `wrangler.jsonc` (auto)
 
 Edit the working copy `wrangler.jsonc` (materialized from `wrangler.example.jsonc` in Phase 0.1): replace `REPLACE_WITH_OUTPUT_OF_WRANGLER_D1_CREATE` with the real UUID (and apply any renames). Confirm `vars.DATABASE_PROVIDER` is `"d1"` and `migrations_dir` is `"drizzle"`. Never commit `wrangler.jsonc` — it's gitignored on purpose.
+
+### 3.4 Create the private Agent Skills bucket (auto; also runs incrementally when missing)
+
+Use `<worker-name>-agent-skills` unless the working config already names a
+different bucket. The bucket stays private; do not enable `r2.dev` or attach a
+custom public domain.
+
+```bash
+npx wrangler r2 bucket create <worker-name>-agent-skills
+```
+
+Set `r2_buckets[].binding` to exactly `AGENT_SKILLS`, replace the bucket-name
+placeholder, and leave `vars.AGENT_SKILLS_RELEASE` for Phase 6 to pin after a
+verified publish. This dedicated bucket is separate from generated user media.
 
 ## Phase 3-PG: First-time setup — Postgres + Hyperdrive variant
 
@@ -222,6 +245,8 @@ DATABASE_PROVIDER=postgresql DATABASE_URL="$PG_URL" pnpm rbac:assign "$EMAIL" su
 ```
 
 Then continue with Phase 5 (secrets), 5.5 (URL), 6 (deploy) unchanged.
+Run the shared Phase 3.4 private Agent Skills bucket setup before Phase 5 when
+the binding or bucket is missing.
 
 ## Phase 4: Schema push to D1 (auto, incremental)
 
@@ -302,16 +327,20 @@ Same two files but with the exact URL, plus:
 
 Warn: the zone must already exist in the account, else deploy fails with "not a zone in your account".
 
-## Phase 6: Deploy — Interruption #2 (the only confirmation)
+## Phase 6: Publish Skills and deploy — Interruption #2 (the only confirmation)
 
 > Ready to deploy `<worker>`:
 > - Account: `<name>` (`<id>`)
 > - D1: `<db>` (N migrations) · RBAC ✓ · Secrets: `<names>`
+> - Agent Skills: private R2 `<skills-bucket>` · immutable release will be published and verified
 > - This creates a live URL and replaces any previous deployment. Proceed? (yes/no)
 
 On `yes`:
 
 ```bash
+# Upload immutable Skill objects, verify every object, then atomically pin the
+# release id in wrangler.jsonc. This command does not deploy by itself.
+pnpm skills:publish -- --bucket=<skills-bucket>
 pnpm run cf:deploy
 ```
 
@@ -396,6 +425,7 @@ Just the `INSERT OR IGNORE ... SELECT` + verify from above. 0 rows → user hasn
 | Sign-in 403 `Invalid origin` from a browser (curl works) | localhost URL baked into the bundle — `.env.local`/`.env.development` beat `.env.production` because `loadEnvFiles` doesn't overwrite existing keys and prefers `.env.local` | Deploy via `pnpm run cf:deploy` (sources `.env.production` first), ensure `wrangler.jsonc` `vars.VITE_APP_URL` is set; verify with `grep -o 'https://[^"]*' .output/server/_ssr/*.mjs \| head` |
 | `wrangler d1 migrations apply` finds no migrations | `migrations_dir` missing from the `d1_databases` entry | Set `"migrations_dir": "drizzle"` |
 | Bundle > limit (3 MiB free / 10 MiB paid, gzip) | Heavy server deps | Paid plan, or dynamic-import heavy modules |
+| `/api/agent/skills` returns 503 | `AGENT_SKILLS` binding/release missing, or release was not published | Run `pnpm skills:publish -- --bucket=<skills-bucket>`, verify the binding name, then redeploy |
 | Image upload fails on Workers | No-storage local-disk fallback needs a filesystem | Configure R2 in admin → Settings → Storage |
 | drizzle-kit "Interactive prompts require a TTY" | Column-conflict resolution needed | User runs `pnpm db:generate` in their terminal once |
 | `sqlite3: command not found` (Phase 4.5/9.A) | CLI missing | `brew install sqlite` / `apt-get install sqlite3` |
@@ -413,4 +443,5 @@ Just the `INSERT OR IGNORE ... SELECT` + verify from above. 0 rows → user hasn
 - Echo secret values (generate with openssl, pipe from env files, print names only)
 - Write secrets into `wrangler.jsonc` `vars` (vars are public)
 - Hand-edit generated files (`.output/**`, `.wrangler/**`)
+- Put Skill bodies in D1, Worker vars, static assets, or the Worker bundle
 - Make the user copy-paste routine wrangler/openssl/db commands — those are agent-executed

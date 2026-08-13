@@ -1,0 +1,90 @@
+export const meta = {
+  title: 'Image-to-Video Prompt Guide: Motion Without Losing the Subject',
+  description:
+    'A practical framework for writing image-to-video prompts that preserve the subject while directing motion, camera, lighting, pacing, and the final frame.',
+  created_at: '2026-08-06',
+  updated_at: '2026-08-13',
+  author_name: 'Video Agent Team',
+  author_image: '/logo.png',
+  image: '/imgs/examples/cover-2.webp',
+  categories: [{ slug: 'guides', title: 'Guides' }],
+};
+
+Image-to-video generation starts with a visual decision that has already been made. The subject, composition, colors, and much of the lighting exist in the source image. A useful prompt should therefore spend less time describing what is already visible and more time directing how the shot changes.
+
+## The five-part motion brief
+
+Use this structure for most image-to-video prompts:
+
+1. **Preserve** — identify what must remain stable.
+2. **Subject motion** — describe one clear action.
+3. **Camera motion** — choose one primary camera move.
+4. **Environment motion** — add restrained secondary movement.
+5. **Ending** — define how the shot settles or transitions.
+
+For example:
+
+> Preserve the product shape, label, and studio lighting. The bottle rotates slowly by fifteen degrees while a narrow highlight travels across the glass. The camera makes a gentle push-in. Fine mist drifts in the background. End on a centered hero frame with the label fully readable.
+
+## Say what must not drift
+
+If identity matters, name the stable elements before describing motion:
+
+- facial identity and hairstyle
+- product geometry and logo placement
+- wardrobe and accessories
+- background architecture
+- text and packaging layout
+
+Avoid asking for several large transformations at once. A dramatic subject action, fast camera orbit, changing environment, and wardrobe transition in the same short clip create competing constraints.
+
+## Choose one camera intention
+
+Camera language should be specific but not overloaded:
+
+- slow push-in
+- gentle pull-back
+- left-to-right tracking shot
+- subtle handheld drift
+- locked camera with subject motion only
+
+If the source image already has a strong composition, a restrained camera move usually preserves it better than a full orbit.
+
+## Use environmental motion as support
+
+Secondary movement makes a static image feel alive without changing the main subject. Useful examples include:
+
+- fabric or hair moving in a light breeze
+- steam, smoke, dust, rain, or mist
+- reflections and moving highlights
+- background pedestrians in soft focus
+- leaves, water, curtains, or particles
+
+Keep these elements subordinate to the main action.
+
+## Match the model to the shot
+
+The available models expose different resolutions, durations, reference limits, and audio behavior. Choose the model from the composer first, then work within the controls shown for that model. A longer duration is not automatically better; short clips are often easier to keep coherent when the source image must stay recognizable.
+
+## Iterate with targeted changes
+
+After the first take, avoid rewriting the entire prompt. Continue in the same chat and describe the smallest useful adjustment:
+
+- “Keep the motion, but reduce the camera push-in by half.”
+- “The product shape is correct. Slow the rotation and remove the background mist.”
+- “Preserve the first three seconds, then hold the final frame longer.”
+
+This makes it clear which parts of the previous result should survive the next generation.
+
+## Final checklist
+
+Before generating, confirm that the prompt answers these questions:
+
+- What must remain unchanged?
+- What is the single main action?
+- How does the camera move?
+- Which secondary details move?
+- What should the final frame look like?
+- Is the requested motion realistic for the selected duration?
+
+A good image-to-video prompt is a motion brief, not a second description of the still image.

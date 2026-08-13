@@ -3,6 +3,7 @@ import { defineTool, type ToolDefinition } from '@codeany/open-agent-sdk';
 import {
   AIMediaType,
   AITaskStatus,
+  EvoLinkProvider,
   FalProvider,
   GRouterProvider,
   ReplicateProvider,
@@ -11,12 +12,14 @@ import {
 } from '@/core/ai';
 import type { StorageManager } from '@/core/storage';
 import { envConfigs } from '@/config';
+import type { AiTask } from '@/config/db/schema';
 import {
   createTask,
   AITaskStatus as DbTaskStatus,
   findTask,
   getActiveTasksForSession,
   markTaskProcessing,
+  taskTurnId,
   updateTask,
 } from '@/modules/ai-tasks/service';
 import { getAllConfigs } from '@/modules/config/service';
@@ -34,14 +37,83 @@ import {
   type VideoProviderName,
 } from '@/lib/agent-settings';
 
-// Tools Video Agent can call. They are the ONLY tools the agent gets:
-// no filesystem/bash base tools — so the agent loop can't touch anything
-// outside video generation.
+import { createImageTool } from './image-tools';
+import { resolveReferenceImage } from './media';
+import { summarizeProviderError } from './provider-error';
+import { createSkillResourceTools, type PromptSkill } from './skills';
+import { assertTurnLeaseOwnership, getActiveTurnLease } from './turn-lease';
+
+export { resolveReferenceImage } from './media';
+
+// Media generation tools plus the selected skill's read-only release-backed
+// reference reader are the ONLY tools the agent gets: no filesystem/bash base
+// tools, so the Worker cannot execute arbitrary code.
 
 export interface AgentToolContext {
   userId: string;
   sessionId: string;
+  turnId?: string;
+  requireTurnLease?: boolean;
   settings?: AgentGenerationSettings;
+  skill?: PromptSkill | null;
+}
+
+function isFailedGenerationResult(
+  result: Awaited<ReturnType<ToolDefinition['call']>>
+): boolean {
+  if (result.is_error || typeof result.content !== 'string')
+    return !!result.is_error;
+  try {
+    const payload = JSON.parse(result.content);
+    return payload?.status === 'error' || payload?.status === 'canceled';
+  } catch {
+    return false;
+  }
+}
+
+/** Keep one failed provider call from turning into repeated billed attempts. */
+export function guardGenerationRetries(
+  tools: ToolDefinition[]
+): ToolDefinition[] {
+  let generationFailed = false;
+  return tools.map((tool) => ({
+    ...tool,
+    async call(input, context) {
+      if (generationFailed) {
+        return {
+          type: 'tool_result',
+          tool_use_id: '',
+          content: JSON.stringify({
+            status: 'error',
+            message:
+              'A generation already failed in this turn. Do not retry it; explain the original error to the user.',
+          }),
+          is_error: true,
+        };
+      }
+      const result = await tool.call(input, context);
+      if (isFailedGenerationResult(result)) generationFailed = true;
+      return result;
+    },
+  }));
+}
+
+function guardTurnOwnership(
+  tools: ToolDefinition[],
+  ctx: AgentToolContext
+): ToolDefinition[] {
+  if (!ctx.requireTurnLease || !ctx.turnId) return tools;
+  return tools.map((tool) => ({
+    ...tool,
+    async call(input, context) {
+      await assertTurnLeaseOwnership({
+        chatId: ctx.sessionId,
+        userId: ctx.userId,
+        turnId: ctx.turnId!,
+      });
+      return tool.call(input, context);
+    },
+  }));
 }
 
 // Video renders are minutes, not seconds — a 10s clip on a busy queue
@@ -62,40 +134,6 @@ function sleep(ms: number, signal?: AbortSignal): Promise<void> {
       { once: true }
     );
   });
-}
-
-/**
- * Reference media arrives as public URLs (uploads and examples both
- * live in object storage) or as data URIs. Anything else can't be read from a
- * Worker, so it's rejected instead of silently failing upstream.
- */
-export function resolveReferenceImage(src: string): string {
-  const value = src.trim();
-  if (value.startsWith('data:')) return value;
-  if (/^https?:\/\//i.test(value)) {
-    let hostname: string;
-    try {
-      hostname = new URL(value).hostname.toLowerCase();
-    } catch {
-      throw new Error(`unsupported image reference: ${src}`);
-    }
-    if (
-      hostname === 'localhost' ||
-      hostname.endsWith('.localhost') ||
-      hostname === '0.0.0.0' ||
-      hostname === '::1' ||
-      hostname === '[::1]' ||
-      /^127(?:\.\d{1,3}){3}$/.test(hostname)
-    ) {
-      throw new Error(`unsupported image reference: ${src}`);
-    }
-    return value;
-  }
-  // Site-relative and localhost URLs must be copied to public storage by the
-  // composer first. Converting them to app_url here only hides the problem in
-  // local development and lets the provider fail later with a 422 download
-  // error.
-  throw new Error(`unsupported image reference: ${src}`);
 }
 
 function extFromUrl(url: string): string {
@@ -187,6 +225,12 @@ function createVideoProvider(
   provider: VideoProviderName,
   configs: Record<string, any>
 ): AIProvider {
+  if (provider === 'evolink') {
+    return new EvoLinkProvider({
+      apiKey: configs.evolink_api_key,
+      baseUrl: configs.evolink_base_url,
+    });
+  }
   if (provider === 'grouter') {
     return new GRouterProvider({
       apiKey: configs.grouter_api_key,
@@ -205,16 +249,32 @@ function createVideoProvider(
  * Stop durable provider jobs for a chat. This works after refresh because the
  * chat id and upstream task id live in `ai_task`, not only in browser memory.
  */
-export async function cancelVideoGenerationsForSession(params: {
+export async function cancelGenerationsForSession(params: {
   userId: string;
   sessionId: string;
+  /** Exact active Turn. Omit only for orphan/legacy cleanup. */
+  turnId?: string;
 }): Promise<{ canceled: number; upstreamCanceled: number }> {
   const tasks = await getActiveTasksForSession(params);
-  if (tasks.length === 0) return { canceled: 0, upstreamCanceled: 0 };
+  // Snapshot tasks first, then protect a lease acquired concurrently. A task
+  // created after this snapshot cannot be in `tasks`; a task already present
+  // must be excluded if its Turn now owns the chat.
+  const activeLease = params.turnId
+    ? undefined
+    : await getActiveTurnLease(params.sessionId);
+  const activeTurnId =
+    activeLease?.userId === params.userId ? activeLease.turnId : undefined;
+  const cancelableTasks = tasks.filter(
+    (task: AiTask) =>
+      params.turnId !== undefined ||
+      !activeTurnId ||
+      taskTurnId(task) !== activeTurnId
+  );
+  if (cancelableTasks.length === 0) return { canceled: 0, upstreamCanceled: 0 };
 
   const configs = await getAllConfigs();
   let upstreamCanceled = 0;
-  for (const task of tasks) {
+  for (const task of cancelableTasks) {
     // Set the durable flag first. The polling loop checks it before accepting
     // a late success and `updateTask` prevents cancellation being overwritten.
     await updateTask({
@@ -225,26 +285,29 @@ export async function cancelVideoGenerationsForSession(params: {
 
     if (!task.taskId) continue;
     const providerName = task.provider as VideoProviderName;
-    if (!['grouter', 'fal', 'replicate'].includes(providerName)) continue;
+    if (!['evolink', 'grouter', 'fal', 'replicate'].includes(providerName)) {
+      continue;
+    }
     try {
       const provider = createVideoProvider(providerName, configs);
       if (!provider.cancel) continue;
       await provider.cancel({
         taskId: task.taskId,
         model: task.model,
-        mediaType: AIMediaType.VIDEO,
+        mediaType:
+          task.mediaType === 'image' ? AIMediaType.IMAGE : AIMediaType.VIDEO,
       });
       upstreamCanceled += 1;
     } catch (error) {
       // The local task is still canceled and refunded. Some providers cannot
       // interrupt a job that crossed from queued to completed concurrently.
       console.error(
-        `failed to cancel ${providerName} video task ${task.taskId}:`,
+        `failed to cancel ${providerName} ${task.mediaType} task ${task.taskId}:`,
         error
       );
     }
   }
-  return { canceled: tasks.length, upstreamCanceled };
+  return { canceled: cancelableTasks.length, upstreamCanceled };
 }
 
 async function runVideoGeneration(params: {
@@ -258,14 +321,25 @@ async function runVideoGeneration(params: {
 }): Promise<string> {
   const { ctx, options, signal, kind, modelKey } = params;
   const configs = await getAllConfigs();
+  const selectedResolution = String(
+    options.resolution ??
+      ctx.settings?.resolution ??
+      modelOptionFor(modelKey)?.defaultResolution ??
+      ''
+  );
 
-  let selectedProvider = pickVideoProvider(configs);
+  let selectedProvider = pickVideoProvider(
+    configs,
+    modelKey,
+    kind,
+    selectedResolution
+  );
 
   if (!selectedProvider) {
     return JSON.stringify({
       status: 'error',
       message:
-        'Video provider is not configured. Ask the site admin to configure gRouter, Fal, or Replicate in Admin Settings.',
+        'No configured video provider supports this model. Ask the site admin to configure EvoLink, gRouter, Fal, or Replicate in Admin Settings.',
     });
   }
 
@@ -275,7 +349,11 @@ async function runVideoGeneration(params: {
     options.reference_video_urls,
   ].some((value) => Array.isArray(value) && value.length > 0);
   if (hasReferenceMedia && selectedProvider !== 'grouter') {
-    if (configs.grouter_api_key && configs.grouter_base_url) {
+    if (
+      configs.grouter_api_key &&
+      configs.grouter_base_url &&
+      providerModelFor(modelKey, 'grouter', kind, selectedResolution)
+    ) {
       selectedProvider = 'grouter';
     } else {
       return JSON.stringify({
@@ -297,12 +375,6 @@ async function runVideoGeneration(params: {
     });
   }
 
-  const selectedResolution = String(
-    options.resolution ??
-      ctx.settings?.resolution ??
-      modelOptionFor(modelKey)?.defaultResolution ??
-      ''
-  );
   const model = providerModelFor(
     modelKey,
     selectedProvider,
@@ -313,7 +385,7 @@ async function runVideoGeneration(params: {
   if (!model) {
     return JSON.stringify({
       status: 'error',
-      message: `${modelOptionFor(modelKey)?.label ?? modelKey} is not available on ${selectedProvider}. Select Fal or gRouter for this model.`,
+      message: `${modelOptionFor(modelKey)?.label ?? modelKey} is not available on ${selectedProvider}. Choose a provider that supports this model.`,
     });
   }
 
@@ -361,6 +433,7 @@ async function runVideoGeneration(params: {
         ...providerOptions,
         providerModel: model,
         sessionId: ctx.sessionId,
+        ...(ctx.turnId ? { turnId: ctx.turnId } : {}),
       },
     });
   } catch (err: any) {
@@ -376,6 +449,13 @@ async function runVideoGeneration(params: {
 
   let providerTaskId = '';
   try {
+    if (ctx.requireTurnLease && ctx.turnId) {
+      await assertTurnLeaseOwnership({
+        chatId: ctx.sessionId,
+        userId: ctx.userId,
+        turnId: ctx.turnId,
+      });
+    }
     const created = await provider.generate({
       params: {
         mediaType: AIMediaType.VIDEO,
@@ -500,49 +580,6 @@ async function runVideoGeneration(params: {
 }
 
 /**
- * Providers report failures by pasting the upstream response body into their
- * error message, which drags in the echoed request (prompt, image sizes, even
- * `openai_api_key: null`). Pull out the sentence a human needs — fal's
- * `detail[].msg`, an OpenAI-style `error.message`, or a plain `detail` — and
- * keep the prefix that says who failed and with what status.
- */
-function summarizeProviderError(message: string): string {
-  const start = message.search(/[[{]/);
-  if (start === -1) return truncate(message);
-
-  const prefix = message
-    .slice(0, start)
-    .trim()
-    .replace(/[:\s]+$/, '');
-  let payload: any;
-  try {
-    payload = JSON.parse(message.slice(start));
-  } catch {
-    return truncate(message);
-  }
-
-  const detail = payload?.detail ?? payload;
-  const first = Array.isArray(detail) ? detail[0] : detail;
-  const summary =
-    (typeof first?.msg === 'string' && first.msg) ||
-    (typeof first?.message === 'string' && first.message) ||
-    (typeof payload?.error?.message === 'string' && payload.error.message) ||
-    (typeof detail === 'string' && detail) ||
-    '';
-  if (!summary) return truncate(message);
-
-  const type = typeof first?.type === 'string' ? ` (${first.type})` : '';
-  return truncate(
-    prefix ? `${prefix}: ${summary}${type}` : `${summary}${type}`
-  );
-}
-
-function truncate(value: string, max = 300): string {
-  const trimmed = value.trim();
-  return trimmed.length > max ? `${trimmed.slice(0, max)}…` : trimmed;
-}
-
-/**
  * The clip length actually sent upstream, and the one the charge is based on.
  * video-lite exposes continuous integer ranges. Clamp tool values to the
  * selected model's bounds and use its default when the value is unreadable.
@@ -596,7 +633,7 @@ function normalizeGenerationOptions(
 }
 
 /** Convert normalized Agent options to the same upstream contract as lite. */
-function providerOptionsFor({
+export function providerOptionsFor({
   provider,
   modelKey,
   kind,
@@ -630,6 +667,18 @@ function providerOptionsFor({
   const referenceVideoUrls = Array.isArray(options.reference_video_urls)
     ? options.reference_video_urls.map(String)
     : [];
+
+  if (modelKey === 'seedance-2-0' && provider === 'evolink') {
+    return {
+      aspect_ratio: aspectRatio,
+      duration,
+      quality: resolution,
+      generate_audio: true,
+      ...(kind === 'animate' && imageUrls.length > 0
+        ? { image_input: imageUrls.slice(0, 2) }
+        : {}),
+    };
+  }
 
   if (modelKey === 'seedance-2-5') {
     if (provider === 'fal') {
@@ -718,25 +767,35 @@ export function normalizeProviderAspectRatio(
 /**
  * Resolve which provider serves this call.
  *
- * The admin's `default_video_provider` decides; `auto` follows video-lite and
- * prefers gRouter, then Fal, then Replicate. An explicitly chosen provider
- * that isn't usable falls back to whatever is configured rather than failing.
- * Returns null when nothing usable is configured.
+ * The admin's `default_video_provider` decides; `auto` prefers EvoLink, then
+ * gRouter, Fal, and Replicate. When a model is supplied, providers without an
+ * exact route for that model are skipped instead of silently substituting a
+ * different model. Returns null when nothing usable is configured.
  */
 export function pickVideoProvider(
-  configs: Record<string, any>
+  configs: Record<string, any>,
+  modelKey?: string,
+  kind: 'generate' | 'animate' = 'generate',
+  resolution?: string
 ): VideoProviderName | null {
   const configured: Record<VideoProviderName, boolean> = {
+    evolink: !!configs.evolink_api_key,
     grouter: !!configs.grouter_api_key && !!configs.grouter_base_url,
     fal: !!configs.fal_api_key,
     replicate: !!configs.replicate_api_token,
   };
 
   const preferred = String(configs.default_video_provider || 'auto');
-  const fallbackOrder: VideoProviderName[] = ['grouter', 'fal', 'replicate'];
+  const fallbackOrder: VideoProviderName[] = [
+    'evolink',
+    'grouter',
+    'fal',
+    'replicate',
+  ];
   const order =
     preferred !== 'auto' &&
-    (preferred === 'grouter' ||
+    (preferred === 'evolink' ||
+      preferred === 'grouter' ||
       preferred === 'fal' ||
       preferred === 'replicate')
       ? [
@@ -745,7 +804,13 @@ export function pickVideoProvider(
         ]
       : fallbackOrder;
 
-  return order.find((name) => configured[name]) ?? null;
+  return (
+    order.find(
+      (name) =>
+        configured[name] &&
+        (!modelKey || providerModelFor(modelKey, name, kind, resolution))
+    ) ?? null
+  );
 }
 
 /**
@@ -762,7 +827,7 @@ function modelSelection(
     defaultComposerSettings().modelOption;
   if (!isModelOptionValue(value)) {
     return {
-      error: `Unsupported video model "${value}". Choose minimax-h3 or seedance-2-5.`,
+      error: `Unsupported video model "${value}". Choose minimax-h3, seedance-2-5, or seedance-2-0.`,
     };
   }
   return { modelKey: value };
@@ -793,7 +858,7 @@ export function createAgentTools(ctx: AgentToolContext): ToolDefinition[] {
         model: {
           type: 'string',
           description:
-            'Optional picker key: minimax-h3 or seedance-2-5. Leave empty to use the composer setting.',
+            'Optional picker key: minimax-h3, seedance-2-5, or seedance-2-0. Leave empty to use the composer setting.',
         },
         resolution: {
           type: 'string',
@@ -897,7 +962,7 @@ export function createAgentTools(ctx: AgentToolContext): ToolDefinition[] {
         model: {
           type: 'string',
           description:
-            'Optional picker key: minimax-h3 or seedance-2-5. Leave empty to use the composer setting.',
+            'Optional picker key: minimax-h3, seedance-2-5, or seedance-2-0. Leave empty to use the composer setting.',
         },
         resolution: {
           type: 'string',
@@ -954,5 +1019,17 @@ export function createAgentTools(ctx: AgentToolContext): ToolDefinition[] {
     },
   });
 
-  return [generateVideo, animateImage];
+  const skillTools = ctx.skill ? createSkillResourceTools(ctx.skill) : [];
+  let mediaTools: ToolDefinition[];
+  if (ctx.settings?.mediaMode === 'image') {
+    mediaTools = [createImageTool(ctx)];
+  } else if (ctx.settings?.mediaMode === 'video') {
+    mediaTools = [generateVideo, animateImage];
+  } else {
+    mediaTools = [createImageTool(ctx), generateVideo, animateImage];
+  }
+  return [
+    ...skillTools,
+    ...guardTurnOwnership(guardGenerationRetries(mediaTools), ctx),
+  ];
 }

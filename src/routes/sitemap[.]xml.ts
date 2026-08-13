@@ -2,7 +2,6 @@ import { createFileRoute } from '@tanstack/react-router';
 
 import { envConfigs } from '@/config';
 import { baseLocale, locales, localizeUrl } from '@/paraglide/runtime.js';
-import { getLocalPosts, mergePosts } from '@/content/posts';
 
 const STATIC_PATHS = [
   '',
@@ -14,10 +13,20 @@ const STATIC_PATHS = [
 
 type Entry = {
   path: string;
+  availableLocales: string[];
   lastModified?: string;
   changeFrequency: string;
   priority: number;
 };
+
+function xml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
 
 function urlFor(path: string, locale: string): string {
   return localizeUrl(`${envConfigs.app_url}${path || '/'}`, {
@@ -25,79 +34,95 @@ function urlFor(path: string, locale: string): string {
   }).href;
 }
 
-function entryXml(e: Entry): string {
-  const alternates = locales
-    .map(
+function entryXml(entry: Entry, locale: string): string {
+  const defaultLocale = entry.availableLocales.includes(baseLocale)
+    ? baseLocale
+    : entry.availableLocales[0];
+  const alternates = [
+    ...entry.availableLocales.map(
       (loc) =>
-        `    <xhtml:link rel="alternate" hreflang="${loc}" href="${urlFor(e.path, loc)}"/>`
-    )
-    .join('\n');
+        `    <xhtml:link rel="alternate" hreflang="${xml(loc)}" href="${xml(urlFor(entry.path, loc))}"/>`
+    ),
+    `    <xhtml:link rel="alternate" hreflang="x-default" href="${xml(urlFor(entry.path, defaultLocale))}"/>`,
+  ].join('\n');
   return [
     '  <url>',
-    `    <loc>${urlFor(e.path, baseLocale)}</loc>`,
+    `    <loc>${xml(urlFor(entry.path, locale))}</loc>`,
     alternates,
-    e.lastModified ? `    <lastmod>${e.lastModified}</lastmod>` : null,
-    `    <changefreq>${e.changeFrequency}</changefreq>`,
-    `    <priority>${e.priority}</priority>`,
+    entry.lastModified
+      ? `    <lastmod>${xml(entry.lastModified)}</lastmod>`
+      : null,
+    `    <changefreq>${entry.changeFrequency}</changefreq>`,
+    `    <priority>${entry.priority}</priority>`,
     '  </url>',
   ]
     .filter(Boolean)
     .join('\n');
 }
 
+async function blogEntries(): Promise<Entry[]> {
+  const entries = new Map<
+    string,
+    { availableLocales: Set<string>; lastModified: string }
+  >();
+  try {
+    const { listPublishedArticles } = await import('@/modules/posts/service');
+    const rows = await listPublishedArticles();
+    for (const row of rows) {
+      const current = entries.get(row.slug) || {
+        availableLocales: new Set<string>(),
+        lastModified: new Date(row.updatedAt).toISOString(),
+      };
+      if (row.locale) current.availableLocales.add(row.locale);
+      else for (const locale of locales) current.availableLocales.add(locale);
+      const updatedAt = new Date(row.updatedAt).toISOString();
+      if (updatedAt > current.lastModified) current.lastModified = updatedAt;
+      entries.set(row.slug, current);
+    }
+  } catch {
+    // An unavailable database produces a static-only sitemap.
+  }
+
+  return [...entries.entries()].map(
+    ([slug, { availableLocales, lastModified }]) => ({
+      path: `/blog/${slug}`,
+      availableLocales: locales.filter((locale) =>
+        availableLocales.has(locale)
+      ),
+      lastModified,
+      changeFrequency: 'monthly',
+      priority: 0.6,
+    })
+  );
+}
+
 export const Route = createFileRoute('/sitemap.xml')({
   server: {
     handlers: {
       GET: async () => {
-        const entries: Entry[] = STATIC_PATHS.map((path) => ({
+        const staticEntries: Entry[] = STATIC_PATHS.map((path) => ({
           path,
+          availableLocales: [...locales],
           changeFrequency: path === '/blog' ? 'daily' : 'weekly',
           priority: path === '' ? 1 : 0.8,
         }));
-
-        // Blog posts: db posts merged with local MDX posts.
-        try {
-          const { listPublishedArticles } =
-            await import('@/modules/posts/service');
-          const rows = await listPublishedArticles().catch(() => []);
-          const dbPosts = rows.map((row) => ({
-            slug: row.slug,
-            title: row.title || row.slug,
-            description: row.description || '',
-            createdAt: new Date(row.createdAt).toISOString(),
-            source: 'db' as const,
-          }));
-          const posts = mergePosts(dbPosts, getLocalPosts(baseLocale));
-          for (const post of posts) {
-            entries.push({
-              path: `/blog/${post.slug}`,
-              lastModified: post.createdAt,
-              changeFrequency: 'monthly',
-              priority: 0.6,
-            });
-          }
-        } catch {
-          // Database unreachable — static paths + local posts still listed.
-          for (const post of getLocalPosts(baseLocale)) {
-            entries.push({
-              path: `/blog/${post.slug}`,
-              lastModified: post.createdAt,
-              changeFrequency: 'monthly',
-              priority: 0.6,
-            });
-          }
-        }
-
-        const xml = [
+        const entries = [...staticEntries, ...(await blogEntries())];
+        const xmlBody = [
           '<?xml version="1.0" encoding="UTF-8"?>',
           '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">',
-          ...entries.map(entryXml),
+          ...entries.flatMap((entry) =>
+            entry.availableLocales.map((locale) => entryXml(entry, locale))
+          ),
           '</urlset>',
           '',
         ].join('\n');
 
-        return new Response(xml, {
-          headers: { 'Content-Type': 'application/xml' },
+        return new Response(xmlBody, {
+          headers: {
+            'Content-Type': 'application/xml',
+            'Cache-Control':
+              'public, s-maxage=3600, stale-while-revalidate=86400',
+          },
         });
       },
     },

@@ -27,7 +27,7 @@ import {
   useAgentRun,
 } from '@/lib/agent-runs';
 import {
-  defaultComposerSettings,
+  normalizeComposerSettings,
   resolveGenerationSettings,
   type AgentGenerationSettings,
 } from '@/lib/agent-settings';
@@ -36,6 +36,7 @@ import { mediaNameFromUrl } from '@/lib/media';
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
 import { useComposerSettings } from '@/hooks/use-composer-settings';
+import { useComposerSkill } from '@/hooks/use-composer-skill';
 import { useAgentHeader } from '@/components/agent/agent-header-context';
 import {
   ChatComposer,
@@ -104,7 +105,9 @@ function ChatSessionPage() {
           message.tools.some(
             (tool) =>
               tool.result === undefined &&
-              (tool.name === 'generate_video' || tool.name === 'animate_image')
+              (tool.name === 'generate_image' ||
+                tool.name === 'generate_video' ||
+                tool.name === 'animate_image')
           )
       ),
     [messages]
@@ -112,6 +115,7 @@ function ChatSessionPage() {
   const generationRunning = streaming || serverRunning || pendingGeneration;
   const [value, setValue] = useState('');
   const [composerSettings, setComposerSettings] = useComposerSettings();
+  const [skillName, setSkillName] = useComposerSkill();
   const [attachments, setAttachments] = useState<PendingAttachment[]>([]);
   const attachmentsRef = useRef<PendingAttachment[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -265,6 +269,7 @@ function ChatSessionPage() {
       text: string,
       imageAttachments: PendingAttachment[] = [],
       settings: AgentGenerationSettings = {},
+      selectedSkillName?: string,
       // Fired once the server has accepted the turn (and therefore persisted
       // the user message) — the caller uses it to drop its retry copy.
       onAccepted?: () => void
@@ -274,6 +279,7 @@ function ChatSessionPage() {
         text,
         attachments: imageAttachments,
         settings,
+        skillName: selectedSkillName,
         onAccepted: () => {
           onAccepted?.();
           // The chat row exists the moment the server accepts the turn, so
@@ -281,8 +287,8 @@ function ChatSessionPage() {
           // only when the turn finishes.
           notifyChatsChanged();
         },
-        onSettled: () => {
-          setServerRunning(false);
+        onSettled: ({ conflictCode }) => {
+          setServerRunning(Boolean(conflictCode));
           // The title is derived from the first message and the chat bubbles
           // to the top on updatedAt; the balance moved if the turn generated
           // anything.
@@ -295,6 +301,13 @@ function ChatSessionPage() {
           onAccepted?.();
           if (subscribed) setTopUpOpen(true);
           else setUpgradeOpen(true);
+        },
+        onTurnConflict: (code) => {
+          toast.error(
+            code === 'stale_run_requires_stop'
+              ? m['agent.chat.stale_run_requires_stop']()
+              : m['agent.chat.turn_in_progress']()
+          );
         },
       });
     },
@@ -311,7 +324,9 @@ function ChatSessionPage() {
       const rawTurn = sessionStorage.getItem(turnKey);
       if (rawTurn) {
         const payload = JSON.parse(rawTurn) as InitialTurnPayload;
-        if (payload.settings) setComposerSettings(payload.settings);
+        const initialSettings = normalizeComposerSettings(payload.settings);
+        if (payload.settings) setComposerSettings(initialSettings);
+        if (payload.skillName !== undefined) setSkillName(payload.skillName);
         const initialAttachments = (payload.attachments ?? []).filter(
           (item) => item.status === 'uploaded' && item.url
         );
@@ -322,9 +337,8 @@ function ChatSessionPage() {
           send(
             payload.prompt ?? '',
             initialAttachments,
-            resolveGenerationSettings(
-              payload.settings ?? defaultComposerSettings()
-            ),
+            resolveGenerationSettings(initialSettings),
+            payload.skillName,
             () => sessionStorage.removeItem(turnKey)
           );
           return;
@@ -333,14 +347,18 @@ function ChatSessionPage() {
       }
       const stashed = sessionStorage.getItem(key);
       if (stashed) {
-        send(stashed, [], resolveGenerationSettings(composerSettings), () =>
-          sessionStorage.removeItem(key)
+        send(
+          stashed,
+          [],
+          resolveGenerationSettings(composerSettings),
+          skillName,
+          () => sessionStorage.removeItem(key)
         );
       }
     } catch {
       // ignore
     }
-  }, [sessionId, send, composerSettings]);
+  }, [sessionId, send, composerSettings, skillName, setSkillName]);
 
   function handleSend() {
     const uploadedAttachments = attachments.filter(
@@ -358,7 +376,8 @@ function ChatSessionPage() {
     send(
       text,
       uploadedAttachments,
-      resolveGenerationSettings(composerSettings)
+      resolveGenerationSettings(composerSettings),
+      skillName
     );
   }
 
@@ -602,6 +621,8 @@ function ChatSessionPage() {
             onRemoveAttachment={removeAttachment}
             settings={composerSettings}
             onSettingsChange={setComposerSettings}
+            skillName={skillName}
+            onSkillNameChange={setSkillName}
             disabled={generationRunning}
             running={generationRunning}
             submitDisabled={

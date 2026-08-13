@@ -6,6 +6,17 @@ type D1Database = {
   batch(statements: any[]): Promise<any[]>;
   exec(query: string): Promise<any>;
   dump(): Promise<ArrayBuffer>;
+  withSession(
+    constraintOrBookmark: 'first-primary' | string
+  ): D1DatabaseSession;
+};
+
+export type D1DatabaseSession = {
+  prepare(query: string): {
+    bind(...values: unknown[]): {
+      first<T = Record<string, unknown>>(): Promise<T | null>;
+    };
+  };
 };
 
 // D1 singleton instance
@@ -37,4 +48,9 @@ export function createD1Db() {
   const binding = getD1Binding();
   d1DbInstance = drizzle(binding);
   return d1DbInstance;
+}
+
+/** A fresh session whose first read is guaranteed to start at primary. */
+export function createD1PrimarySession(): D1DatabaseSession {
+  return getD1Binding().withSession('first-primary');
 }

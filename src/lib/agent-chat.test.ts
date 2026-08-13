@@ -19,6 +19,14 @@ function attachment(
 }
 
 describe('composer reference media', () => {
+  it('uses the explicitly selected medium for an attachment-only turn', () => {
+    const image = attachment('source.png', 'image');
+    expect(buildAgentMessage('', [image], 'image')).toContain(
+      'create or edit one still image'
+    );
+    expect(buildAgentMessage('', [image], 'video')).toContain('create a video');
+  });
+
   it('keeps generic image material in order and hides its plumbing', () => {
     const message = buildAgentMessage('Animate this', [
       attachment('opening.png', 'image'),

@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import { z } from 'zod';
 
 import { tDynamic } from '@/core/i18n/dynamic';
+import { localeNames } from '@/config/locale';
 import {
   apiDelete,
   apiGet,
@@ -23,6 +24,7 @@ import {
 import { formatDateTime } from '@/lib/time';
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
+import { baseLocale, locales } from '@/paraglide/runtime.js';
 import { DataTable, type Column } from '@/components/data-table';
 import { TextField } from '@/components/form-field';
 import { RichTextEditor } from '@/components/rich-text-editor';
@@ -50,6 +52,7 @@ import {
 interface Post {
   id: string;
   slug: string;
+  locale: string;
   type: string;
   title: string;
   description: string | null;
@@ -68,23 +71,36 @@ interface CategoryOption {
 }
 
 const PAGE_SIZE = 20;
+const ALL_LOCALES_VALUE = '__all_locales__';
 const TABS = ['all', 'published', 'draft'] as const;
 type Tab = (typeof TABS)[number];
 
 const postSchema = z.object({
   slug: z.string().min(1),
+  locale: z.string().min(1),
   title: z.string().min(1),
   description: z.string(),
+  image: z.string(),
   content: z.string(),
   categories: z.string(),
   authorName: z.string(),
   status: z.string(),
 });
 type PostForm = z.infer<typeof postSchema>;
+
+function serializePostForm(value: PostForm) {
+  return {
+    ...value,
+    locale: value.locale === ALL_LOCALES_VALUE ? '' : value.locale,
+  };
+}
+
 const emptyForm: PostForm = {
   slug: '',
+  locale: baseLocale,
   title: '',
   description: '',
+  image: '',
   content: '',
   categories: '',
   authorName: '',
@@ -95,6 +111,7 @@ function PostsPage() {
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [tab, setTab] = useState<Tab>('all');
+  const [localeFilter, setLocaleFilter] = useState('all');
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
 
@@ -109,7 +126,7 @@ function PostsPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [tab, debouncedSearch]);
+  }, [tab, localeFilter, debouncedSearch]);
 
   const categoriesQuery = useQuery({
     queryKey: ['admin-categories', 'options'],
@@ -118,13 +135,14 @@ function PostsPage() {
   const categoryOptions = categoriesQuery.data ?? [];
 
   const listQuery = useQuery({
-    queryKey: ['admin-posts', page, tab, debouncedSearch],
+    queryKey: ['admin-posts', page, tab, localeFilter, debouncedSearch],
     queryFn: () => {
       const params = new URLSearchParams({
         page: String(page),
         pageSize: String(PAGE_SIZE),
       });
       if (tab !== 'all') params.set('status', tab);
+      if (localeFilter !== 'all') params.set('locale', localeFilter);
       if (debouncedSearch) params.set('search', debouncedSearch);
       return apiGet<PageResult<Post>>(`/api/admin/posts?${params}`);
     },
@@ -151,7 +169,8 @@ function PostsPage() {
   });
 
   const createMutation = useMutation({
-    mutationFn: (value: PostForm) => apiPost('/api/admin/posts', value),
+    mutationFn: (value: PostForm) =>
+      apiPost('/api/admin/posts', serializePostForm(value)),
     onSuccess: () => {
       toast.success(m['admin.posts.created']());
       setCreateOpen(false);
@@ -162,8 +181,11 @@ function PostsPage() {
   });
 
   const editMutation = useMutation({
-    mutationFn: (body: Record<string, unknown>) =>
-      apiPut('/api/admin/posts', body),
+    mutationFn: (body: Record<string, unknown>) => {
+      const locale =
+        body.locale === ALL_LOCALES_VALUE ? '' : (body.locale as string);
+      return apiPut('/api/admin/posts', { ...body, locale });
+    },
     onSuccess: () => {
       toast.success(m['admin.posts.updated']());
       setEditingPost(null);
@@ -186,8 +208,10 @@ function PostsPage() {
   function openEdit(p: Post) {
     editForm.reset({
       slug: p.slug,
+      locale: p.locale || ALL_LOCALES_VALUE,
       title: p.title,
       description: p.description || '',
+      image: p.image || '',
       content: '',
       categories: p.categories || '',
       authorName: p.authorName || '',
@@ -214,6 +238,14 @@ function PostsPage() {
     {
       header: m['admin.posts.slug_col'](),
       cell: (p) => <span className="font-mono text-xs">{p.slug}</span>,
+    },
+    {
+      header: m['admin.posts.locale_col'](),
+      cell: (p) => (
+        <Badge variant="outline">
+          {localeNames[p.locale] || p.locale || m['admin.posts.locale_all']()}
+        </Badge>
+      ),
     },
     { header: m['admin.posts.author_col'](), cell: (p) => p.authorName || '—' },
     {
@@ -257,6 +289,43 @@ function PostsPage() {
   function renderFields(form: typeof createForm) {
     return (
       <div className="space-y-4 py-4">
+        <form.Field name="locale">
+          {(field) => (
+            <div className="space-y-2">
+              <Label>{m['admin.posts.locale_field']()}</Label>
+              <Select
+                items={[
+                  {
+                    label: m['admin.posts.locale_all'](),
+                    value: ALL_LOCALES_VALUE,
+                  },
+                  ...locales.map((locale) => ({
+                    label: localeNames[locale] || locale,
+                    value: locale,
+                  })),
+                ]}
+                value={field.state.value || ALL_LOCALES_VALUE}
+                onValueChange={(value) =>
+                  field.handleChange(value || ALL_LOCALES_VALUE)
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL_LOCALES_VALUE}>
+                    {m['admin.posts.locale_all']()}
+                  </SelectItem>
+                  {locales.map((locale) => (
+                    <SelectItem key={locale} value={locale}>
+                      {localeNames[locale] || locale}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+        </form.Field>
         <form.Field name="slug">
           {(field) => (
             <TextField
@@ -281,6 +350,15 @@ function PostsPage() {
               field={field}
               label={m['admin.posts.description_field']()}
               placeholder={m['admin.posts.description_placeholder']()}
+            />
+          )}
+        </form.Field>
+        <form.Field name="image">
+          {(field) => (
+            <TextField
+              field={field}
+              label={m['admin.posts.image_field']()}
+              placeholder={m['admin.posts.image_placeholder']()}
             />
           )}
         </form.Field>
@@ -413,21 +491,46 @@ function PostsPage() {
         </Dialog>
       </div>
 
-      <div className="border-border flex gap-1 overflow-x-auto overflow-y-hidden border-b">
-        {TABS.map((tb) => (
-          <button
-            key={tb}
-            onClick={() => setTab(tb)}
-            className={cn(
-              '-mb-px border-b-2 px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors',
-              tab === tb
-                ? 'border-primary text-foreground'
-                : 'text-muted-foreground hover:text-foreground border-transparent'
-            )}
-          >
-            {tDynamic(`admin.posts.tab_${tb}`)}
-          </button>
-        ))}
+      <div className="border-border flex items-end justify-between gap-4 border-b">
+        <div className="flex gap-1 overflow-x-auto overflow-y-hidden">
+          {TABS.map((tb) => (
+            <button
+              key={tb}
+              onClick={() => setTab(tb)}
+              className={cn(
+                '-mb-px border-b-2 px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors',
+                tab === tb
+                  ? 'border-primary text-foreground'
+                  : 'text-muted-foreground hover:text-foreground border-transparent'
+              )}
+            >
+              {tDynamic(`admin.posts.tab_${tb}`)}
+            </button>
+          ))}
+        </div>
+        <Select
+          items={[
+            { label: m['admin.posts.locale_all'](), value: 'all' },
+            ...locales.map((locale) => ({
+              label: localeNames[locale] || locale,
+              value: locale,
+            })),
+          ]}
+          value={localeFilter}
+          onValueChange={(value) => setLocaleFilter(value || 'all')}
+        >
+          <SelectTrigger className="mb-2 w-36">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">{m['admin.posts.locale_all']()}</SelectItem>
+            {locales.map((locale) => (
+              <SelectItem key={locale} value={locale}>
+                {localeNames[locale] || locale}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       <Card>

@@ -4,7 +4,12 @@ declare module '*.mdx' {
   export const meta: {
     title: string;
     description: string;
-    updated_at: string;
+    created_at?: string;
+    updated_at?: string;
+    author_name?: string;
+    author_image?: string;
+    image?: string;
+    categories?: Array<{ slug: string; title: string }>;
   };
 
   const MDXComponent: ComponentType<{

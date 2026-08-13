@@ -18,6 +18,15 @@ export enum TaxonomyStatus {
 
 type NewTaxonomy = typeof taxonomy.$inferInsert;
 
+async function getById(id: string) {
+  const [result] = await db()
+    .select()
+    .from(taxonomy)
+    .where(eq(taxonomy.id, id))
+    .limit(1);
+  return result;
+}
+
 export async function list(params: {
   type?: string;
   status?: string;
@@ -88,8 +97,8 @@ export async function create(data: {
     description: data.description || '',
     status: TaxonomyStatus.PUBLISHED,
   };
-  const [result] = await db().insert(taxonomy).values(newTaxonomy).returning();
-  return result;
+  await db().insert(taxonomy).values(newTaxonomy);
+  return getById(newTaxonomy.id);
 }
 
 export async function update(
@@ -103,12 +112,8 @@ export async function update(
 ) {
   const updateData: any = { ...data };
   if (updateData.slug) updateData.slug = updateData.slug.toLowerCase();
-  const [result] = await db()
-    .update(taxonomy)
-    .set(updateData)
-    .where(eq(taxonomy.id, id))
-    .returning();
-  return result;
+  await db().update(taxonomy).set(updateData).where(eq(taxonomy.id, id));
+  return getById(id);
 }
 
 export async function remove(id: string) {

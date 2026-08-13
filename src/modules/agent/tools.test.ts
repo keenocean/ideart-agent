@@ -1,11 +1,89 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  createAgentTools,
   durationSeconds,
+  guardGenerationRetries,
   normalizeProviderAspectRatio,
   pickVideoProvider,
+  providerOptionsFor,
   resolveReferenceImage,
 } from './tools';
+
+describe('createAgentTools', () => {
+  it('exposes still-image and video generation tools', () => {
+    expect(
+      createAgentTools({ userId: 'user-1', sessionId: 'session-1' }).map(
+        (tool) => tool.name
+      )
+    ).toEqual(['generate_image', 'generate_video', 'animate_image']);
+  });
+
+  it('restricts tools when the composer explicitly selects a medium', () => {
+    expect(
+      createAgentTools({
+        userId: 'user-1',
+        sessionId: 'session-1',
+        settings: { mediaMode: 'image' },
+      }).map((tool) => tool.name)
+    ).toEqual(['generate_image']);
+    expect(
+      createAgentTools({
+        userId: 'user-1',
+        sessionId: 'session-1',
+        settings: { mediaMode: 'video' },
+      }).map((tool) => tool.name)
+    ).toEqual(['generate_video', 'animate_image']);
+  });
+
+  it('keeps the selected Skill reader alongside the medium tools', () => {
+    expect(
+      createAgentTools({
+        userId: 'user-1',
+        sessionId: 'session-1',
+        settings: { mediaMode: 'image' },
+        skill: {
+          name: 'cinematic-skill',
+          title: 'Cinematic',
+          summary: 'Cinematic direction',
+          instructions: 'Use deliberate framing.',
+          references: {},
+          releaseId: 'release-1',
+        },
+      }).map((tool) => tool.name)
+    ).toEqual(['read_skill_resource', 'generate_image']);
+  });
+
+  it('does not execute another generation after a same-turn failure', async () => {
+    let calls = 0;
+    const [tool] = guardGenerationRetries([
+      {
+        name: 'generate_image',
+        description: 'test generator',
+        inputSchema: { type: 'object', properties: {} },
+        async call() {
+          calls += 1;
+          return {
+            type: 'tool_result' as const,
+            tool_use_id: '',
+            content: JSON.stringify({
+              status: 'error',
+              message: 'upstream failed',
+            }),
+          };
+        },
+      },
+    ]);
+
+    const first = await tool.call({}, { cwd: '/' });
+    const second = await tool.call({}, { cwd: '/' });
+
+    expect(calls).toBe(1);
+    expect(first.content).toContain('upstream failed');
+    expect(second.content).toContain('Do not retry');
+    expect(second.is_error).toBe(true);
+  });
+});
 
 describe('resolveReferenceImage', () => {
   it('passes absolute URLs through untouched', () => {
@@ -35,6 +113,11 @@ describe('resolveReferenceImage', () => {
       'http://127.0.0.1/a.png',
       'http://0.0.0.0/a.png',
       'http://[::1]/a.png',
+      'http://10.0.0.1/a.png',
+      'http://172.16.0.1/a.png',
+      'http://192.168.1.1/a.png',
+      'http://169.254.169.254/latest/meta-data',
+      'http://metadata.local/a.png',
     ]) {
       expect(() => resolveReferenceImage(local)).toThrow(
         /unsupported image reference/
@@ -94,6 +177,38 @@ describe('durationSeconds', () => {
     expect(durationSeconds(1, undefined, 'minimax-h3')).toBe(5);
     expect(durationSeconds(99, undefined, 'minimax-h3')).toBe(15);
     expect(durationSeconds(99, undefined, 'seedance-2-5')).toBe(30);
+    expect(durationSeconds(99, undefined, 'seedance-2-0')).toBe(15);
+  });
+});
+
+describe('providerOptionsFor', () => {
+  it('maps Seedance 2.0 image-to-video settings to EvoLink', () => {
+    expect(
+      providerOptionsFor({
+        provider: 'evolink',
+        modelKey: 'seedance-2-0',
+        kind: 'animate',
+        options: {
+          aspect_ratio: '16:9',
+          duration: 8,
+          resolution: '1080p',
+          image_input: [
+            'https://cdn.example.com/start.png',
+            'https://cdn.example.com/end.png',
+            'https://cdn.example.com/ignored.png',
+          ],
+        },
+      })
+    ).toEqual({
+      aspect_ratio: '16:9',
+      duration: 8,
+      quality: '1080p',
+      generate_audio: true,
+      image_input: [
+        'https://cdn.example.com/start.png',
+        'https://cdn.example.com/end.png',
+      ],
+    });
   });
 });
 
@@ -102,7 +217,7 @@ describe('pickVideoProvider', () => {
     expect(pickVideoProvider({})).toBeNull();
   });
 
-  it('prefers gRouter when auto and all are configured', () => {
+  it('prefers gRouter when auto and the existing providers are configured', () => {
     expect(
       pickVideoProvider({
         grouter_api_key: 'g',
@@ -110,6 +225,38 @@ describe('pickVideoProvider', () => {
         fal_api_key: 'k',
         replicate_api_token: 't',
       })
+    ).toBe('grouter');
+  });
+
+  it('prefers EvoLink in auto mode when it supports the selected model', () => {
+    expect(
+      pickVideoProvider(
+        {
+          evolink_api_key: 'e',
+          grouter_api_key: 'g',
+          grouter_base_url: 'https://gateway.example.com',
+          fal_api_key: 'k',
+          replicate_api_token: 't',
+        },
+        'seedance-2-0',
+        'generate',
+        '720p'
+      )
+    ).toBe('evolink');
+  });
+
+  it('skips EvoLink when the selected model has no EvoLink route', () => {
+    expect(
+      pickVideoProvider(
+        {
+          evolink_api_key: 'e',
+          grouter_api_key: 'g',
+          grouter_base_url: 'https://gateway.example.com',
+        },
+        'minimax-h3',
+        'generate',
+        '2K'
+      )
     ).toBe('grouter');
   });
 

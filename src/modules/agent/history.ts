@@ -1,6 +1,40 @@
 import type { NormalizedMessageParam } from '@codeany/open-agent-sdk';
 
+import type {
+  AgentAssistantMessageMetadataV1,
+  AgentMessageMetadata,
+  AgentTurnMetadataV1,
+} from '@/core/agent/types';
 import { getChatWithMessages, type StoredPart } from '@/modules/chats/service';
+
+export const LONG_RUNNING_MEDIA_TOOL_NAMES = [
+  'generate_image',
+  'generate_video',
+  'animate_image',
+] as const;
+
+const INTERRUPTED_TOOL_RESULT = JSON.stringify({
+  status: 'interrupted',
+  message: 'Generation was interrupted before a final result was recorded.',
+});
+const TOOL_HISTORY_SUMMARY_MAX_CHARS = 2_000;
+
+/** Resolve unfinished built-in media calls once no durable task is active. */
+export function completeInterruptedMediaCalls(
+  parts: StoredPart[],
+  hasActiveRun: boolean,
+  longRunningToolNames?: readonly string[]
+): StoredPart[] {
+  if (hasActiveRun) return parts;
+  const allowed = longRunningToolNames ? new Set(longRunningToolNames) : null;
+  return parts.map((part) =>
+    part.type === 'tool_call' &&
+    part.result === undefined &&
+    (!allowed || allowed.has(part.name))
+      ? { ...part, result: INTERRUPTED_TOOL_RESULT }
+      : part
+  );
+}
 
 /**
  * Rebuild the agent's conversation history from the chat rows.
@@ -17,11 +51,31 @@ import { getChatWithMessages, type StoredPart } from '@/modules/chats/service';
  */
 export async function loadAgentHistory(
   chatId: string,
-  userId: string
+  userId: string,
+  excludeMessageId?: string,
+  currentToolNames: readonly string[] = []
 ): Promise<NormalizedMessageParam[]> {
   const chat = await getChatWithMessages(chatId, userId);
   if (!chat) return [];
-  return mapRowsToHistory(chat.messages);
+  return mapRowsToHistory(chat.messages, excludeMessageId, currentToolNames);
+}
+
+interface HistoryRow {
+  id?: string;
+  role: 'user' | 'assistant';
+  parts: StoredPart[];
+  metadata?: AgentMessageMetadata | null;
+}
+
+/** Long-running tools authorized by each assistant row's linked user Turn. */
+export function assistantLongRunningToolNames(
+  rows: HistoryRow[]
+): Map<number, readonly string[]> {
+  const result = new Map<number, readonly string[]>();
+  for (const [rowIndex, audit] of buildTurnAssociations(rows).assistantAudit) {
+    result.set(rowIndex, audit.longRunningToolNames);
+  }
+  return result;
 }
 
 /**
@@ -30,11 +84,18 @@ export async function loadAgentHistory(
  * or worse, silently accepts with the tool results detached from their calls.
  */
 export function mapRowsToHistory(
-  rows: Array<{ role: 'user' | 'assistant'; parts: StoredPart[] }>
+  rows: HistoryRow[],
+  excludeMessageId?: string,
+  currentToolNames: readonly string[] = []
 ): NormalizedMessageParam[] {
   const history: NormalizedMessageParam[] = [];
+  const currentTools = new Set(currentToolNames);
+  const associations = buildTurnAssociations(rows);
 
-  for (const row of rows) {
+  for (let rowIndex = 0; rowIndex < rows.length; rowIndex++) {
+    const row = rows[rowIndex];
+    if (excludeMessageId && row.id === excludeMessageId) continue;
+
     if (row.role === 'user') {
       const text = textOf(row.parts);
       if (text) history.push({ role: 'user', content: text });
@@ -43,25 +104,33 @@ export function mapRowsToHistory(
 
     const assistant: NormalizedMessageParam['content'] = [];
     const results: NormalizedMessageParam['content'] = [];
+    const audit = associations.assistantAudit.get(rowIndex);
 
     for (const part of row.parts) {
       if (part.type === 'text') {
         if (part.text.trim()) assistant.push({ type: 'text', text: part.text });
         continue;
       }
+      const canReplayStructured =
+        audit?.toolNames.includes(part.name) === true &&
+        currentTools.has(part.name);
+      if (!canReplayStructured) {
+        assistant.push({ type: 'text', text: summarizeToolCall(part) });
+        continue;
+      }
+
       assistant.push({
         type: 'tool_use',
         id: part.id,
         name: part.name,
         input: parseArguments(part.arguments),
       });
-      // A tool call the model never got an answer for would leave the
-      // conversation malformed, so unfinished calls report as much.
+      const result = part.result ?? INTERRUPTED_TOOL_RESULT;
       results.push({
         type: 'tool_result',
         tool_use_id: part.id,
-        content: part.result ?? 'No result recorded.',
-        ...(part.result ? {} : { is_error: true }),
+        content: result,
+        ...(part.result === undefined ? { is_error: true } : {}),
       });
     }
 
@@ -71,6 +140,62 @@ export function mapRowsToHistory(
   }
 
   return history;
+}
+
+function buildTurnAssociations(rows: HistoryRow[]) {
+  const usersById = new Map<
+    string,
+    { metadata: AgentTurnMetadataV1; rowIndex: number }
+  >();
+  const userTurnCounts = new Map<string, number>();
+  const assistantRoundCounts = new Map<string, number>();
+
+  rows.forEach((row, rowIndex) => {
+    if (row.role === 'user' && row.id && row.metadata?.kind === 'user') {
+      usersById.set(row.id, { metadata: row.metadata, rowIndex });
+      userTurnCounts.set(
+        row.metadata.turnId,
+        (userTurnCounts.get(row.metadata.turnId) ?? 0) + 1
+      );
+    }
+    if (row.role === 'assistant' && row.metadata?.kind === 'assistant') {
+      const key = assistantRoundKey(row.metadata);
+      assistantRoundCounts.set(key, (assistantRoundCounts.get(key) ?? 0) + 1);
+    }
+  });
+
+  const assistantAudit = new Map<number, AgentTurnMetadataV1>();
+  rows.forEach((row, rowIndex) => {
+    if (row.role !== 'assistant' || row.metadata?.kind !== 'assistant') return;
+    const metadata = row.metadata;
+    const parent = usersById.get(metadata.parentUserMessageId);
+    if (
+      !parent ||
+      parent.metadata.turnId !== metadata.turnId ||
+      userTurnCounts.get(metadata.turnId) !== 1 ||
+      assistantRoundCounts.get(assistantRoundKey(metadata)) !== 1 ||
+      parent.rowIndex >= rowIndex
+    ) {
+      return;
+    }
+    assistantAudit.set(rowIndex, parent.metadata);
+  });
+
+  return { assistantAudit };
+}
+
+function assistantRoundKey(metadata: AgentAssistantMessageMetadataV1) {
+  return `${metadata.turnId}\u0000${metadata.roundIndex}`;
+}
+
+function summarizeToolCall(
+  part: Extract<StoredPart, { type: 'tool_call' }>
+): string {
+  const result = part.result ?? INTERRUPTED_TOOL_RESULT;
+  const summary = `[Historical tool record: ${part.name}]\nArguments: ${part.arguments}\nResult: ${result}`;
+  return summary.length <= TOOL_HISTORY_SUMMARY_MAX_CHARS
+    ? summary
+    : `${summary.slice(0, TOOL_HISTORY_SUMMARY_MAX_CHARS - 1)}…`;
 }
 
 function textOf(parts: StoredPart[]): string {

@@ -20,31 +20,58 @@ export enum PostStatus {
 type Post = typeof post.$inferSelect;
 type NewPost = typeof post.$inferInsert;
 
+const POST_SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+export function normalizePostSlug(value: string): string {
+  const slug = value.trim().toLowerCase();
+  if (!POST_SLUG_PATTERN.test(slug)) {
+    throw new Error(
+      'Invalid slug: use lowercase letters, numbers, and single hyphens'
+    );
+  }
+  return slug;
+}
+
+export function isValidPostSlug(value: unknown): value is string {
+  return (
+    typeof value === 'string' &&
+    POST_SLUG_PATTERN.test(value.trim().toLowerCase())
+  );
+}
+
 export type PublishedArticleItem = Pick<
   Post,
   | 'id'
   | 'slug'
+  | 'locale'
   | 'title'
   | 'description'
   | 'image'
+  | 'categories'
   | 'authorName'
   | 'authorImage'
   | 'createdAt'
+  | 'updatedAt'
 >;
+
+export type PublishedArticleDetail = PublishedArticleItem &
+  Pick<Post, 'content'>;
 
 export async function list(params: {
   type?: string;
   status?: string;
+  locale?: string;
   search?: string;
   page?: number;
   pageSize?: number;
 }) {
-  const { type, status, search, page = 1, pageSize = 10 } = params;
+  const { type, status, locale, search, page = 1, pageSize = 10 } = params;
   const offset = (page - 1) * pageSize;
 
   const conditions: SQL[] = [];
   if (type) conditions.push(eq(post.type, type));
   if (status) conditions.push(eq(post.status, status));
+  if (locale !== undefined) conditions.push(eq(post.locale, locale));
   if (search) {
     conditions.push(
       or(like(post.title, `%${search}%`), like(post.slug, `%${search}%`))!
@@ -62,6 +89,7 @@ export async function list(params: {
     .select({
       id: post.id,
       slug: post.slug,
+      locale: post.locale,
       type: post.type,
       title: post.title,
       description: post.description,
@@ -82,45 +110,105 @@ export async function list(params: {
 }
 
 export async function listPublishedArticles(
-  params: { limit?: number } = {}
+  params: { locale?: string; limit?: number } = {}
 ): Promise<PublishedArticleItem[]> {
-  const { limit = 100 } = params;
-  return db()
+  const { locale, limit } = params;
+  const conditions: SQL[] = [
+    eq(post.type, PostType.ARTICLE),
+    eq(post.status, PostStatus.PUBLISHED),
+  ];
+  if (locale) {
+    conditions.push(or(eq(post.locale, locale), eq(post.locale, ''))!);
+  }
+  const query = db()
     .select({
       id: post.id,
       slug: post.slug,
+      locale: post.locale,
       title: post.title,
       description: post.description,
       image: post.image,
+      categories: post.categories,
       authorName: post.authorName,
       authorImage: post.authorImage,
       createdAt: post.createdAt,
+      updatedAt: post.updatedAt,
     })
     .from(post)
-    .where(
-      and(
-        eq(post.type, PostType.ARTICLE),
-        eq(post.status, PostStatus.PUBLISHED)
-      )
-    )
-    .orderBy(desc(post.createdAt))
-    .limit(limit);
+    .where(and(...conditions))
+    .orderBy(desc(post.createdAt));
+  return limit ? query.limit(limit) : query;
+}
+
+export async function listPublishedArticleDetails(
+  params: { locale?: string; limit?: number } = {}
+): Promise<PublishedArticleDetail[]> {
+  const { locale, limit } = params;
+  const conditions: SQL[] = [
+    eq(post.type, PostType.ARTICLE),
+    eq(post.status, PostStatus.PUBLISHED),
+  ];
+  if (locale) {
+    conditions.push(or(eq(post.locale, locale), eq(post.locale, ''))!);
+  }
+  const query = db()
+    .select({
+      id: post.id,
+      slug: post.slug,
+      locale: post.locale,
+      title: post.title,
+      description: post.description,
+      image: post.image,
+      categories: post.categories,
+      authorName: post.authorName,
+      authorImage: post.authorImage,
+      createdAt: post.createdAt,
+      updatedAt: post.updatedAt,
+      content: post.content,
+    })
+    .from(post)
+    .where(and(...conditions))
+    .orderBy(desc(post.createdAt));
+  return limit ? query.limit(limit) : query;
 }
 
 export async function findPublishedBySlug(
-  slug: string
+  slug: string,
+  locale?: string
 ): Promise<Post | undefined> {
-  const [result] = await db()
+  const conditions: SQL[] = [
+    eq(post.slug, slug.trim().toLowerCase()),
+    eq(post.type, PostType.ARTICLE),
+    eq(post.status, PostStatus.PUBLISHED),
+  ];
+  if (locale) {
+    conditions.push(or(eq(post.locale, locale), eq(post.locale, ''))!);
+  }
+  const results = (await db()
     .select()
+    .from(post)
+    .where(and(...conditions))
+    .limit(locale ? 2 : 1)) as Post[];
+  return locale
+    ? results.find((item) => item.locale === locale) ||
+        results.find((item) => item.locale === '')
+    : results[0];
+}
+
+export async function listPublishedLocalesBySlug(
+  slug: string
+): Promise<string[]> {
+  const rows = (await db()
+    .select({ locale: post.locale })
     .from(post)
     .where(
       and(
-        eq(post.slug, slug.toLowerCase()),
+        eq(post.slug, slug.trim().toLowerCase()),
+        eq(post.type, PostType.ARTICLE),
         eq(post.status, PostStatus.PUBLISHED)
       )
-    )
-    .limit(1);
-  return result;
+    )) as Array<Pick<Post, 'locale'>>;
+  return [...new Set(rows.map((item) => item.locale))];
 }
 
 export async function getById(id: string) {
@@ -135,6 +223,7 @@ export async function getById(id: string) {
 export async function create(data: {
   userId: string;
   slug: string;
+  locale?: string;
   title: string;
   description?: string;
   image?: string;
@@ -146,7 +235,8 @@ export async function create(data: {
   const newPost: NewPost = {
     id: getUuid(),
     userId: data.userId,
-    slug: data.slug.toLowerCase(),
+    slug: normalizePostSlug(data.slug),
+    locale: data.locale || '',
     type: PostType.ARTICLE,
     title: data.title,
     description: data.description || '',
@@ -156,14 +246,15 @@ export async function create(data: {
     authorName: data.authorName || '',
     status: data.status || PostStatus.DRAFT,
   };
-  const [result] = await db().insert(post).values(newPost).returning();
-  return result;
+  await db().insert(post).values(newPost);
+  return getById(newPost.id);
 }
 
 export async function update(
   id: string,
   data: {
     slug?: string;
+    locale?: string;
     title?: string;
     description?: string;
     image?: string;
@@ -174,13 +265,11 @@ export async function update(
   }
 ) {
   const updateData: any = { ...data };
-  if (updateData.slug) updateData.slug = updateData.slug.toLowerCase();
-  const [result] = await db()
-    .update(post)
-    .set(updateData)
-    .where(eq(post.id, id))
-    .returning();
-  return result;
+  if (updateData.slug !== undefined) {
+    updateData.slug = normalizePostSlug(updateData.slug);
+  }
+  await db().update(post).set(updateData).where(eq(post.id, id));
+  return getById(id);
 }
 
 export async function remove(id: string) {

@@ -63,6 +63,8 @@ export async function runTest(
         return await testReplicate(inputs, configs);
       case 'fal':
         return await testFal(inputs, configs);
+      case 'evolink':
+        return await testEvoLink(configs);
       case 'grouter':
         return await testGRouter(inputs, configs);
       default:
@@ -507,6 +509,44 @@ async function testFal(
     success: true,
     message: 'Fal accepted the request',
     details: { 'Task ID': result.taskId, Status: result.taskStatus },
+  };
+}
+
+async function testEvoLink(
+  configs: Record<string, string>
+): Promise<TestResult> {
+  const missing = need(configs, ['evolink_api_key']);
+  if (missing) return { success: false, message: missing };
+
+  const baseUrl = (
+    configs.evolink_base_url || 'https://api.evolink.ai'
+  ).replace(/\/+$/g, '');
+  const response = await fetch(`${baseUrl}/v1/credits`, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${configs.evolink_api_key}`,
+    },
+  });
+  const payload: any = await response.json().catch(() => ({}));
+  if (!response.ok || payload?.success === false) {
+    return {
+      success: false,
+      message:
+        payload?.error?.message ||
+        payload?.message ||
+        `Request failed (${response.status})`,
+    };
+  }
+
+  return {
+    success: true,
+    message: 'EvoLink accepted the request',
+    details: {
+      'Token credits':
+        payload?.data?.token?.remaining_credits ?? '(unavailable)',
+      'Account credits':
+        payload?.data?.user?.remaining_credits ?? '(unavailable)',
+    },
   };
 }
 

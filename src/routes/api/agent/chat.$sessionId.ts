@@ -1,6 +1,11 @@
 import { createFileRoute } from '@tanstack/react-router';
 
 import { getAuth } from '@/core/auth';
+import {
+  assistantLongRunningToolNames,
+  completeInterruptedMediaCalls,
+} from '@/modules/agent/history';
+import { getActiveTurnLease } from '@/modules/agent/turn-lease';
 import { getActiveTasksForSession } from '@/modules/ai-tasks/service';
 import {
   deleteChat,
@@ -17,31 +22,30 @@ async function requireUser(request: Request) {
   return session?.user ?? null;
 }
 
-async function GET({ request, params }: Ctx) {
+export async function GET({ request, params }: Ctx) {
   const user = await requireUser(request);
   if (!user) return respErr('Unauthorized');
 
-  const [detail, activeTasks] = await Promise.all([
+  const [detail, activeTasks, activeLease] = await Promise.all([
     getChatWithMessages(params.sessionId, user.id),
     getActiveTasksForSession({
       userId: user.id,
       sessionId: params.sessionId,
     }),
+    getActiveTurnLease(params.sessionId),
   ]);
+  const hasActiveRun =
+    activeTasks.length > 0 || activeLease?.userId === user.id;
   if (!detail) {
     // Fresh session that hasn't been persisted yet — let the UI start blank.
     return respData({
       chat: null,
       messages: [],
-      run: { active: activeTasks.length > 0 },
+      run: { active: hasActiveRun },
     });
   }
 
-  const interruptedResult = JSON.stringify({
-    status: 'interrupted',
-    message: 'Generation was interrupted before a final result was recorded.',
-  });
-  const hasActiveRun = activeTasks.length > 0;
+  const longRunningTools = assistantLongRunningToolNames(detail.messages);
 
   return respData({
     chat: {
@@ -49,18 +53,14 @@ async function GET({ request, params }: Ctx) {
       title: detail.chat.title,
       updatedAt: detail.chat.updatedAt.toISOString(),
     },
-    messages: detail.messages.map((m) => ({
+    messages: detail.messages.map((m, index) => ({
       id: m.id,
       role: m.role,
-      parts: hasActiveRun
-        ? m.parts
-        : m.parts.map((part) =>
-            part.type === 'tool_call' &&
-            part.result === undefined &&
-            (part.name === 'generate_video' || part.name === 'animate_image')
-              ? { ...part, result: interruptedResult }
-              : part
-          ),
+      parts: completeInterruptedMediaCalls(
+        m.parts,
+        hasActiveRun,
+        longRunningTools.get(index)
+      ),
       createdAt: m.createdAt.toISOString(),
     })),
     run: { active: hasActiveRun },

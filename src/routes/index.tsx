@@ -5,10 +5,12 @@ import { useRouter } from '@/core/i18n/navigation';
 import { envConfigs } from '@/config';
 import { m } from '@/paraglide/messages.js';
 import { getLocale, locales, localizeUrl } from '@/paraglide/runtime.js';
+import { Blog } from '@/blocks/blog';
 import { Footer } from '@/blocks/footer';
 import { Header } from '@/blocks/header';
 import { Hero } from '@/blocks/hero';
 import { SupportWidget } from '@/blocks/support-widget';
+import { getBlogPostsFn } from '@/content/posts/server';
 
 /**
  * Signed-in? Decided from the session cookie alone — `useSession()` would
@@ -28,6 +30,7 @@ function hasSessionCookie(): boolean {
 function HomePage() {
   const router = useRouter();
   const redirected = useRef(false);
+  const { posts } = Route.useLoaderData();
 
   // Signed-in visitors get the app, not the pitch. Client-side (and at layout
   // time, before paint) so the landing page still renders — and indexes — for
@@ -43,6 +46,7 @@ function HomePage() {
       <Header />
       <main className="flex flex-1 flex-col">
         <Hero />
+        <Blog posts={posts} />
       </main>
       <Footer />
       <SupportWidget />
@@ -57,7 +61,11 @@ export const Route = createFileRoute('/')({
   beforeLoad: () => {
     if (hasSessionCookie()) throw redirect({ to: '/chat' });
   },
-  loader: () => ({ locale: getLocale() }),
+  loader: async () => {
+    const locale = getLocale();
+    const posts = await getBlogPostsFn({ data: { locale, limit: 3 } });
+    return { locale, posts };
+  },
   head: ({ loaderData }) => {
     const locale = loaderData?.locale ?? 'en';
     const urlFor = (loc: string) =>

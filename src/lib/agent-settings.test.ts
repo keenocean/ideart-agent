@@ -1,13 +1,20 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  AGENT_IMAGE_MODEL_OPTIONS,
   AGENT_MODEL_OPTIONS,
   aspectRatiosForModel,
   creditsForGeneration,
+  creditsForImageGeneration,
+  DEFAULT_IMAGE_MODEL,
   defaultComposerSettings,
   durationsForModel,
+  imageProviderModelFor,
   labelForGeneratedModel,
   normalizeClientGenerationSettings,
+  normalizeImageAspectRatio,
+  normalizeImageQuality,
+  normalizeImageResolution,
   providerModelFor,
   resolutionsForModel,
   resolveGenerationSettings,
@@ -49,7 +56,7 @@ describe('creditsForGeneration', () => {
     }
   });
 
-  it('uses the same resolution multipliers as video-lite', () => {
+  it('uses the catalog resolution multipliers', () => {
     expect(creditsForGeneration('minimax-h3', 5, '768P')).toBe(
       expectedCredits(110, 5, 0.75)
     );
@@ -59,6 +66,9 @@ describe('creditsForGeneration', () => {
     expect(creditsForGeneration('minimax-h3', 5, '4K')).toBe(
       expectedCredits(110, 5, 1.5)
     );
+    expect(creditsForGeneration('seedance-2-0', 5, '480p')).toBe(460);
+    expect(creditsForGeneration('seedance-2-0', 5, '720p')).toBe(1000);
+    expect(creditsForGeneration('seedance-2-0', 5, '1080p')).toBe(2480);
   });
 
   it('clamps duration to the selected model range', () => {
@@ -81,20 +91,70 @@ describe('creditsForGeneration', () => {
   });
 });
 
+describe('image generation catalog', () => {
+  it('exposes GPT Image 2 under exact provider ids', () => {
+    expect(AGENT_IMAGE_MODEL_OPTIONS.map((option) => option.label)).toEqual([
+      'GPT Image 2',
+    ]);
+    expect(
+      imageProviderModelFor(DEFAULT_IMAGE_MODEL, 'evolink', 'generate')
+    ).toBe('gpt-image-2');
+    expect(imageProviderModelFor(DEFAULT_IMAGE_MODEL, 'fal', 'edit')).toBe(
+      'openai/gpt-image-2/edit'
+    );
+    expect(
+      imageProviderModelFor(DEFAULT_IMAGE_MODEL, 'replicate', 'generate')
+    ).toBe('openai/gpt-image-2');
+  });
+
+  it('uses the EvoLink resolution and quality rate card', () => {
+    const expected = {
+      '1K': { low: 6, medium: 48, high: 190 },
+      '2K': { low: 11, medium: 97, high: 386 },
+      '4K': { low: 18, medium: 161, high: 641 },
+    } as const;
+    for (const [resolution, qualities] of Object.entries(expected)) {
+      for (const [quality, credits] of Object.entries(qualities)) {
+        expect(
+          creditsForImageGeneration(DEFAULT_IMAGE_MODEL, resolution, quality)
+        ).toBe(credits);
+      }
+    }
+  });
+
+  it('normalizes image options to safe defaults', () => {
+    expect(normalizeImageAspectRatio('16:9')).toBe('16:9');
+    expect(normalizeImageAspectRatio('invalid')).toBe('1:1');
+    expect(normalizeImageResolution('2k')).toBe('2K');
+    expect(normalizeImageResolution('8K')).toBe('1K');
+    expect(normalizeImageQuality('HIGH')).toBe('high');
+    expect(normalizeImageQuality('ultra')).toBe('medium');
+  });
+
+  it('fails expensive for an unknown image model', () => {
+    expect(creditsForImageGeneration('unknown', '1K', 'low')).toBe(641);
+  });
+});
+
 describe('composer model capabilities', () => {
-  it('matches the current video-lite catalog in order', () => {
+  it('lists the current media catalog in order', () => {
     expect(AGENT_MODEL_OPTIONS.map((option) => option.label)).toEqual([
       'MiniMax H3',
       'Seedance 2.5',
+      'Seedance 2.0',
     ]);
   });
 
   it('starts with the video-lite defaults', () => {
     expect(defaultComposerSettings()).toEqual({
+      mediaMode: 'auto',
       modelOption: 'minimax-h3',
       duration: 5,
       resolution: '2K',
       aspectRatio: 'adaptive',
+      imageAspectRatio: '1:1',
+      imageResolution: '1K',
+      imageQuality: 'medium',
     });
   });
 
@@ -103,16 +163,26 @@ describe('composer model capabilities', () => {
       5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
     ]);
     expect(durationsForModel('seedance-2-5')).toHaveLength(27);
+    expect(durationsForModel('seedance-2-0')).toEqual([
+      4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
+    ]);
     expect(resolutionsForModel('minimax-h3')).toEqual(['768P', '2K', '4K']);
     expect(resolutionsForModel('seedance-2-5')).toEqual(['480p', '720p']);
+    expect(resolutionsForModel('seedance-2-0')).toEqual([
+      '480p',
+      '720p',
+      '1080p',
+    ]);
     expect(aspectRatiosForModel('minimax-h3')).toContain('adaptive');
     expect(aspectRatiosForModel('seedance-2-5')).toContain('auto');
+    expect(aspectRatiosForModel('seedance-2-0')).toContain('adaptive');
   });
 
   it('resets incompatible values when the model changes', () => {
     expect(
       settingsForModel(
         {
+          ...defaultComposerSettings(),
           modelOption: 'seedance-2-5',
           duration: 30,
           resolution: '720p',
@@ -121,6 +191,7 @@ describe('composer model capabilities', () => {
         'minimax-h3'
       )
     ).toEqual({
+      ...defaultComposerSettings(),
       modelOption: 'minimax-h3',
       duration: 5,
       resolution: '2K',
@@ -132,48 +203,89 @@ describe('composer model capabilities', () => {
 describe('resolveGenerationSettings', () => {
   it('sends the picker key and explicit lite defaults', () => {
     expect(resolveGenerationSettings(defaultComposerSettings())).toEqual({
+      mediaMode: 'auto',
       modelName: 'minimax-h3',
       aspectRatio: 'adaptive',
       resolution: '2K',
       duration: 5,
       creditCost: creditsForGeneration('minimax-h3', 5, '2K'),
+      imageModelName: 'gpt-image-2',
+      imageAspectRatio: '1:1',
+      imageResolution: '1K',
+      imageQuality: 'medium',
+      imageCreditCost: creditsForImageGeneration(
+        DEFAULT_IMAGE_MODEL,
+        '1K',
+        'medium'
+      ),
     });
   });
 
   it('passes supported explicit settings through', () => {
     const settings = resolveGenerationSettings({
+      ...defaultComposerSettings(),
+      mediaMode: 'video',
       modelOption: 'seedance-2-5',
       aspectRatio: '16:9',
       resolution: '480p',
       duration: 8,
     });
     expect(settings).toEqual({
+      mediaMode: 'video',
       modelName: 'seedance-2-5',
       aspectRatio: '16:9',
       resolution: '480p',
       duration: 8,
       creditCost: creditsForGeneration('seedance-2-5', 8, '480p'),
+      imageModelName: 'gpt-image-2',
+      imageAspectRatio: '1:1',
+      imageResolution: '1K',
+      imageQuality: 'medium',
+      imageCreditCost: creditsForImageGeneration(
+        DEFAULT_IMAGE_MODEL,
+        '1K',
+        'medium'
+      ),
     });
   });
 
   it('does not trust client pricing or unsupported values', () => {
     expect(
       normalizeClientGenerationSettings({
+        mediaMode: 'image',
         modelName: 'seedance-2-5',
         duration: 99,
         resolution: '4K',
         aspectRatio: 'adaptive',
         creditCost: 0,
+        imageResolution: '4k',
+        imageQuality: 'HIGH',
+        imageCreditCost: 0,
       })
     ).toEqual({
+      mediaMode: 'image',
       modelName: 'seedance-2-5',
       duration: 30,
       aspectRatio: 'auto',
       resolution: '720p',
       creditCost: creditsForGeneration('seedance-2-5', 30, '720p'),
+      imageModelName: 'gpt-image-2',
+      imageAspectRatio: '1:1',
+      imageResolution: '4K',
+      imageQuality: 'high',
+      imageCreditCost: creditsForImageGeneration(
+        DEFAULT_IMAGE_MODEL,
+        '4K',
+        'high'
+      ),
     });
     expect(
       normalizeClientGenerationSettings({ modelName: 'free-video' })
+    ).toBeNull();
+    expect(
+      normalizeClientGenerationSettings({
+        mediaMode: 'audio' as 'auto',
+      })
     ).toBeNull();
   });
 });
@@ -192,11 +304,20 @@ describe('providerModelFor', () => {
     expect(providerModelFor('minimax-h3', 'fal', 'animate', '4K')).toBe(
       'fal-ai/minimax/hailuo-2.3/pro/image-to-video'
     );
+    expect(
+      providerModelFor('seedance-2-0', 'evolink', 'generate', '720p')
+    ).toBe('seedance-2.0-text-to-video');
+    expect(providerModelFor('seedance-2-0', 'evolink', 'animate', '720p')).toBe(
+      'seedance-2.0-image-to-video'
+    );
   });
 
   it('does not downgrade Seedance on Replicate', () => {
     expect(
       providerModelFor('seedance-2-5', 'replicate', 'generate', '720p')
+    ).toBeUndefined();
+    expect(
+      providerModelFor('seedance-2-5', 'evolink', 'generate', '720p')
     ).toBeUndefined();
   });
 
@@ -219,6 +340,10 @@ describe('labelForGeneratedModel', () => {
     expect(
       labelForGeneratedModel('fal-ai/minimax/hailuo-2.3/pro/image-to-video')
     ).toBe('MiniMax H3');
+    expect(labelForGeneratedModel('gpt-image-2')).toBe('GPT Image 2');
+    expect(labelForGeneratedModel('openai/gpt-image-2/edit')).toBe(
+      'GPT Image 2'
+    );
   });
 
   it('shows the raw id for a model no longer sold', () => {

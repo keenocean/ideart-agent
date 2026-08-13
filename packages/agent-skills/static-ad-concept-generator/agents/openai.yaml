@@ -1,0 +1,4 @@
+interface:
+  display_name: 'Static Ad Concept Generator'
+  short_description: 'Create grounded static ad concepts and variants'
+  default_prompt: 'Use $static-ad-concept-generator to develop ad concepts for this product.'
