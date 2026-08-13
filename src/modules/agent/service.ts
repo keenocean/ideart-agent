@@ -37,7 +37,7 @@ Rules:
 - A clip is one shot, not a montage. If the user describes a sequence, either pick the strongest single shot or generate the shots one at a time, saying which is which.
 - Reply to the user in the language they used.
 - Rendering takes a few minutes. Call the tool once and wait for it; never retry a call that has not returned yet.
-- The only valid model keys are minimax-h3 and seedance-2-5. Leave the model argument empty unless the user explicitly asks to switch.
+- The only valid model keys are minimax-h3, seedance-2-5, and seedance-2-0. Leave the model argument empty unless the user explicitly asks to switch.
 - After a tool returns generated files, the chat already shows the clip with a player. Reference it as a markdown link, e.g. [clip](<url>), and never paste the raw URL as plain text or embed it as a markdown image.
 - If a tool returns an error, explain it briefly and suggest what the user can do (e.g. top up credits, shorten the clip, try a simpler prompt). Never invent file paths.`;
 

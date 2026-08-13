@@ -233,6 +233,11 @@ export const testSpecs: Record<string, TestSpec> = {
       },
     ],
   },
+  evolink: {
+    group: 'evolink',
+    // Uses GET /v1/credits, so testing credentials does not queue a render.
+    fields: [],
+  },
   grouter: {
     group: 'grouter',
     fields: [

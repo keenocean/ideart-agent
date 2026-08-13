@@ -1,5 +1,5 @@
 /** The video backends an admin can route generation through. */
-export type VideoProviderName = 'grouter' | 'fal' | 'replicate';
+export type VideoProviderName = 'evolink' | 'grouter' | 'fal' | 'replicate';
 
 export interface AgentGenerationSettings {
   /** Picker key (`minimax-h3`) — resolved to a provider model server-side. */
@@ -18,9 +18,9 @@ export const DEFAULT_RESOLUTION = '2K';
 export const DEFAULT_DURATION = 5;
 
 /**
- * Ideart uses the same public catalog as shipany-video-lite. Keep model
- * capabilities, defaults, provider routes and prices aligned with that app so
- * a setting selected in the composer has the same meaning in both products.
+ * Ideart starts from the shipany-video-lite catalog and adds provider-specific
+ * models only under distinct picker keys. Never map an older provider model to
+ * a newer label: the picker key is also the pricing and capability boundary.
  */
 export const AGENT_MODEL_OPTIONS = [
   {
@@ -45,6 +45,7 @@ export const AGENT_MODEL_OPTIONS = [
     audio: false,
     maxImages: 1,
     providers: {
+      evolink: null,
       grouter: {
         model: 'minimax-h3',
         imageModel: 'minimax-h3',
@@ -83,6 +84,7 @@ export const AGENT_MODEL_OPTIONS = [
     audio: true,
     maxImages: 2,
     providers: {
+      evolink: null,
       grouter: {
         model: 'seedance-2.5',
         imageModel: 'seedance-2.5',
@@ -93,6 +95,37 @@ export const AGENT_MODEL_OPTIONS = [
       },
       // shipany-video-lite deliberately leaves this unsupported instead of
       // silently substituting an older Seedance model.
+      replicate: null,
+    },
+  },
+  {
+    value: 'seedance-2-0',
+    label: 'Seedance 2.0',
+    creditsPerSecond: 200,
+    autoBillingSeconds: 5,
+    resolutionCreditMultipliers: {
+      '480p': 0.46,
+      '720p': 1,
+      '1080p': 2.48,
+    },
+    durations: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+    defaultDuration: 5,
+    durationMin: 4,
+    durationMax: 15,
+    supportsAutoDuration: false,
+    resolutions: ['480p', '720p', '1080p'],
+    defaultResolution: '720p',
+    aspectRatios: ['adaptive', '21:9', '16:9', '4:3', '1:1', '3:4', '9:16'],
+    defaultAspectRatio: 'adaptive',
+    audio: true,
+    maxImages: 2,
+    providers: {
+      evolink: {
+        model: 'seedance-2.0-text-to-video',
+        imageModel: 'seedance-2.0-image-to-video',
+      },
+      grouter: null,
+      fal: null,
       replicate: null,
     },
   },
@@ -123,6 +156,7 @@ export const AGENT_RESOLUTIONS = [
   { value: '4K', label: '4K' },
   { value: '480p', label: '480p' },
   { value: '720p', label: '720p' },
+  { value: '1080p', label: '1080p' },
 ] as const;
 
 export interface AgentComposerSettings {
@@ -280,7 +314,7 @@ export function normalizeClientGenerationSettings(
   );
 }
 
-/** Same price formula and resolution multipliers as shipany-video-lite. */
+/** Server-authoritative price formula and per-model resolution multipliers. */
 export function creditsForGeneration(
   modelKey: string | undefined,
   durationSeconds?: number,

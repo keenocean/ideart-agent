@@ -191,6 +191,12 @@ export function getSettingGroups(): SettingGroup[] {
     },
     { name: 'fal', title: 'Fal', description: 'Fal AI API', tab: 'ai' },
     {
+      name: 'evolink',
+      title: 'EvoLink',
+      description: 'EvoLink multimodal API',
+      tab: 'ai',
+    },
+    {
       name: 'grouter',
       title: 'gRouter',
       description: 'gRouter gateway for image and video generation',
@@ -882,11 +888,12 @@ export function getSettings(): Setting[] {
       type: 'select',
       options: [
         { label: 'Auto', value: 'auto' },
+        { label: 'EvoLink', value: 'evolink' },
         { label: 'gRouter', value: 'grouter' },
         { label: 'Fal', value: 'fal' },
         { label: 'Replicate', value: 'replicate' },
       ],
-      tip: 'Auto prefers gRouter when it is configured, then Replicate, then Fal. Applies to both text-to-image and image editing.',
+      tip: 'Auto prefers EvoLink when it is configured, then gRouter, Replicate, and Fal. Applies to both text-to-image and image editing.',
       group: 'image_generation',
       tab: 'ai',
       defaultValue: 'auto',
@@ -899,11 +906,12 @@ export function getSettings(): Setting[] {
       type: 'select',
       options: [
         { label: 'Auto', value: 'auto' },
+        { label: 'EvoLink', value: 'evolink' },
         { label: 'gRouter', value: 'grouter' },
         { label: 'Fal', value: 'fal' },
         { label: 'Replicate', value: 'replicate' },
       ],
-      tip: 'Auto prefers gRouter when it is configured, then Fal, then Replicate. Applies to both text-to-video and image-to-video.',
+      tip: 'Auto picks the first configured provider with an exact model route: EvoLink, gRouter, Fal, then Replicate.',
       group: 'video_generation',
       tab: 'ai',
       defaultValue: 'auto',
@@ -916,6 +924,25 @@ export function getSettings(): Setting[] {
       type: 'password',
       placeholder: 'xxx',
       group: 'fal',
+      tab: 'ai',
+    },
+
+    // ─── AI / EvoLink ───────────────────────────────────────────────
+    {
+      name: 'evolink_base_url',
+      title: 'Base URL',
+      type: 'text',
+      placeholder: 'https://api.evolink.ai',
+      defaultValue: 'https://api.evolink.ai',
+      group: 'evolink',
+      tab: 'ai',
+    },
+    {
+      name: 'evolink_api_key',
+      title: 'API Key',
+      type: 'password',
+      placeholder: 'xxx',
+      group: 'evolink',
       tab: 'ai',
     },
 

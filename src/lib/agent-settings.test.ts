@@ -49,7 +49,7 @@ describe('creditsForGeneration', () => {
     }
   });
 
-  it('uses the same resolution multipliers as video-lite', () => {
+  it('uses the catalog resolution multipliers', () => {
     expect(creditsForGeneration('minimax-h3', 5, '768P')).toBe(
       expectedCredits(110, 5, 0.75)
     );
@@ -59,6 +59,9 @@ describe('creditsForGeneration', () => {
     expect(creditsForGeneration('minimax-h3', 5, '4K')).toBe(
       expectedCredits(110, 5, 1.5)
     );
+    expect(creditsForGeneration('seedance-2-0', 5, '480p')).toBe(460);
+    expect(creditsForGeneration('seedance-2-0', 5, '720p')).toBe(1000);
+    expect(creditsForGeneration('seedance-2-0', 5, '1080p')).toBe(2480);
   });
 
   it('clamps duration to the selected model range', () => {
@@ -82,10 +85,11 @@ describe('creditsForGeneration', () => {
 });
 
 describe('composer model capabilities', () => {
-  it('matches the current video-lite catalog in order', () => {
+  it('lists the current Ideart catalog in order', () => {
     expect(AGENT_MODEL_OPTIONS.map((option) => option.label)).toEqual([
       'MiniMax H3',
       'Seedance 2.5',
+      'Seedance 2.0',
     ]);
   });
 
@@ -103,10 +107,19 @@ describe('composer model capabilities', () => {
       5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
     ]);
     expect(durationsForModel('seedance-2-5')).toHaveLength(27);
+    expect(durationsForModel('seedance-2-0')).toEqual([
+      4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
+    ]);
     expect(resolutionsForModel('minimax-h3')).toEqual(['768P', '2K', '4K']);
     expect(resolutionsForModel('seedance-2-5')).toEqual(['480p', '720p']);
+    expect(resolutionsForModel('seedance-2-0')).toEqual([
+      '480p',
+      '720p',
+      '1080p',
+    ]);
     expect(aspectRatiosForModel('minimax-h3')).toContain('adaptive');
     expect(aspectRatiosForModel('seedance-2-5')).toContain('auto');
+    expect(aspectRatiosForModel('seedance-2-0')).toContain('adaptive');
   });
 
   it('resets incompatible values when the model changes', () => {
@@ -192,11 +205,20 @@ describe('providerModelFor', () => {
     expect(providerModelFor('minimax-h3', 'fal', 'animate', '4K')).toBe(
       'fal-ai/minimax/hailuo-2.3/pro/image-to-video'
     );
+    expect(
+      providerModelFor('seedance-2-0', 'evolink', 'generate', '720p')
+    ).toBe('seedance-2.0-text-to-video');
+    expect(providerModelFor('seedance-2-0', 'evolink', 'animate', '720p')).toBe(
+      'seedance-2.0-image-to-video'
+    );
   });
 
   it('does not downgrade Seedance on Replicate', () => {
     expect(
       providerModelFor('seedance-2-5', 'replicate', 'generate', '720p')
+    ).toBeUndefined();
+    expect(
+      providerModelFor('seedance-2-5', 'evolink', 'generate', '720p')
     ).toBeUndefined();
   });
 

@@ -68,7 +68,7 @@ src/
 │   ├── payment/                 # Payment providers (Stripe, PayPal, Creem)
 │   ├── email/                   # Email providers (Resend)
 │   ├── storage/                 # Storage providers (S3, R2)
-│   └── ai/                     # AI providers (Replicate, Gemini, Fal, Kie)
+│   └── ai/                     # AI providers (EvoLink, Replicate, Gemini, Fal, Kie)
 │
 ├── modules/                     # Business logic — independently removable
 │   ├── payment/service.ts       # Checkout, webhook, order + subscription + credit atomicity
@@ -441,26 +441,26 @@ it when the task matches:
 
 All functionality is self-contained — no external packages needed.
 
-| Location                  | Key Exports                                                                                   |
-| ------------------------- | --------------------------------------------------------------------------------------------- |
-| `@/core/payment`          | `PaymentManager`, `StripeProvider`, `PayPalProvider`, `CreemProvider`                         |
-| `@/core/email`            | `EmailManager`, `ResendProvider`                                                              |
-| `@/core/storage`          | `StorageManager`, `S3Provider`, `R2Provider`                                                  |
-| `@/core/ai`               | `AIManager`, `ReplicateProvider`, `GeminiProvider`, `FalProvider`, `KieProvider`              |
-| `@/core/auth/rbac`        | `matchPermission`, `matchAnyPermission`, `ROLES`                                              |
-| `@/core/db`               | `db()` singleton, `createDb` (multi-dialect)                                                  |
-| `@/lib/hash`              | `getUuid`, `getSnowId`, `getUniSeq`, `getNonceStr`, `md5`                                     |
-| `@/lib/resp`              | `respData`, `respOk`, `respErr`                                                               |
-| `@/lib/cookie`            | `getCookie`, `setCookie`, `getCookieFromCtx`                                                  |
-| `@/lib/rate-limit`        | `enforceMinIntervalRateLimit`                                                                 |
-| `@/lib/cache`             | `cacheGet`, `cacheSet`, `cacheRemove`                                                         |
-| `@/lib/time`              | `getTimestamp`, `getIsoTimestr`                                                               |
-| `@/lib/api-client`        | `apiGet`, `apiPost`, `apiPut`, `apiPatch`, `apiDelete`, `pageQuery`, `PageResult`, `ApiError` |
-| `@/lib/query-client`      | `getQueryClient`, `makeQueryClient`                                                           |
-| `@/paraglide/messages.js` | `m` — compiled message functions (`m['ns.key']()`)                                            |
-| `@/paraglide/runtime.js`  | `getLocale`, `setLocale`, `localizeHref`, `localizeUrl`, `locales`, `baseLocale`              |
-| `@/core/i18n/navigation`  | `Link`, `useRouter`, `usePathname` (locale-aware)                                             |
-| `@/core/i18n/dynamic`     | `tDynamic` (runtime-built message keys)                                                       |
+| Location                  | Key Exports                                                                                         |
+| ------------------------- | --------------------------------------------------------------------------------------------------- |
+| `@/core/payment`          | `PaymentManager`, `StripeProvider`, `PayPalProvider`, `CreemProvider`                               |
+| `@/core/email`            | `EmailManager`, `ResendProvider`                                                                    |
+| `@/core/storage`          | `StorageManager`, `S3Provider`, `R2Provider`                                                        |
+| `@/core/ai`               | `AIManager`, `EvoLinkProvider`, `ReplicateProvider`, `GeminiProvider`, `FalProvider`, `KieProvider` |
+| `@/core/auth/rbac`        | `matchPermission`, `matchAnyPermission`, `ROLES`                                                    |
+| `@/core/db`               | `db()` singleton, `createDb` (multi-dialect)                                                        |
+| `@/lib/hash`              | `getUuid`, `getSnowId`, `getUniSeq`, `getNonceStr`, `md5`                                           |
+| `@/lib/resp`              | `respData`, `respOk`, `respErr`                                                                     |
+| `@/lib/cookie`            | `getCookie`, `setCookie`, `getCookieFromCtx`                                                        |
+| `@/lib/rate-limit`        | `enforceMinIntervalRateLimit`                                                                       |
+| `@/lib/cache`             | `cacheGet`, `cacheSet`, `cacheRemove`                                                               |
+| `@/lib/time`              | `getTimestamp`, `getIsoTimestr`                                                                     |
+| `@/lib/api-client`        | `apiGet`, `apiPost`, `apiPut`, `apiPatch`, `apiDelete`, `pageQuery`, `PageResult`, `ApiError`       |
+| `@/lib/query-client`      | `getQueryClient`, `makeQueryClient`                                                                 |
+| `@/paraglide/messages.js` | `m` — compiled message functions (`m['ns.key']()`)                                                  |
+| `@/paraglide/runtime.js`  | `getLocale`, `setLocale`, `localizeHref`, `localizeUrl`, `locales`, `baseLocale`                    |
+| `@/core/i18n/navigation`  | `Link`, `useRouter`, `usePathname` (locale-aware)                                                   |
+| `@/core/i18n/dynamic`     | `tDynamic` (runtime-built message keys)                                                             |
 
 ## Database Schema (21 tables)
 

@@ -58,3 +58,4 @@ export * from './replicate';
 export * from './gemini';
 export * from './fal';
 export * from './grouter';
+export * from './evolink';

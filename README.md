@@ -290,7 +290,7 @@ src/
 ├── modules/agent/          # Agent runtime, tools, provider polling, paywall
 ├── modules/ai-tasks/       # Durable task status and credit refund lifecycle
 ├── modules/chats/          # Chat history, sharing, and generated-media library
-├── core/ai/                # gRouter, Fal, and Replicate adapters
+├── core/ai/                # EvoLink, gRouter, Fal, and Replicate adapters
 ├── routes/(agent)/         # Chat, library, and editor surfaces
 ├── routes/api/agent/       # Chat SSE, history/status, stop, library, CRUD
 ├── routes/admin/           # Admin settings, provider tests, chat inspection

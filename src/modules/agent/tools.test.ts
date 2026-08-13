@@ -4,6 +4,7 @@ import {
   durationSeconds,
   normalizeProviderAspectRatio,
   pickVideoProvider,
+  providerOptionsFor,
   resolveReferenceImage,
 } from './tools';
 
@@ -94,6 +95,38 @@ describe('durationSeconds', () => {
     expect(durationSeconds(1, undefined, 'minimax-h3')).toBe(5);
     expect(durationSeconds(99, undefined, 'minimax-h3')).toBe(15);
     expect(durationSeconds(99, undefined, 'seedance-2-5')).toBe(30);
+    expect(durationSeconds(99, undefined, 'seedance-2-0')).toBe(15);
+  });
+});
+
+describe('providerOptionsFor', () => {
+  it('maps Seedance 2.0 image-to-video settings to EvoLink', () => {
+    expect(
+      providerOptionsFor({
+        provider: 'evolink',
+        modelKey: 'seedance-2-0',
+        kind: 'animate',
+        options: {
+          aspect_ratio: '16:9',
+          duration: 8,
+          resolution: '1080p',
+          image_input: [
+            'https://cdn.example.com/start.png',
+            'https://cdn.example.com/end.png',
+            'https://cdn.example.com/ignored.png',
+          ],
+        },
+      })
+    ).toEqual({
+      aspect_ratio: '16:9',
+      duration: 8,
+      quality: '1080p',
+      generate_audio: true,
+      image_input: [
+        'https://cdn.example.com/start.png',
+        'https://cdn.example.com/end.png',
+      ],
+    });
   });
 });
 
@@ -102,7 +135,7 @@ describe('pickVideoProvider', () => {
     expect(pickVideoProvider({})).toBeNull();
   });
 
-  it('prefers gRouter when auto and all are configured', () => {
+  it('prefers gRouter when auto and the existing providers are configured', () => {
     expect(
       pickVideoProvider({
         grouter_api_key: 'g',
@@ -110,6 +143,38 @@ describe('pickVideoProvider', () => {
         fal_api_key: 'k',
         replicate_api_token: 't',
       })
+    ).toBe('grouter');
+  });
+
+  it('prefers EvoLink in auto mode when it supports the selected model', () => {
+    expect(
+      pickVideoProvider(
+        {
+          evolink_api_key: 'e',
+          grouter_api_key: 'g',
+          grouter_base_url: 'https://gateway.example.com',
+          fal_api_key: 'k',
+          replicate_api_token: 't',
+        },
+        'seedance-2-0',
+        'generate',
+        '720p'
+      )
+    ).toBe('evolink');
+  });
+
+  it('skips EvoLink when the selected model has no EvoLink route', () => {
+    expect(
+      pickVideoProvider(
+        {
+          evolink_api_key: 'e',
+          grouter_api_key: 'g',
+          grouter_base_url: 'https://gateway.example.com',
+        },
+        'minimax-h3',
+        'generate',
+        '2K'
+      )
     ).toBe('grouter');
   });
 

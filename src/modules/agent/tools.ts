@@ -3,6 +3,7 @@ import { defineTool, type ToolDefinition } from '@codeany/open-agent-sdk';
 import {
   AIMediaType,
   AITaskStatus,
+  EvoLinkProvider,
   FalProvider,
   GRouterProvider,
   ReplicateProvider,
@@ -187,6 +188,12 @@ function createVideoProvider(
   provider: VideoProviderName,
   configs: Record<string, any>
 ): AIProvider {
+  if (provider === 'evolink') {
+    return new EvoLinkProvider({
+      apiKey: configs.evolink_api_key,
+      baseUrl: configs.evolink_base_url,
+    });
+  }
   if (provider === 'grouter') {
     return new GRouterProvider({
       apiKey: configs.grouter_api_key,
@@ -225,7 +232,9 @@ export async function cancelVideoGenerationsForSession(params: {
 
     if (!task.taskId) continue;
     const providerName = task.provider as VideoProviderName;
-    if (!['grouter', 'fal', 'replicate'].includes(providerName)) continue;
+    if (!['evolink', 'grouter', 'fal', 'replicate'].includes(providerName)) {
+      continue;
+    }
     try {
       const provider = createVideoProvider(providerName, configs);
       if (!provider.cancel) continue;
@@ -258,14 +267,25 @@ async function runVideoGeneration(params: {
 }): Promise<string> {
   const { ctx, options, signal, kind, modelKey } = params;
   const configs = await getAllConfigs();
+  const selectedResolution = String(
+    options.resolution ??
+      ctx.settings?.resolution ??
+      modelOptionFor(modelKey)?.defaultResolution ??
+      ''
+  );
 
-  let selectedProvider = pickVideoProvider(configs);
+  let selectedProvider = pickVideoProvider(
+    configs,
+    modelKey,
+    kind,
+    selectedResolution
+  );
 
   if (!selectedProvider) {
     return JSON.stringify({
       status: 'error',
       message:
-        'Video provider is not configured. Ask the site admin to configure gRouter, Fal, or Replicate in Admin Settings.',
+        'No configured video provider supports this model. Ask the site admin to configure EvoLink, gRouter, Fal, or Replicate in Admin Settings.',
     });
   }
 
@@ -275,7 +295,11 @@ async function runVideoGeneration(params: {
     options.reference_video_urls,
   ].some((value) => Array.isArray(value) && value.length > 0);
   if (hasReferenceMedia && selectedProvider !== 'grouter') {
-    if (configs.grouter_api_key && configs.grouter_base_url) {
+    if (
+      configs.grouter_api_key &&
+      configs.grouter_base_url &&
+      providerModelFor(modelKey, 'grouter', kind, selectedResolution)
+    ) {
       selectedProvider = 'grouter';
     } else {
       return JSON.stringify({
@@ -297,12 +321,6 @@ async function runVideoGeneration(params: {
     });
   }
 
-  const selectedResolution = String(
-    options.resolution ??
-      ctx.settings?.resolution ??
-      modelOptionFor(modelKey)?.defaultResolution ??
-      ''
-  );
   const model = providerModelFor(
     modelKey,
     selectedProvider,
@@ -313,7 +331,7 @@ async function runVideoGeneration(params: {
   if (!model) {
     return JSON.stringify({
       status: 'error',
-      message: `${modelOptionFor(modelKey)?.label ?? modelKey} is not available on ${selectedProvider}. Select Fal or gRouter for this model.`,
+      message: `${modelOptionFor(modelKey)?.label ?? modelKey} is not available on ${selectedProvider}. Choose a provider that supports this model.`,
     });
   }
 
@@ -596,7 +614,7 @@ function normalizeGenerationOptions(
 }
 
 /** Convert normalized Agent options to the same upstream contract as lite. */
-function providerOptionsFor({
+export function providerOptionsFor({
   provider,
   modelKey,
   kind,
@@ -630,6 +648,18 @@ function providerOptionsFor({
   const referenceVideoUrls = Array.isArray(options.reference_video_urls)
     ? options.reference_video_urls.map(String)
     : [];
+
+  if (modelKey === 'seedance-2-0' && provider === 'evolink') {
+    return {
+      aspect_ratio: aspectRatio,
+      duration,
+      quality: resolution,
+      generate_audio: true,
+      ...(kind === 'animate' && imageUrls.length > 0
+        ? { image_input: imageUrls.slice(0, 2) }
+        : {}),
+    };
+  }
 
   if (modelKey === 'seedance-2-5') {
     if (provider === 'fal') {
@@ -718,25 +748,35 @@ export function normalizeProviderAspectRatio(
 /**
  * Resolve which provider serves this call.
  *
- * The admin's `default_video_provider` decides; `auto` follows video-lite and
- * prefers gRouter, then Fal, then Replicate. An explicitly chosen provider
- * that isn't usable falls back to whatever is configured rather than failing.
- * Returns null when nothing usable is configured.
+ * The admin's `default_video_provider` decides; `auto` prefers EvoLink, then
+ * gRouter, Fal, and Replicate. When a model is supplied, providers without an
+ * exact route for that model are skipped instead of silently substituting a
+ * different model. Returns null when nothing usable is configured.
  */
 export function pickVideoProvider(
-  configs: Record<string, any>
+  configs: Record<string, any>,
+  modelKey?: string,
+  kind: 'generate' | 'animate' = 'generate',
+  resolution?: string
 ): VideoProviderName | null {
   const configured: Record<VideoProviderName, boolean> = {
+    evolink: !!configs.evolink_api_key,
     grouter: !!configs.grouter_api_key && !!configs.grouter_base_url,
     fal: !!configs.fal_api_key,
     replicate: !!configs.replicate_api_token,
   };
 
   const preferred = String(configs.default_video_provider || 'auto');
-  const fallbackOrder: VideoProviderName[] = ['grouter', 'fal', 'replicate'];
+  const fallbackOrder: VideoProviderName[] = [
+    'evolink',
+    'grouter',
+    'fal',
+    'replicate',
+  ];
   const order =
     preferred !== 'auto' &&
-    (preferred === 'grouter' ||
+    (preferred === 'evolink' ||
+      preferred === 'grouter' ||
       preferred === 'fal' ||
       preferred === 'replicate')
       ? [
@@ -745,7 +785,13 @@ export function pickVideoProvider(
         ]
       : fallbackOrder;
 
-  return order.find((name) => configured[name]) ?? null;
+  return (
+    order.find(
+      (name) =>
+        configured[name] &&
+        (!modelKey || providerModelFor(modelKey, name, kind, resolution))
+    ) ?? null
+  );
 }
 
 /**
@@ -762,7 +808,7 @@ function modelSelection(
     defaultComposerSettings().modelOption;
   if (!isModelOptionValue(value)) {
     return {
-      error: `Unsupported video model "${value}". Choose minimax-h3 or seedance-2-5.`,
+      error: `Unsupported video model "${value}". Choose minimax-h3, seedance-2-5, or seedance-2-0.`,
     };
   }
   return { modelKey: value };
@@ -793,7 +839,7 @@ export function createAgentTools(ctx: AgentToolContext): ToolDefinition[] {
         model: {
           type: 'string',
           description:
-            'Optional picker key: minimax-h3 or seedance-2-5. Leave empty to use the composer setting.',
+            'Optional picker key: minimax-h3, seedance-2-5, or seedance-2-0. Leave empty to use the composer setting.',
         },
         resolution: {
           type: 'string',
@@ -897,7 +943,7 @@ export function createAgentTools(ctx: AgentToolContext): ToolDefinition[] {
         model: {
           type: 'string',
           description:
-            'Optional picker key: minimax-h3 or seedance-2-5. Leave empty to use the composer setting.',
+            'Optional picker key: minimax-h3, seedance-2-5, or seedance-2-0. Leave empty to use the composer setting.',
         },
         resolution: {
           type: 'string',
