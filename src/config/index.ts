@@ -19,7 +19,7 @@ export const envConfigs: Record<string, string> = {
   app_description:
     publicEnv('VITE_APP_DESCRIPTION') ??
     'Create and refine AI video clips through conversation.',
-  app_logo: publicEnv('VITE_APP_LOGO') ?? '/logo.png',
+  app_logo: publicEnv('VITE_APP_LOGO') ?? '/logo.svg',
 
   // Database
   database_url: procEnv.DATABASE_URL ?? '',

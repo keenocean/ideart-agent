@@ -73,7 +73,7 @@ export const Route = createRootRoute({
       '';
     // Social-card defaults. A route's own head() overrides the ones it repeats
     // (title/description), so pages only restate what differs.
-    const ogImage = `${appUrl}/logo.png`;
+    const ogImage = `${appUrl}/logo.svg`;
     return {
       meta: [
         { charSet: 'utf-8' },
@@ -92,8 +92,8 @@ export const Route = createRootRoute({
         { name: 'twitter:image', content: ogImage },
       ],
       links: [
-        { rel: 'icon', href: '/favicon.ico' },
-        { rel: 'apple-touch-icon', href: '/logo.png' },
+        { rel: 'icon', href: '/favicon.svg', type: 'image/svg+xml' },
+        { rel: 'apple-touch-icon', href: '/logo.svg' },
         ...locales.map((loc) => ({
           rel: 'alternate',
           hrefLang: loc,
