@@ -16,7 +16,7 @@ const mocks = vi.hoisted(() => ({
   resolveLlm: vi.fn(),
 }));
 
-vi.mock('@codeany/open-agent-sdk', () => ({
+vi.mock('@keenocean/open-agent-sdk', () => ({
   createProvider: mocks.createProvider,
 }));
 

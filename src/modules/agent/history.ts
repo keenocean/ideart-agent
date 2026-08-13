@@ -1,4 +1,4 @@
-import type { NormalizedMessageParam } from '@codeany/open-agent-sdk';
+import type { NormalizedMessageParam } from '@keenocean/open-agent-sdk';
 
 import type {
   AgentAssistantMessageMetadataV1,

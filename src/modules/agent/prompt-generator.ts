@@ -1,4 +1,4 @@
-import { createProvider } from '@codeany/open-agent-sdk';
+import { createProvider } from '@keenocean/open-agent-sdk';
 
 import {
   promptByteLength,

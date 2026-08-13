@@ -1,7 +1,7 @@
 import type {
   NormalizedMessageParam,
   ToolDefinition,
-} from '@codeany/open-agent-sdk';
+} from '@keenocean/open-agent-sdk';
 
 import type { AgentGenerationSettings } from '@/lib/agent-settings';
 

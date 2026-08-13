@@ -1,4 +1,4 @@
-import { defineTool, type ToolDefinition } from '@codeany/open-agent-sdk';
+import { defineTool, type ToolDefinition } from '@keenocean/open-agent-sdk';
 
 import { AIMediaType, AITaskStatus, type AITaskResult } from '@/core/ai';
 import type { StorageManager } from '@/core/storage';
