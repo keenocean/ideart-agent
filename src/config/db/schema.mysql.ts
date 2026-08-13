@@ -14,6 +14,7 @@ import {
   mysqlTable,
   text,
   timestamp,
+  uniqueIndex,
   varchar,
 } from 'drizzle-orm/mysql-core';
 
@@ -138,7 +139,8 @@ export const post = table(
       .notNull()
       .references(() => user.id, { onDelete: 'cascade' }),
     parentId: varchar191('parent_id'),
-    slug: varchar191('slug').unique().notNull(),
+    slug: varchar191('slug').notNull(),
+    locale: varchar('locale', { length: 20 }).notNull().default(''),
     type: varchar('type', { length: 50 }).notNull(),
     title: varchar('title', { length: 255 }),
     description: text('description'),
@@ -154,7 +156,14 @@ export const post = table(
     deletedAt: timestamp('deleted_at'),
     sort: int('sort').default(0).notNull(),
   },
-  (table) => [index('idx_post_type_status').on(table.type, table.status)]
+  (table) => [
+    uniqueIndex('idx_post_slug_locale').on(table.slug, table.locale),
+    index('idx_post_type_status_locale').on(
+      table.type,
+      table.status,
+      table.locale
+    ),
+  ]
 );
 
 // ─── Business ────────────────────────────────────────────────────────────────
@@ -462,6 +471,28 @@ export const chat = table(
   (table) => [index('idx_chat_user_status').on(table.userId, table.status)]
 );
 
+export const agentTurnLease = table(
+  'agent_turn_lease',
+  {
+    chatId: varchar191('chat_id').primaryKey(),
+    userId: varchar191('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    turnId: varchar191('turn_id').notNull(),
+    expiresAt: timestamp('expires_at').notNull(),
+    cancelRequestedAt: timestamp('cancel_requested_at'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => [
+    index('idx_agent_turn_lease_user_expires').on(
+      table.userId,
+      table.expiresAt
+    ),
+    index('idx_agent_turn_lease_turn_id').on(table.turnId),
+  ]
+);
+
 export const chatMessage = table(
   'chat_message',
   {
@@ -518,6 +549,8 @@ export type AiTask = typeof aiTask.$inferSelect;
 export type NewAiTask = typeof aiTask.$inferInsert;
 export type Chat = typeof chat.$inferSelect;
 export type NewChat = typeof chat.$inferInsert;
+export type AgentTurnLease = typeof agentTurnLease.$inferSelect;
+export type NewAgentTurnLease = typeof agentTurnLease.$inferInsert;
 export type ChatMessage = typeof chatMessage.$inferSelect;
 export type NewChatMessage = typeof chatMessage.$inferInsert;
 

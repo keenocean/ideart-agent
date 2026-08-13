@@ -6,7 +6,13 @@
  */
 
 import { sql } from 'drizzle-orm';
-import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import {
+  index,
+  integer,
+  sqliteTable,
+  text,
+  uniqueIndex,
+} from 'drizzle-orm/sqlite-core';
 
 const table = sqliteTable;
 
@@ -160,7 +166,8 @@ export const post = table(
       .notNull()
       .references(() => user.id, { onDelete: 'cascade' }),
     parentId: text('parent_id'),
-    slug: text('slug').unique().notNull(),
+    slug: text('slug').notNull(),
+    locale: text('locale').notNull().default(''),
     type: text('type').notNull(),
     title: text('title'),
     description: text('description'),
@@ -181,7 +188,14 @@ export const post = table(
     deletedAt: integer('deleted_at', { mode: 'timestamp_ms' }),
     sort: integer('sort').default(0).notNull(),
   },
-  (table) => [index('idx_post_type_status').on(table.type, table.status)]
+  (table) => [
+    uniqueIndex('idx_post_slug_locale').on(table.slug, table.locale),
+    index('idx_post_type_status_locale').on(
+      table.type,
+      table.status,
+      table.locale
+    ),
+  ]
 );
 
 // ─── Business ────────────────────────────────────────────────────────────────
@@ -539,6 +553,35 @@ export const chat = table(
   (table) => [index('idx_chat_user_status').on(table.userId, table.status)]
 );
 
+export const agentTurnLease = table(
+  'agent_turn_lease',
+  {
+    chatId: text('chat_id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    turnId: text('turn_id').notNull(),
+    expiresAt: integer('expires_at', { mode: 'timestamp_ms' }).notNull(),
+    cancelRequestedAt: integer('cancel_requested_at', {
+      mode: 'timestamp_ms',
+    }),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' })
+      .default(sqliteNowMs)
+      .notNull(),
+    updatedAt: integer('updated_at', { mode: 'timestamp_ms' })
+      .default(sqliteNowMs)
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    index('idx_agent_turn_lease_user_expires').on(
+      table.userId,
+      table.expiresAt
+    ),
+    index('idx_agent_turn_lease_turn_id').on(table.turnId),
+  ]
+);
+
 export const chatMessage = table(
   'chat_message',
   {
@@ -600,6 +643,8 @@ export type AiTask = typeof aiTask.$inferSelect;
 export type NewAiTask = typeof aiTask.$inferInsert;
 export type Chat = typeof chat.$inferSelect;
 export type NewChat = typeof chat.$inferInsert;
+export type AgentTurnLease = typeof agentTurnLease.$inferSelect;
+export type NewAgentTurnLease = typeof agentTurnLease.$inferInsert;
 export type ChatMessage = typeof chatMessage.$inferSelect;
 export type NewChatMessage = typeof chatMessage.$inferInsert;
 
