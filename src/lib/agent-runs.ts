@@ -185,12 +185,23 @@ export interface StartRunOptions {
   text: string;
   attachments?: PendingAttachment[];
   settings?: AgentGenerationSettings;
+  skillName?: string;
   /** Called once the server has the turn (and has persisted the user message). */
   onAccepted?: () => void;
   /** Called when the turn ends, however it ends. */
-  onSettled?: () => void;
+  onSettled?: (result: AgentRunSettlement) => void;
   /** The turn was refused for lack of credits — show the matching paywall. */
   onInsufficientCredits?: (info: CreditRefusal) => void;
+  /** The server already has work for this chat; callers expose its Stop UI. */
+  onTurnConflict?: (code: AgentTurnConflictCode) => void;
+}
+
+export type AgentTurnConflictCode =
+  | 'turn_in_progress'
+  | 'stale_run_requires_stop';
+
+export interface AgentRunSettlement {
+  conflictCode?: AgentTurnConflictCode;
 }
 
 export interface CreditRefusal {
@@ -223,6 +234,21 @@ function parseInsufficientCredits(
   }
 }
 
+export function parseAgentTurnConflict(
+  status: number,
+  body: string
+): AgentTurnConflictCode | null {
+  if (status !== 409) return null;
+  try {
+    const code = (JSON.parse(body) as { code?: unknown }).code;
+    return code === 'turn_in_progress' || code === 'stale_run_requires_stop'
+      ? code
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Start a turn and stream it into the session's transcript. Safe to call for
  * several sessions at once; a session that's already streaming is ignored.
@@ -232,9 +258,11 @@ export async function startRun({
   text,
   attachments = [],
   settings = {},
+  skillName,
   onAccepted,
   onSettled,
   onInsufficientCredits,
+  onTurnConflict,
 }: StartRunOptions): Promise<void> {
   const content = buildAgentMessage(text, attachments, settings.mediaMode);
   if (!content || isRunning(sessionId)) return;
@@ -251,6 +279,7 @@ export async function startRun({
   });
   emit(sessionId);
   emitRunning();
+  const settlement: AgentRunSettlement = {};
 
   const handleEvent = (evt: AgentEvent) => {
     switch (evt.type) {
@@ -301,7 +330,12 @@ export async function startRun({
     const res = await fetch('/api/agent/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sessionId, message: content, settings }),
+      body: JSON.stringify({
+        sessionId,
+        message: content,
+        settings,
+        skillName,
+      }),
       signal: controller.signal,
     });
 
@@ -313,6 +347,13 @@ export async function startRun({
       if (refusal) {
         updateMessages(sessionId, (msgs) => msgs.slice(0, -1));
         onInsufficientCredits?.(refusal);
+        return;
+      }
+      const conflictCode = parseAgentTurnConflict(res.status, errText);
+      if (conflictCode) {
+        settlement.conflictCode = conflictCode;
+        updateMessages(sessionId, (msgs) => msgs.slice(0, -1));
+        onTurnConflict?.(conflictCode);
         return;
       }
       updateMessages(sessionId, (msgs) =>
@@ -356,6 +397,6 @@ export async function startRun({
   } finally {
     update(sessionId, { streaming: false, controller: null });
     emitRunning();
-    onSettled?.();
+    onSettled?.(settlement);
   }
 }

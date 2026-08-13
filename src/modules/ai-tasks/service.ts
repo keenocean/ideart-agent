@@ -154,20 +154,34 @@ export async function markTaskProcessing(params: {
   return task?.status === AITaskStatus.PROCESSING;
 }
 
-function taskSessionId(task: { options?: string | null }): string {
-  if (!task.options) return '';
+function taskOptions(task: { options?: string | null }): {
+  sessionId: string;
+  turnId: string | null;
+} {
+  if (!task.options) return { sessionId: '', turnId: null };
   try {
-    const options = JSON.parse(task.options) as { sessionId?: unknown };
-    return typeof options.sessionId === 'string' ? options.sessionId : '';
+    const options = JSON.parse(task.options) as {
+      sessionId?: unknown;
+      turnId?: unknown;
+    };
+    return {
+      sessionId: typeof options.sessionId === 'string' ? options.sessionId : '',
+      turnId: typeof options.turnId === 'string' ? options.turnId : null,
+    };
   } catch {
-    return '';
+    return { sessionId: '', turnId: null };
   }
+}
+
+export function taskTurnId(task: { options?: string | null }): string | null {
+  return taskOptions(task).turnId;
 }
 
 /** Active provider jobs owned by one chat session. */
 export async function getActiveTasksForSession(params: {
   userId: string;
   sessionId: string;
+  turnId?: string;
 }) {
   const rows = await db()
     .select()
@@ -184,9 +198,13 @@ export async function getActiveTasksForSession(params: {
     )
     .orderBy(desc(aiTask.createdAt));
 
-  return rows.filter(
-    (task: AiTask) => taskSessionId(task) === params.sessionId
-  );
+  return rows.filter((task: AiTask) => {
+    const options = taskOptions(task);
+    return (
+      options.sessionId === params.sessionId &&
+      (params.turnId === undefined || options.turnId === params.turnId)
+    );
+  });
 }
 
 /**

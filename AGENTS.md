@@ -144,6 +144,7 @@ API routes are thin server-route wrappers — they check auth, parse params, cal
 - Modules depend on `core/`, `config/`, `lib/`, and `drizzle-orm` — never on other modules' internals
 - Exception: `payment/service.ts` calls `credits/` and `subscriptions/` because payment success triggers credit granting and subscription creation. This is the ONE allowed cross-module dependency.
 - `ai-tasks/service.ts` calls `credits/` for consumption/revocation. This is the second.
+- The existing `agent` runtime is a restricted product-orchestration exception: files under `src/modules/agent/` may call only `chats`, `ai-tasks`, `config`, and `storage`. Do not add other module dependencies, and those modules must never import `agent` back.
 - All other modules are fully independent.
 
 ## Key Patterns
@@ -431,6 +432,10 @@ it when the task matches:
 | `launch-audit`      | Whole-project sweep on one axis — responsive, light/dark theme, SEO, performance (Lighthouse), or security; run `all` before deploy |
 | `sync-upstream`     | Pull latest template updates; local changes win on conflict                                                                         |
 | `deploy-cloudflare` | Deploy to Cloudflare Workers (D1 or Postgres+Hyperdrive + secrets + schema, idempotent)                                             |
+
+Product Agent contracts are documented in [`docs/agent-template.md`](docs/agent-template.md).
+Marketing/tool/model page rules are documented in
+[`docs/marketing-pages-guide.md`](docs/marketing-pages-guide.md).
 
 **Database backends on Cloudflare Workers** (chosen by `wrangler.jsonc` `vars.DATABASE_PROVIDER`):
 

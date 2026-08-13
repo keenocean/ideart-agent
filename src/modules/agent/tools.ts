@@ -12,12 +12,14 @@ import {
 } from '@/core/ai';
 import type { StorageManager } from '@/core/storage';
 import { envConfigs } from '@/config';
+import type { AiTask } from '@/config/db/schema';
 import {
   createTask,
   AITaskStatus as DbTaskStatus,
   findTask,
   getActiveTasksForSession,
   markTaskProcessing,
+  taskTurnId,
   updateTask,
 } from '@/modules/ai-tasks/service';
 import { getAllConfigs } from '@/modules/config/service';
@@ -38,17 +40,22 @@ import {
 import { createImageTool } from './image-tools';
 import { resolveReferenceImage } from './media';
 import { summarizeProviderError } from './provider-error';
+import { createSkillResourceTools, type PromptSkill } from './skills';
+import { assertTurnLeaseOwnership, getActiveTurnLease } from './turn-lease';
 
 export { resolveReferenceImage } from './media';
 
-// Media tools Ideart can call. They are the ONLY tools the agent gets:
-// no filesystem/bash base tools — so the agent loop can't touch anything
-// outside image and video generation.
+// Media generation tools plus the selected Skill's read-only release-backed
+// reference reader are the ONLY tools the agent gets: no filesystem/bash base
+// tools, so the Worker cannot execute arbitrary code.
 
 export interface AgentToolContext {
   userId: string;
   sessionId: string;
+  turnId?: string;
+  requireTurnLease?: boolean;
   settings?: AgentGenerationSettings;
+  skill?: PromptSkill | null;
 }
 
 function isFailedGenerationResult(
@@ -87,6 +94,24 @@ export function guardGenerationRetries(
       const result = await tool.call(input, context);
       if (isFailedGenerationResult(result)) generationFailed = true;
       return result;
+    },
+  }));
+}
+
+function guardTurnOwnership(
+  tools: ToolDefinition[],
+  ctx: AgentToolContext
+): ToolDefinition[] {
+  if (!ctx.requireTurnLease || !ctx.turnId) return tools;
+  return tools.map((tool) => ({
+    ...tool,
+    async call(input, context) {
+      await assertTurnLeaseOwnership({
+        chatId: ctx.sessionId,
+        userId: ctx.userId,
+        turnId: ctx.turnId!,
+      });
+      return tool.call(input, context);
     },
   }));
 }
@@ -227,13 +252,29 @@ function createVideoProvider(
 export async function cancelGenerationsForSession(params: {
   userId: string;
   sessionId: string;
+  /** Exact active Turn. Omit only for orphan/legacy cleanup. */
+  turnId?: string;
 }): Promise<{ canceled: number; upstreamCanceled: number }> {
   const tasks = await getActiveTasksForSession(params);
-  if (tasks.length === 0) return { canceled: 0, upstreamCanceled: 0 };
+  // Snapshot tasks first, then protect a lease acquired concurrently. A task
+  // created after this snapshot cannot be in `tasks`; a task already present
+  // must be excluded if its Turn now owns the chat.
+  const activeLease = params.turnId
+    ? undefined
+    : await getActiveTurnLease(params.sessionId);
+  const activeTurnId =
+    activeLease?.userId === params.userId ? activeLease.turnId : undefined;
+  const cancelableTasks = tasks.filter(
+    (task: AiTask) =>
+      params.turnId !== undefined ||
+      !activeTurnId ||
+      taskTurnId(task) !== activeTurnId
+  );
+  if (cancelableTasks.length === 0) return { canceled: 0, upstreamCanceled: 0 };
 
   const configs = await getAllConfigs();
   let upstreamCanceled = 0;
-  for (const task of tasks) {
+  for (const task of cancelableTasks) {
     // Set the durable flag first. The polling loop checks it before accepting
     // a late success and `updateTask` prevents cancellation being overwritten.
     await updateTask({
@@ -266,7 +307,7 @@ export async function cancelGenerationsForSession(params: {
       );
     }
   }
-  return { canceled: tasks.length, upstreamCanceled };
+  return { canceled: cancelableTasks.length, upstreamCanceled };
 }
 
 async function runVideoGeneration(params: {
@@ -392,6 +433,7 @@ async function runVideoGeneration(params: {
         ...providerOptions,
         providerModel: model,
         sessionId: ctx.sessionId,
+        ...(ctx.turnId ? { turnId: ctx.turnId } : {}),
       },
     });
   } catch (err: any) {
@@ -407,6 +449,13 @@ async function runVideoGeneration(params: {
 
   let providerTaskId = '';
   try {
+    if (ctx.requireTurnLease && ctx.turnId) {
+      await assertTurnLeaseOwnership({
+        chatId: ctx.sessionId,
+        userId: ctx.userId,
+        turnId: ctx.turnId,
+      });
+    }
     const created = await provider.generate({
       params: {
         mediaType: AIMediaType.VIDEO,
@@ -970,15 +1019,17 @@ export function createAgentTools(ctx: AgentToolContext): ToolDefinition[] {
     },
   });
 
+  const skillTools = ctx.skill ? createSkillResourceTools(ctx.skill) : [];
+  let mediaTools: ToolDefinition[];
   if (ctx.settings?.mediaMode === 'image') {
-    return guardGenerationRetries([createImageTool(ctx)]);
+    mediaTools = [createImageTool(ctx)];
+  } else if (ctx.settings?.mediaMode === 'video') {
+    mediaTools = [generateVideo, animateImage];
+  } else {
+    mediaTools = [createImageTool(ctx), generateVideo, animateImage];
   }
-  if (ctx.settings?.mediaMode === 'video') {
-    return guardGenerationRetries([generateVideo, animateImage]);
-  }
-  return guardGenerationRetries([
-    createImageTool(ctx),
-    generateVideo,
-    animateImage,
-  ]);
+  return [
+    ...skillTools,
+    ...guardTurnOwnership(guardGenerationRetries(mediaTools), ctx),
+  ];
 }

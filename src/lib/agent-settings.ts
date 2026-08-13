@@ -30,9 +30,10 @@ export const DEFAULT_RESOLUTION = '2K';
 export const DEFAULT_DURATION = 5;
 
 /**
- * Ideart starts from the shipany-video-lite catalog and adds provider-specific
- * models only under distinct picker keys. Never map an older provider model to
- * a newer label: the picker key is also the pricing and capability boundary.
+ * Video Agent starts from the shipany-video-lite catalog and adds provider-
+ * specific models only under distinct picker keys. Never map an older provider
+ * model to a newer label: the picker key is also the pricing and capability
+ * boundary.
  */
 export const AGENT_MODEL_OPTIONS = [
   {

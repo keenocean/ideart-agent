@@ -14,12 +14,7 @@ import { ThemeProvider } from 'next-themes';
 
 import { envConfigs } from '@/config';
 import { getQueryClient } from '@/lib/query-client';
-import {
-  baseLocale,
-  getLocale,
-  locales,
-  localizeUrl,
-} from '@/paraglide/runtime.js';
+import { getLocale } from '@/paraglide/runtime.js';
 import { Ads } from '@/components/analytics/ads';
 import { GoogleAnalytics } from '@/components/analytics/google-analytics';
 import { Plausible } from '@/components/analytics/plausible';
@@ -94,16 +89,6 @@ export const Route = createRootRoute({
       links: [
         { rel: 'icon', href: '/favicon.svg', type: 'image/svg+xml' },
         { rel: 'apple-touch-icon', href: '/logo.svg' },
-        ...locales.map((loc) => ({
-          rel: 'alternate',
-          hrefLang: loc,
-          href: localizeUrl(`${appUrl}/`, { locale: loc }).href,
-        })),
-        {
-          rel: 'alternate',
-          hrefLang: 'x-default',
-          href: localizeUrl(`${appUrl}/`, { locale: baseLocale }).href,
-        },
       ],
       scripts: [
         {

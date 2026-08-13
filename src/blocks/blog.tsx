@@ -36,6 +36,7 @@ export function Blog({ posts }: { posts: BlogPost[] }) {
               date={formatPostDate(post.createdAt, locale)}
               authorName={post.authorName}
               authorImage={post.authorImage}
+              categories={post.categories}
             />
           ))}
         </div>

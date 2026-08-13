@@ -33,7 +33,7 @@ The skill is designed to be run **any number of times**. A repeat invocation aut
 2. **Final deploy confirmation** — always asked; deploy is irreversible.
 3. **(Optional) Admin credentials** — only asked on first deploy when no `super_admin` exists yet. User picks one of: `email password` (agent creates the account directly so user can log in immediately), `email` (promote an existing user — requires prior sign-up via web), or `skip` (assign later with `/deploy-cloudflare --admin-email=X --admin-password=Y` or `--admin=X`).
 
-Every other step (D1 create, schema migrations, RBAC seed, secrets, URL fixup) is automatic AND idempotent. So **"再发布一下" / "ship again"** = run `/deploy-cloudflare` again.
+Every other step (D1 create, schema migrations, RBAC seed, optional Skill release, secrets, URL fixup) is automatic AND idempotent. So **"再发布一下" / "ship again"** = run `/deploy-cloudflare` again.
 
 ### Idempotency cheat sheet
 
@@ -45,7 +45,7 @@ Every other step (D1 create, schema migrations, RBAC seed, secrets, URL fixup) i
 | 4.5 RBAC seed | `SELECT COUNT(*) FROM role` ≥ 1 on remote D1 | Skip local-sqlite dance entirely |
 | 5 Secrets | `wrangler secret list` already contains the name | Skip per-secret upload (`--rotate-secrets` forces) |
 | 5.5 Production URL | `.env.production` `VITE_APP_URL` AND `wrangler.jsonc` `vars.VITE_APP_URL` are both consistent with routes (workers.dev + no routes, OR custom domain matching a routes pattern) | Skip the prompt (`--domain=X` overrides) |
-| 6 Deploy | (always runs) | Fresh `pnpm run cf:deploy` with the latest code/env |
+| 6 Optional Skill release + deploy | Skill scripts absent, or latest immutable release is already pinned | Publish/verify Skills when present, then fresh `pnpm run cf:deploy` with the latest code/env |
 | 7 URL fix | Both `.env.production` AND `wrangler.jsonc` vars already match the deployed URL | Skip redeploy |
 | 9 Admin | `SELECT COUNT(*) FROM user_role ur JOIN role r ON r.id=ur.role_id WHERE r.name='super_admin'` ≥ 1 | Don't prompt (explicit `--admin*` flags still run) |
 
@@ -148,7 +148,7 @@ Narrate the detection table (one line each: D1 / wrangler.jsonc / prior deploy /
 > First-time Cloudflare setup. I'll do all of this in one shot — interject only if you want different names.
 >
 > **Resources to create:** Worker `<name from wrangler.jsonc>`, D1 `<database_name>`
-> **Then:** push schema → seed RBAC → set secrets (AUTH_SECRET, CONFIG_ENCRYPTION_KEY, never shown) → ask for production URL → deploy (with confirmation) → fix baked URL if needed → optional admin setup.
+> **Then:** push schema → seed RBAC → prepare optional Skill release if this repo has one → set secrets (AUTH_SECRET, CONFIG_ENCRYPTION_KEY, never shown) → ask for production URL → deploy (with confirmation) → fix baked URL if needed → optional admin setup.
 >
 > Reply `ok` or `rename worker=X db=Y`.
 
@@ -302,11 +302,24 @@ Same two files but with the exact URL, plus:
 
 Warn: the zone must already exist in the account, else deploy fails with "not a zone in your account".
 
-## Phase 6: Deploy — Interruption #2 (the only confirmation)
+## Phase 6: Optional Skill release and deploy — Interruption #2 (the only confirmation)
+
+Ideart does not vendor the source project's private 122-Skill bundle by default. Only run the Skill release steps if this repository actually contains the release system (`package.json` scripts such as `skills:publish`/`skills:check-bundle`, `packages/agent-skills/`, and a compatible `docs/agent-skills-r2.md`).
+
+When present, the Worker reads prompt-only Agent Skills from a private R2 bucket. Use `<worker-name>-agent-skills` unless `wrangler.jsonc` already names an `AGENT_SKILLS` bucket:
+
+```bash
+npx wrangler r2 bucket create <worker-name>-agent-skills
+pnpm skills:publish -- --bucket=<worker-name>-agent-skills
+pnpm skills:check-bundle
+```
+
+The publish command must generate an immutable release, upload it to R2, verify it, and pin `vars.AGENT_SKILLS_RELEASE` in `wrangler.jsonc`. Bind the bucket as `AGENT_SKILLS`. Do not put Skill bodies in D1, Worker vars, public static assets, or the Worker bundle.
 
 > Ready to deploy `<worker>`:
 > - Account: `<name>` (`<id>`)
 > - D1: `<db>` (N migrations) · RBAC ✓ · Secrets: `<names>`
+> - Agent Skills: `<skipped>` or private R2 `<skills-bucket>` with pinned immutable release
 > - This creates a live URL and replaces any previous deployment. Proceed? (yes/no)
 
 On `yes`:
@@ -395,6 +408,7 @@ Just the `INSERT OR IGNORE ... SELECT` + verify from above. 0 rows → user hasn
 | 500 on every page | AUTH_SECRET unset/placeholder, or `vars.DATABASE_PROVIDER` ≠ `d1` | Phase 5.1 / 3.3 |
 | Sign-in 403 `Invalid origin` from a browser (curl works) | localhost URL baked into the bundle — `.env.local`/`.env.development` beat `.env.production` because `loadEnvFiles` doesn't overwrite existing keys and prefers `.env.local` | Deploy via `pnpm run cf:deploy` (sources `.env.production` first), ensure `wrangler.jsonc` `vars.VITE_APP_URL` is set; verify with `grep -o 'https://[^"]*' .output/server/_ssr/*.mjs \| head` |
 | `wrangler d1 migrations apply` finds no migrations | `migrations_dir` missing from the `d1_databases` entry | Set `"migrations_dir": "drizzle"` |
+| `/api/agent/skills` returns 503 | Optional Skill binding/release missing, or release was not published | Run `pnpm skills:publish -- --bucket=<skills-bucket>` if Ideart has enabled Skills, verify the `AGENT_SKILLS` binding, then redeploy |
 | Bundle > limit (3 MiB free / 10 MiB paid, gzip) | Heavy server deps | Paid plan, or dynamic-import heavy modules |
 | Image upload fails on Workers | No-storage local-disk fallback needs a filesystem | Configure R2 in admin → Settings → Storage |
 | drizzle-kit "Interactive prompts require a TTY" | Column-conflict resolution needed | User runs `pnpm db:generate` in their terminal once |
@@ -413,4 +427,5 @@ Just the `INSERT OR IGNORE ... SELECT` + verify from above. 0 rows → user hasn
 - Echo secret values (generate with openssl, pipe from env files, print names only)
 - Write secrets into `wrangler.jsonc` `vars` (vars are public)
 - Hand-edit generated files (`.output/**`, `.wrangler/**`)
+- Put optional Skill bodies in D1, Worker vars, static assets, or the Worker bundle
 - Make the user copy-paste routine wrangler/openssl/db commands — those are agent-executed

@@ -1,18 +1,22 @@
 import { createAgent } from '@codeany/open-agent-sdk';
 
-import { CORE_AGENT_GUARDRAILS } from '@/core/agent/guardrails';
-import { applyAgentPromptVariables } from '@/core/agent/prompt-config';
+import { buildAgentPrompt } from '@/core/agent/prompt-builder';
+import { promptByteLength } from '@/core/agent/prompt-config';
+import type { PreparedAgentTurn } from '@/core/agent/types';
 import { envConfigs } from '@/config';
 import { DEFAULT_AGENT_SYSTEM_PROMPT } from '@/config/agent';
-import { getAllConfigs, getConfigLatest } from '@/modules/config/service';
+import { getAllConfigs } from '@/modules/config/service';
 import type { AgentGenerationSettings } from '@/lib/agent-settings';
 import {
   normalizeAnthropicBaseUrl,
   normalizeOpenAIBaseUrl,
 } from '@/lib/llm-base-url';
 
-import { loadAgentHistory } from './history';
+import { loadAgentHistory, LONG_RUNNING_MEDIA_TOOL_NAMES } from './history';
+import { resolveAgentProfile } from './profile';
+import { buildSkillSystemPrompt, type PromptSkill } from './skills';
 import { createAgentTools } from './tools';
+import { assertTurnLeaseOwnership } from './turn-lease';
 
 // In-process runtime for the Ideart chat, replacing the remote
 // FastClaw runtime the Next.js version proxied to. Each request creates a
@@ -29,30 +33,10 @@ export interface AgentStreamEvent {
   data?: Record<string, unknown>;
 }
 
-const AGENT_SYSTEM_PROMPT_CONFIG_KEY = 'agent_system_prompt';
-const DEFAULT_TOOL_NAMES = [
-  'generate_image',
-  'generate_video',
-  'animate_image',
-] as const;
-
 export function buildAgentSystemPrompt(
-  settings: AgentGenerationSettings | undefined,
-  businessPrompt = DEFAULT_AGENT_SYSTEM_PROMPT,
-  toolNames: readonly string[] = DEFAULT_TOOL_NAMES
+  settings: AgentGenerationSettings | undefined
 ) {
-  const availableTools = [...toolNames].join(', ') || 'none';
-  const resolvedBusinessPrompt = applyAgentPromptVariables(businessPrompt, {
-    app_name: envConfigs.app_name,
-    agent_name: 'Ideart',
-    available_tools: availableTools,
-  });
-  return [
-    CORE_AGENT_GUARDRAILS,
-    resolvedBusinessPrompt,
-    `Effective tool policy:\n- Available tools for this turn: ${availableTools}.\n- No other tool is authorized.`,
-    mediaModeInstruction(settings),
-  ].join('\n\n');
+  return `${DEFAULT_AGENT_SYSTEM_PROMPT}\n\n${mediaModeInstruction(settings)}`;
 }
 
 export interface RunAgentTurnParams {
@@ -60,8 +44,10 @@ export interface RunAgentTurnParams {
   userId: string;
   message: string;
   persistedUserMessageId: string;
+  skill?: PromptSkill | null;
   settings?: AgentGenerationSettings;
   signal?: AbortSignal;
+  prepared?: PreparedAgentTurn;
 }
 
 type LlmProvider = 'openai' | 'anthropic';
@@ -72,6 +58,107 @@ export interface LlmSetup {
   baseURL?: string;
   apiType: 'openai-completions' | 'anthropic-messages';
   model: string;
+}
+
+export interface PrepareAgentTurnParams {
+  turnId: string;
+  sessionId: string;
+  userId: string;
+  message: string;
+  persistedUserMessageId?: string;
+  skill?: PromptSkill | null;
+  settings?: AgentGenerationSettings;
+  leaseOwner?: PreparedAgentTurn['leaseOwner'];
+}
+
+export async function prepareAgentTurn(
+  params: PrepareAgentTurnParams
+): Promise<PreparedAgentTurn> {
+  const tools = createAgentTools({
+    userId: params.userId,
+    sessionId: params.sessionId,
+    settings: params.settings,
+    skill: params.skill,
+    turnId: params.turnId,
+    requireTurnLease: Boolean(params.leaseOwner),
+  });
+  const toolNames = tools.map((tool) => tool.name);
+  if (new Set(toolNames).size !== toolNames.length) {
+    throw new Error('Agent tool names must be unique.');
+  }
+  const longRunningSet = new Set<string>(LONG_RUNNING_MEDIA_TOOL_NAMES);
+  const longRunningToolNames = toolNames.filter((name) =>
+    longRunningSet.has(name)
+  );
+  const [configs, profile, history] = await Promise.all([
+    getAllConfigs(),
+    resolveAgentProfile(),
+    loadAgentHistory(
+      params.sessionId,
+      params.userId,
+      params.persistedUserMessageId,
+      toolNames
+    ),
+  ]);
+  const llm = resolveLlm(configs);
+  if (!llm) {
+    throw new Error(
+      'The chat model is not configured: add an OpenAI or Anthropic API key under Admin Settings → AI.'
+    );
+  }
+  if (!llm.model) {
+    throw new Error(
+      'No chat model set: fill in Admin Settings → AI → Chat Model → Model (OpenAI-compatible endpoints have no safe default).'
+    );
+  }
+  const builtPrompt = await buildAgentPrompt({
+    appName: envConfigs.app_name,
+    agentName: profile.definition.name,
+    businessPrompt: profile.businessPrompt,
+    promptSource: profile.promptSource,
+    toolNames,
+    capabilityInstructions: mediaModeInstruction(params.settings),
+    skillPrompt: params.skill
+      ? buildSkillSystemPrompt(params.skill).trim()
+      : undefined,
+  });
+
+  console.info('[agent prompt] prepared', {
+    agentDefinitionId: profile.definition.id,
+    promptSource: builtPrompt.promptSource,
+    businessPromptHash: builtPrompt.businessPromptHash,
+    effectivePromptHash: builtPrompt.effectivePromptHash,
+    businessPromptBytes: promptByteLength(profile.businessPrompt),
+    effectivePromptBytes: promptByteLength(builtPrompt.systemPrompt),
+  });
+
+  return {
+    turnId: params.turnId,
+    definitionId: profile.definition.id,
+    settings: params.settings,
+    history,
+    systemPrompt: builtPrompt.systemPrompt,
+    userMessage: withGenerationSettings(params.message, params.settings),
+    tools,
+    llm,
+    maxTurns: profile.definition.maxTurns,
+    leaseOwner: params.leaseOwner,
+    audit: {
+      schemaVersion: 1,
+      kind: 'user',
+      turnId: params.turnId,
+      agentDefinitionId: profile.definition.id,
+      businessPromptHash: builtPrompt.businessPromptHash,
+      effectivePromptHash: builtPrompt.effectivePromptHash,
+      promptSource: builtPrompt.promptSource,
+      llmProvider: llm.provider,
+      llmModel: llm.model,
+      skillName: params.skill?.name ?? null,
+      skillReleaseId: params.skill?.releaseId ?? null,
+      toolNames,
+      longRunningToolNames,
+    },
+  };
 }
 
 /**
@@ -135,102 +222,57 @@ export async function* runAgentTurn(
     userId,
     message,
     persistedUserMessageId,
+    skill,
     settings,
     signal,
   } = params;
-
-  const configs = await getAllConfigs();
-  const llm = resolveLlm(configs);
-
-  if (!llm) {
-    yield {
-      type: 'error',
-      data: {
-        message:
-          'The chat model is not configured: add an OpenAI or Anthropic API key under Admin Settings → AI.',
-      },
-    };
-    yield { type: 'done' };
-    return;
-  }
-
-  if (!llm.model) {
-    yield {
-      type: 'error',
-      data: {
-        message:
-          'No chat model set: fill in Admin Settings → AI → Chat Model → Model (OpenAI-compatible endpoints have no safe default).',
-      },
-    };
-    yield { type: 'done' };
-    return;
-  }
-
-  let businessPrompt = DEFAULT_AGENT_SYSTEM_PROMPT;
+  let prepared: PreparedAgentTurn;
   try {
-    const configuredPrompt = await getConfigLatest(
-      AGENT_SYSTEM_PROMPT_CONFIG_KEY
-    );
-    if (configuredPrompt?.trim()) businessPrompt = configuredPrompt;
-  } catch (error) {
-    console.error('[agent prompt] latest read failed', error);
+    prepared =
+      params.prepared ??
+      (await prepareAgentTurn({
+        turnId: crypto.randomUUID(),
+        sessionId,
+        userId,
+        message,
+        persistedUserMessageId,
+        skill,
+        settings,
+      }));
+  } catch (error: any) {
     yield {
       type: 'error',
-      data: {
-        message: 'The Agent configuration is temporarily unavailable.',
-      },
+      data: { message: String(error?.message ?? error) },
     };
     yield { type: 'done' };
     return;
   }
 
-  // Stateless: the transcript comes from the database and goes back to it
-  // (the chat route persists each round), so the SDK never reads or writes
-  // session files — there's no disk to write to on Workers.
-  const history = await loadAgentHistory(
-    sessionId,
-    userId,
-    persistedUserMessageId
-  );
-
-  const tools = createAgentTools({ userId, sessionId, settings });
-  let systemPrompt: string;
-  try {
-    systemPrompt = buildAgentSystemPrompt(
-      settings,
-      businessPrompt,
-      tools.map((tool) => tool.name)
-    );
-  } catch (error) {
-    console.error('[agent prompt] invalid database override', error);
-    yield {
-      type: 'error',
-      data: { message: 'The configured Agent System Prompt is invalid.' },
-    };
-    yield { type: 'done' };
-    return;
+  if (prepared.leaseOwner) {
+    await assertTurnLeaseOwnership(prepared.leaseOwner);
   }
 
   const agent = createAgent({
-    model: llm.model,
-    apiKey: llm.apiKey,
-    baseURL: llm.baseURL,
-    apiType: llm.apiType,
+    model: prepared.llm.model,
+    apiKey: prepared.llm.apiKey,
+    baseURL: prepared.llm.baseURL,
+    apiType: prepared.llm.apiType,
     sessionId,
-    history,
+    history: prepared.history,
     persistSession: false,
-    systemPrompt,
-    tools,
-    maxTurns: 12,
+    systemPrompt: prepared.systemPrompt,
+    tools: [...prepared.tools],
+    maxTurns: prepared.maxTurns,
     permissionMode: 'bypassPermissions',
     abortSignal: signal,
   });
 
   try {
-    for await (const msg of agent.query(
-      withGenerationSettings(message, settings)
-    )) {
+    for await (const msg of agent.query(prepared.userMessage)) {
       if (signal?.aborted) break;
+      if (prepared.leaseOwner) {
+        await assertTurnLeaseOwnership(prepared.leaseOwner);
+      }
       switch (msg.type) {
         case 'assistant': {
           for (const block of msg.message.content) {

@@ -1,7 +1,5 @@
 import { describe, expect, it } from 'vitest';
 
-import { CORE_AGENT_GUARDRAILS } from '@/core/agent/guardrails';
-
 import { buildAgentSystemPrompt, withGenerationSettings } from './service';
 
 describe('agent generation instructions', () => {
@@ -34,20 +32,5 @@ describe('agent generation instructions', () => {
       'If the user explicitly requests an image result, call generate_image; otherwise answer without calling a tool.'
     );
     expect(message).not.toContain('You must call generate_image');
-  });
-
-  it('keeps code-owned guardrails around an editable business prompt', () => {
-    const prompt = buildAgentSystemPrompt(
-      undefined,
-      'You are {{agent_name}} for {{app_name}}. Tools: {{available_tools}}.',
-      ['generate_image']
-    );
-
-    expect(prompt.startsWith(CORE_AGENT_GUARDRAILS)).toBe(true);
-    expect(prompt).toContain(
-      'You are Ideart for Ideart. Tools: generate_image.'
-    );
-    expect(prompt).toContain('Available tools for this turn: generate_image.');
-    expect(prompt).toContain('No other tool is authorized.');
   });
 });

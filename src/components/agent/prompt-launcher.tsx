@@ -16,6 +16,7 @@ import {
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
 import { useComposerSettings } from '@/hooks/use-composer-settings';
+import { useComposerSkill } from '@/hooks/use-composer-skill';
 import {
   ChatComposer,
   type LibraryMedia,
@@ -62,6 +63,7 @@ export function PromptLauncher({ className }: { className?: string }) {
   const [value, setValue] = useState('');
   const [attachments, setAttachments] = useState<PendingAttachment[]>([]);
   const [composerSettings, setComposerSettings] = useComposerSettings();
+  const [skillName, setSkillName] = useComposerSkill();
   const [submitting, setSubmitting] = useState(false);
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
 
@@ -369,6 +371,7 @@ export function PromptLauncher({ className }: { className?: string }) {
         JSON.stringify({
           prompt,
           settings: composerSettings,
+          skillName,
           attachments: attachments
             .filter((item) => item.status === 'uploaded' && item.url)
             .map((item) => ({ ...item, preview: item.url })),
@@ -399,6 +402,8 @@ export function PromptLauncher({ className }: { className?: string }) {
         onRemoveAttachment={removeAttachment}
         settings={composerSettings}
         onSettingsChange={setComposerSettings}
+        skillName={skillName}
+        onSkillNameChange={setSkillName}
         disabled={submitting}
         submitDisabled={(!value.trim() && !hasUploaded) || uploading}
       />

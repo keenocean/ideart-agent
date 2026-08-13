@@ -239,6 +239,7 @@ export interface ChatHistoryData {
 export interface InitialTurnPayload {
   prompt?: string;
   settings?: AgentComposerSettings;
+  skillName?: string;
   /** Media already uploaded or selected by the landing composer. */
   attachments?: PendingAttachment[];
 }

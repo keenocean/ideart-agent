@@ -1,13 +1,19 @@
 import { describe, expect, it } from 'vitest';
 
+import type { AgentMessageMetadata } from '@/core/agent/types';
 import type { StoredPart } from '@/modules/chats/service';
 
-import { mapRowsToHistory } from './history';
+import { completeInterruptedMediaCalls, mapRowsToHistory } from './history';
 
 // The runtime is stateless: every turn replays the conversation from these
 // rows. If the mapping drops a tool call or detaches it from its result, the
 // model either forgets what it just did or the provider rejects the request.
-type Row = { role: 'user' | 'assistant'; parts: StoredPart[] };
+type Row = {
+  id?: string;
+  role: 'user' | 'assistant';
+  parts: StoredPart[];
+  metadata?: AgentMessageMetadata | null;
+};
 
 const text = (t: string): StoredPart => ({ type: 'text', text: t });
 const call = (
@@ -16,6 +22,47 @@ const call = (
   args: string,
   result?: string
 ): StoredPart => ({ type: 'tool_call', id, name, arguments: args, result });
+
+const userAudit: AgentMessageMetadata = {
+  schemaVersion: 1,
+  kind: 'user',
+  turnId: 'turn-1',
+  agentDefinitionId: 'primary',
+  businessPromptHash: 'business-hash',
+  effectivePromptHash: 'effective-hash',
+  promptSource: 'default',
+  llmProvider: 'openai',
+  llmModel: 'model-1',
+  skillName: null,
+  skillReleaseId: null,
+  toolNames: ['generate_image'],
+  longRunningToolNames: ['generate_image'],
+};
+
+const assistantAudit: AgentMessageMetadata = {
+  schemaVersion: 1,
+  kind: 'assistant',
+  turnId: 'turn-1',
+  parentUserMessageId: 'user-1',
+  roundIndex: 0,
+};
+
+function linkedToolRows(parts: StoredPart[]): Row[] {
+  return [
+    {
+      id: 'user-1',
+      role: 'user',
+      parts: [text('draw a cat')],
+      metadata: userAudit,
+    },
+    {
+      id: 'assistant-1',
+      role: 'assistant',
+      parts,
+      metadata: assistantAudit,
+    },
+  ];
+}
 
 describe('mapRowsToHistory', () => {
   it('carries a plain exchange through in order', () => {
@@ -50,18 +97,12 @@ describe('mapRowsToHistory', () => {
   });
 
   it('splits a tool call into tool_use and a following tool_result', () => {
-    const rows: Row[] = [
-      { role: 'user', parts: [text('draw a cat')] },
-      {
-        role: 'assistant',
-        parts: [
-          text('on it'),
-          call('c1', 'generate_image', '{"prompt":"a cat"}', '{"files":["a"]}'),
-        ],
-      },
-    ];
+    const rows = linkedToolRows([
+      text('on it'),
+      call('c1', 'generate_image', '{"prompt":"a cat"}', '{"files":["a"]}'),
+    ]);
 
-    const history = mapRowsToHistory(rows);
+    const history = mapRowsToHistory(rows, undefined, ['generate_image']);
 
     expect(history).toHaveLength(3);
     expect(history[1]).toEqual({
@@ -87,10 +128,11 @@ describe('mapRowsToHistory', () => {
   });
 
   it('marks a call that never got a result as an error', () => {
-    const rows: Row[] = [
-      { role: 'assistant', parts: [call('c1', 'generate_image', '{}')] },
-    ];
-    const [, result] = mapRowsToHistory(rows);
+    const rows = linkedToolRows([call('c1', 'generate_image', '{}')]);
+    const [, assistant, result] = mapRowsToHistory(rows, undefined, [
+      'generate_image',
+    ]);
+    expect(assistant.role).toBe('assistant');
     // Leaving it out would strand the tool_use; leaving it blank would let the
     // model believe the call succeeded.
     expect(result).toEqual({
@@ -99,7 +141,7 @@ describe('mapRowsToHistory', () => {
         {
           type: 'tool_result',
           tool_use_id: 'c1',
-          content: 'No result recorded.',
+          content: expect.stringContaining('"status":"interrupted"'),
           is_error: true,
         },
       ],
@@ -107,16 +149,13 @@ describe('mapRowsToHistory', () => {
   });
 
   it('keeps several calls in one turn together, results in step', () => {
-    const rows: Row[] = [
-      {
-        role: 'assistant',
-        parts: [
-          call('c1', 'generate_image', '{"prompt":"a"}', 'ok-a'),
-          call('c2', 'generate_image', '{"prompt":"b"}', 'ok-b'),
-        ],
-      },
-    ];
-    const [assistant, results] = mapRowsToHistory(rows);
+    const rows = linkedToolRows([
+      call('c1', 'generate_image', '{"prompt":"a"}', 'ok-a'),
+      call('c2', 'generate_image', '{"prompt":"b"}', 'ok-b'),
+    ]);
+    const [, assistant, results] = mapRowsToHistory(rows, undefined, [
+      'generate_image',
+    ]);
     expect((assistant.content as unknown[]).length).toBe(2);
     expect(results.content).toEqual([
       { type: 'tool_result', tool_use_id: 'c1', content: 'ok-a' },
@@ -125,13 +164,8 @@ describe('mapRowsToHistory', () => {
   });
 
   it('survives arguments that are not valid JSON', () => {
-    const rows: Row[] = [
-      {
-        role: 'assistant',
-        parts: [call('c1', 'generate_image', '{oops', 'r')],
-      },
-    ];
-    const [assistant] = mapRowsToHistory(rows);
+    const rows = linkedToolRows([call('c1', 'generate_image', '{oops', 'r')]);
+    const [, assistant] = mapRowsToHistory(rows, undefined, ['generate_image']);
     // An empty object still lets the turn replay; throwing would lose the
     // whole conversation over one malformed row.
     expect((assistant.content as Array<{ input: unknown }>)[0].input).toEqual(
@@ -145,5 +179,97 @@ describe('mapRowsToHistory', () => {
       { role: 'assistant', parts: [text('')] },
     ];
     expect(mapRowsToHistory(rows)).toEqual([]);
+  });
+
+  it('downgrades a completed legacy tool call to bounded text', () => {
+    const hugeResult = 'x'.repeat(10_000);
+    const history = mapRowsToHistory(
+      [
+        {
+          role: 'assistant',
+          parts: [call('c1', 'legacy_tool', '{}', hugeResult)],
+        },
+      ],
+      undefined,
+      ['legacy_tool']
+    );
+
+    expect(history).toHaveLength(1);
+    const content = history[0].content as Array<{ type: string; text: string }>;
+    expect(content[0].type).toBe('text');
+    expect(content[0].text).toContain('Historical tool record: legacy_tool');
+    expect(content[0].text.length).toBeLessThanOrEqual(2_000);
+  });
+
+  it('fails closed for a broken parent link or duplicate round', () => {
+    const rows = linkedToolRows([call('c1', 'generate_image', '{}', 'ok')]);
+    rows.push({
+      id: 'assistant-duplicate',
+      role: 'assistant',
+      parts: [call('c2', 'generate_image', '{}', 'ok')],
+      metadata: assistantAudit,
+    });
+
+    const history = mapRowsToHistory(rows, undefined, ['generate_image']);
+    expect(JSON.stringify(history)).not.toContain('"type":"tool_use"');
+    expect(JSON.stringify(history)).toContain('Historical tool record');
+  });
+
+  it('fails closed when a previously authorized tool is not registered now', () => {
+    const history = mapRowsToHistory(
+      linkedToolRows([call('c1', 'generate_image', '{}', 'ok')]),
+      undefined,
+      []
+    );
+    expect(JSON.stringify(history)).not.toContain('"type":"tool_use"');
+  });
+
+  it('never exposes audit metadata as model-visible history content', () => {
+    const history = mapRowsToHistory(
+      linkedToolRows([call('c1', 'generate_image', '{}', 'ok')]),
+      undefined,
+      ['generate_image']
+    );
+    const serialized = JSON.stringify(history);
+    expect(serialized).not.toContain('business-hash');
+    expect(serialized).not.toContain('effective-hash');
+    expect(serialized).not.toContain('turn-1');
+  });
+});
+
+describe('completeInterruptedMediaCalls', () => {
+  it.each(['generate_image', 'generate_video', 'animate_image'])(
+    'terminates an unfinished %s call when no task is active',
+    (name) => {
+      const [part] = completeInterruptedMediaCalls(
+        [call('c1', name, '{}')],
+        false
+      );
+
+      expect(part).toMatchObject({
+        type: 'tool_call',
+        name,
+      });
+      expect(
+        JSON.parse(
+          (part as Extract<StoredPart, { type: 'tool_call' }>).result ?? '{}'
+        )
+      ).toMatchObject({ status: 'interrupted' });
+    }
+  );
+
+  it('preserves unfinished calls while a durable task is active', () => {
+    const parts = [call('c1', 'generate_image', '{}')];
+    expect(completeInterruptedMediaCalls(parts, true)).toBe(parts);
+  });
+
+  it('terminates unknown legacy calls instead of leaving a spinner dangling', () => {
+    const parts = [call('c1', 'future_tool', '{}')];
+    const [completed] = completeInterruptedMediaCalls(parts, false);
+    expect(completed).toMatchObject({
+      type: 'tool_call',
+      name: 'future_tool',
+      result: expect.stringContaining('"status":"interrupted"'),
+    });
   });
 });

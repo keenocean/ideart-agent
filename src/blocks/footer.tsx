@@ -19,11 +19,13 @@ export function Footer() {
     {
       title: m['landing.footer.products'](),
       links: [
-        // Sibling products, not this one — a footer that links to the site
-        // you are already on is just noise.
-        { label: 'ShipAny', href: 'https://shipany.ai' },
-        { label: 'ImgAny', href: 'https://imgany.ai' },
+        { label: m['landing.nav.create'](), href: '/chat' },
+        { label: m['landing.footer.gallery'](), href: '/library' },
       ],
+    },
+    {
+      title: m['landing.footer.resources'](),
+      links: [{ label: m['landing.footer.blog'](), href: '/blog' }],
     },
     {
       title: m['landing.footer.legal'](),

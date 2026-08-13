@@ -137,7 +137,7 @@ describe('image generation catalog', () => {
 });
 
 describe('composer model capabilities', () => {
-  it('lists the current Ideart catalog in order', () => {
+  it('lists the current media catalog in order', () => {
     expect(AGENT_MODEL_OPTIONS.map((option) => option.label)).toEqual([
       'MiniMax H3',
       'Seedance 2.5',

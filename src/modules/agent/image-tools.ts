@@ -28,6 +28,7 @@ import {
 } from './image-provider';
 import { resolveReferenceImage } from './media';
 import { summarizeProviderError } from './provider-error';
+import { assertTurnLeaseOwnership } from './turn-lease';
 
 const IMAGE_POLL_INTERVAL_MS = 2000;
 const IMAGE_POLL_TIMEOUT_MS = 180_000;
@@ -39,6 +40,8 @@ class ImageRedirectError extends Error {}
 interface ImageToolContext {
   userId: string;
   sessionId: string;
+  turnId?: string;
+  requireTurnLease?: boolean;
   settings?: AgentGenerationSettings;
 }
 
@@ -330,6 +333,7 @@ async function runImageGeneration(params: {
         ...normalizedOptions,
         providerModel: model,
         sessionId: ctx.sessionId,
+        ...(ctx.turnId ? { turnId: ctx.turnId } : {}),
       },
     });
   } catch (error: any) {
@@ -346,6 +350,13 @@ async function runImageGeneration(params: {
   const provider = createImageProvider(selectedProvider, configs);
   let providerTaskId = '';
   try {
+    if (ctx.requireTurnLease && ctx.turnId) {
+      await assertTurnLeaseOwnership({
+        chatId: ctx.sessionId,
+        userId: ctx.userId,
+        turnId: ctx.turnId,
+      });
+    }
     const created = await provider.generate({
       params: {
         mediaType: AIMediaType.IMAGE,

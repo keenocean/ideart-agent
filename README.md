@@ -26,7 +26,7 @@ Around that loop:
   maps it to the generation tool's parameters.
 - **Video Lite-compatible composer** — MiniMax H3 and Seedance 2.5 expose the
   same duration, resolution, aspect-ratio, provider model mapping, and example
-  behavior as `shipany-video-lite`.
+  behavior expected by Ideart's public workbench and chat UI.
 - **Living showcase** — examples use a responsive masonry layout, load and
   autoplay only near the viewport, and open in a full-screen preview with
   “Use this prompt” and “Use as reference” actions.
@@ -67,6 +67,12 @@ correct active/interrupted state and cancel a provider task after navigation
 or reconnection. If you need renders to survive server process restarts and
 continue without an open request, move the same polling service behind a queue
 or workflow runner.
+
+The database schema includes `agent_turn_lease` for lease-aware Agent turns.
+When the runtime lease code is enabled, deploy it only after the reviewed
+migration has been applied and existing long-running requests have drained.
+See [docs/agent-template.md](docs/agent-template.md) for the Prompt, audit,
+history, and Turn concurrency contract.
 
 ## Quick start
 
@@ -183,6 +189,10 @@ pnpm db:generate                                        # writes drizzle/
 npx wrangler d1 migrations apply <your-db-name> --remote
 ```
 
+Review generated SQL before applying it. The checked-in D1/SQLite migrations
+are not portable to PostgreSQL or MySQL; regenerate and review migrations under
+the chosen provider before applying them there.
+
 ### 4. Seed roles and permissions
 
 `rbac:init` talks to a database over libsql, which can't reach remote D1. Run
@@ -242,6 +252,11 @@ pnpm cf:deploy
 That sources `.env.production`, builds with the Cloudflare preset, and runs
 `wrangler deploy`.
 
+If this project later adds a private Agent Skills release system, publish and
+verify the release before `pnpm cf:deploy`, pin `AGENT_SKILLS_RELEASE` in
+`wrangler.jsonc`, and bind the private R2 bucket as `AGENT_SKILLS`. Ideart does
+not vendor the source project's private 122-Skill bundle by default.
+
 ### 8. Admin account
 
 Sign up through the site, then grant yourself the role:
@@ -285,6 +300,9 @@ is still required for generated media.
 | `pnpm db:migrate`  | Apply pending migrations                   |
 | `pnpm db:studio`   | Drizzle Studio                             |
 | `pnpm rbac:init`   | Seed roles and permissions, optional admin |
+
+Optional Skill release scripts, when present in a future Ideart build, should
+run before `pnpm cf:deploy` so the Worker points at an immutable R2 release.
 
 ## Structure
 

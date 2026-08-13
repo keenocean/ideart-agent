@@ -20,6 +20,9 @@
     // sync with .env.production (better-auth trustedOrigins, payment callbacks).
     "VITE_APP_URL": "https://<worker>.<your-subdomain>.workers.dev",
     "VITE_APP_NAME": "Ideart",
+    // Immutable content hash printed by `pnpm skills:build`. Publish it to
+    // the private bucket with `pnpm skills:publish -- --bucket=<name>`.
+    "AGENT_SKILLS_RELEASE": "REPLACE_WITH_OUTPUT_OF_PNPM_SKILLS_BUILD",
   },
   "d1_databases": [
     {
@@ -27,6 +30,14 @@
       "database_name": "ideart-agent-db",
       "database_id": "REPLACE_WITH_OUTPUT_OF_WRANGLER_D1_CREATE",
       "migrations_dir": "drizzle",
+    },
+  ],
+  // Dedicated private content store for Agent Skills. Keep it separate from
+  // the admin-configured bucket used for generated user media.
+  "r2_buckets": [
+    {
+      "binding": "AGENT_SKILLS",
+      "bucket_name": "REPLACE_WITH_AGENT_SKILLS_BUCKET_NAME",
     },
   ],
   // ── Postgres via Hyperdrive (instead of D1) ────────────────────────────────
@@ -40,5 +51,5 @@
   //
   // Other optional bindings — uncomment when needed:
   // "kv_namespaces":  [{ "binding": "CACHE",  "id": "..." }],
-  // "r2_buckets":     [{ "binding": "BUCKET", "bucket_name": "..." }]
+  // Add other R2 buckets with distinct binding names when needed.
 }

@@ -36,6 +36,24 @@ describe('createAgentTools', () => {
     ).toEqual(['generate_video', 'animate_image']);
   });
 
+  it('keeps the selected Skill reader alongside the medium tools', () => {
+    expect(
+      createAgentTools({
+        userId: 'user-1',
+        sessionId: 'session-1',
+        settings: { mediaMode: 'image' },
+        skill: {
+          name: 'cinematic-skill',
+          title: 'Cinematic',
+          summary: 'Cinematic direction',
+          instructions: 'Use deliberate framing.',
+          references: {},
+          releaseId: 'release-1',
+        },
+      }).map((tool) => tool.name)
+    ).toEqual(['read_skill_resource', 'generate_image']);
+  });
+
   it('does not execute another generation after a same-turn failure', async () => {
     let calls = 0;
     const [tool] = guardGenerationRetries([

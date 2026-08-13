@@ -1,5 +1,7 @@
 import { and, asc, count, desc, eq, like, lt, or } from 'drizzle-orm';
 
+import { decodeAgentMessageMetadata } from '@/core/agent/metadata';
+import type { AgentMessageMetadata } from '@/core/agent/types';
 import { db } from '@/core/db';
 import {
   chat,
@@ -46,6 +48,10 @@ function decodeParts(raw: string | null): StoredPart[] {
   } catch {
     return [];
   }
+}
+
+function encodeMetadata(metadata: AgentMessageMetadata | undefined) {
+  return metadata ? JSON.stringify(metadata) : null;
 }
 
 /** First non-empty text part — used as a preview snippet for the chat list. */
@@ -96,6 +102,18 @@ export async function findChat(
   return row;
 }
 
+/** Ownership probe used before acquiring a lease for a client-supplied id. */
+export async function findChatOwnerId(
+  chatId: string
+): Promise<string | undefined> {
+  const [row] = await db()
+    .select({ userId: chat.userId })
+    .from(chat)
+    .where(eq(chat.id, chatId))
+    .limit(1);
+  return row?.userId;
+}
+
 interface EnsureChatParams {
   chatId: string;
   userId: string;
@@ -135,6 +153,9 @@ interface AppendMessageParams {
   userId: string;
   role: 'user' | 'assistant';
   parts: StoredPart[];
+  metadata?: AgentMessageMetadata;
+  model?: string;
+  provider?: string;
 }
 
 /**
@@ -155,14 +176,19 @@ export async function appendMessage(
       status: CHAT_STATUS_ACTIVE,
       role: params.role,
       parts: encodeParts(params.parts),
-      model: DEFAULT_MODEL,
-      provider: DEFAULT_PROVIDER,
+      metadata: encodeMetadata(params.metadata),
+      model: params.model ?? DEFAULT_MODEL,
+      provider: params.provider ?? DEFAULT_PROVIDER,
     })
     .returning();
 
   await db()
     .update(chat)
-    .set({ updatedAt: new Date() })
+    .set({
+      updatedAt: new Date(),
+      ...(params.model ? { model: params.model } : {}),
+      ...(params.provider ? { provider: params.provider } : {}),
+    })
     .where(and(eq(chat.id, params.chatId), eq(chat.userId, params.userId)));
 
   return row;
@@ -174,7 +200,8 @@ export async function appendMessage(
  */
 export async function cancelPendingToolCalls(
   chatId: string,
-  userId: string
+  userId: string,
+  turnId?: string
 ): Promise<number> {
   const rows = await db()
     .select()
@@ -195,6 +222,12 @@ export async function cancelPendingToolCalls(
   let count = 0;
 
   for (const row of rows) {
+    const metadata = decodeAgentMessageMetadata(row.metadata);
+    if (turnId !== undefined) {
+      if (metadata?.kind !== 'assistant' || metadata.turnId !== turnId) {
+        continue;
+      }
+    }
     const parts = decodeParts(row.parts);
     let changed = false;
     const next = parts.map((part) => {
@@ -488,6 +521,9 @@ export interface ChatWithMessages {
     id: string;
     role: 'user' | 'assistant';
     parts: StoredPart[];
+    metadata: AgentMessageMetadata | null;
+    model: string;
+    provider: string;
     createdAt: Date;
   }>;
 }
@@ -521,6 +557,9 @@ export async function getChatWithMessages(
       id: r.id,
       role: r.role === 'user' ? 'user' : 'assistant',
       parts: decodeParts(r.parts),
+      metadata: decodeAgentMessageMetadata(r.metadata),
+      model: r.model,
+      provider: r.provider,
       createdAt: r.createdAt,
     })),
   };
@@ -638,6 +677,9 @@ export async function getChatForAdmin(
       id: r.id,
       role: r.role === 'user' ? ('user' as const) : ('assistant' as const),
       parts: decodeParts(r.parts),
+      metadata: decodeAgentMessageMetadata(r.metadata),
+      model: r.model,
+      provider: r.provider,
       createdAt: r.createdAt,
     })),
   };

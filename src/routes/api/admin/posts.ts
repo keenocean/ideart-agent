@@ -4,6 +4,20 @@ import { getAuth } from '@/core/auth';
 import * as postsService from '@/modules/posts/service';
 import { hasPermission } from '@/modules/rbac/service';
 import { respData, respErr, respOk, respPage } from '@/lib/resp';
+import { baseLocale, locales } from '@/paraglide/runtime.js';
+
+const POST_STATUSES = new Set(Object.values(postsService.PostStatus));
+
+function isValidLocale(locale: unknown): locale is (typeof locales)[number] {
+  return (
+    typeof locale === 'string' &&
+    locales.includes(locale as (typeof locales)[number])
+  );
+}
+
+function isValidStoredLocale(locale: unknown): locale is string {
+  return locale === '' || isValidLocale(locale);
+}
 
 async function checkAdmin(request: Request) {
   const auth = getAuth();
@@ -34,10 +48,13 @@ async function GET({ request }: { request: Request }) {
     );
     const search = searchParams.get('search') || undefined;
     const status = searchParams.get('status') || undefined;
+    const localeParam = searchParams.get('locale');
+    const locale = isValidLocale(localeParam) ? localeParam : undefined;
 
     const { items, total } = await postsService.list({
       search,
       status,
+      locale,
       page,
       pageSize,
     });
@@ -52,6 +69,7 @@ async function POST({ request }: { request: Request }) {
     const session = await checkAdmin(request);
     const {
       slug,
+      locale = baseLocale,
       title,
       description,
       image,
@@ -61,9 +79,17 @@ async function POST({ request }: { request: Request }) {
       status,
     } = await request.json();
     if (!slug || !title) return respErr('slug and title are required');
+    if (!postsService.isValidPostSlug(slug)) {
+      return respErr(
+        'Invalid slug: use lowercase letters, numbers, and single hyphens'
+      );
+    }
+    if (!isValidStoredLocale(locale)) return respErr('Invalid locale');
+    if (status && !POST_STATUSES.has(status)) return respErr('Invalid status');
     const result = await postsService.create({
       userId: session.user.id,
       slug,
+      locale,
       title,
       description,
       image,
@@ -84,6 +110,7 @@ async function PUT({ request }: { request: Request }) {
     const {
       id,
       slug,
+      locale,
       title,
       description,
       image,
@@ -93,8 +120,18 @@ async function PUT({ request }: { request: Request }) {
       status,
     } = await request.json();
     if (!id) return respErr('ID is required');
+    if (slug !== undefined && !postsService.isValidPostSlug(slug)) {
+      return respErr(
+        'Invalid slug: use lowercase letters, numbers, and single hyphens'
+      );
+    }
+    if (locale !== undefined && !isValidStoredLocale(locale)) {
+      return respErr('Invalid locale');
+    }
+    if (status && !POST_STATUSES.has(status)) return respErr('Invalid status');
     const result = await postsService.update(id, {
       slug,
+      locale,
       title,
       description,
       image,

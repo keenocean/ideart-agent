@@ -1,14 +1,13 @@
 // Server-side markdown renderer for database-backed posts.
-// Local MDX posts render through mdx-components.tsx instead — the
-// wrapper classes below mirror those styles so both sources look alike.
 import MarkdownIt from 'markdown-it';
 
 import { cn } from '@/lib/utils';
 
 function generateHeadingId(text: string): string {
   return text
+    .normalize('NFKC')
     .toLowerCase()
-    .replace(/[^\w\s-]/g, '')
+    .replace(/[^\p{Letter}\p{Number}\s-]/gu, '')
     .replace(/\s+/g, '-')
     .replace(/(^-|-$)/g, '');
 }
@@ -21,8 +20,12 @@ const md = new MarkdownIt({
 // Headings get stable IDs so in-content anchors work
 md.renderer.rules.heading_open = function (tokens, idx) {
   const token = tokens[idx];
-  const level = token.markup.length;
+  const level = Math.max(2, token.markup.length);
   const nextToken = tokens[idx + 1];
+  const closingToken = tokens[idx + 2];
+
+  token.tag = `h${level}`;
+  if (closingToken?.type === 'heading_close') closingToken.tag = `h${level}`;
 
   if (nextToken && nextToken.type === 'inline') {
     return `<h${level} id="${generateHeadingId(nextToken.content)}">`;
@@ -30,12 +33,12 @@ md.renderer.rules.heading_open = function (tokens, idx) {
   return `<h${level}>`;
 };
 
-// External links open in a new tab with nofollow
+// External links open safely without suppressing trusted editorial citations.
 md.renderer.rules.link_open = function (tokens, idx, options, _env, renderer) {
   const token = tokens[idx];
   const href = token.attrGet('href');
   if (href && (href.startsWith('http://') || href.startsWith('https://'))) {
-    token.attrSet('rel', 'nofollow noopener');
+    token.attrSet('rel', 'noopener');
     token.attrSet('target', '_blank');
   }
   return renderer.renderToken(tokens, idx, options);

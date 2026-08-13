@@ -1,6 +1,7 @@
 import { Calendar } from 'lucide-react';
 
 import { Link } from '@/core/i18n/navigation';
+import type { BlogCategory } from '@/content/posts';
 
 export type BlogCardProps = {
   href: string;
@@ -10,6 +11,7 @@ export type BlogCardProps = {
   date?: string;
   authorName?: string;
   authorImage?: string;
+  categories?: BlogCategory[];
 };
 
 export function BlogCard({
@@ -20,6 +22,7 @@ export function BlogCard({
   date,
   authorName,
   authorImage,
+  categories = [],
 }: BlogCardProps) {
   return (
     <Link
@@ -37,6 +40,18 @@ export function BlogCard({
         />
       )}
       <div className="flex flex-1 flex-col gap-3 p-6">
+        {categories.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {categories.map((category) => (
+              <span
+                key={category.slug}
+                className="bg-muted text-muted-foreground rounded-full px-2.5 py-1 text-[11px] font-medium"
+              >
+                {category.title}
+              </span>
+            ))}
+          </div>
+        )}
         <h3 className="leading-snug font-medium group-hover:underline group-hover:underline-offset-4">
           {title}
         </h3>

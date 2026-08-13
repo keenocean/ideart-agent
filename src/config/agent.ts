@@ -1,3 +1,7 @@
+import { createServerOnlyFn } from '@tanstack/react-start';
+
+import type { AgentDefinition } from '@/core/agent/types';
+
 export const DEFAULT_AGENT_SYSTEM_PROMPT = `You are Ideart, an AI image-and-video generation assistant. You help users create still images and video clips through conversation.
 
 Rules:
@@ -17,3 +21,15 @@ Rules:
 - After generate_image returns files, the chat already shows the image. Reference it as a markdown image, e.g. ![image](<url>), without pasting a raw URL.
 - After a video tool returns files, the chat already shows the clip with a player. Reference it as a markdown link, e.g. [clip](<url>), and never embed a video URL as a markdown image.
 - If a generation tool returns an error, do not retry it in the same turn. Explain it briefly and suggest what the user can do. Never invent file paths.`;
+
+const AGENT_DEFINITION: AgentDefinition = {
+  id: 'primary',
+  name: 'Ideart',
+  defaultSystemPrompt: DEFAULT_AGENT_SYSTEM_PROMPT,
+  maxTurns: 12,
+};
+
+/** Build-time boundary prevents project Prompt content from entering clients. */
+export const getAgentDefinition = createServerOnlyFn(
+  (): AgentDefinition => AGENT_DEFINITION
+);
