@@ -35,9 +35,15 @@ import {
   type VideoProviderName,
 } from '@/lib/agent-settings';
 
-// Tools Ideart can call. They are the ONLY tools the agent gets:
+import { createImageTool } from './image-tools';
+import { resolveReferenceImage } from './media';
+import { summarizeProviderError } from './provider-error';
+
+export { resolveReferenceImage } from './media';
+
+// Media tools Ideart can call. They are the ONLY tools the agent gets:
 // no filesystem/bash base tools — so the agent loop can't touch anything
-// outside video generation.
+// outside image and video generation.
 
 export interface AgentToolContext {
   userId: string;
@@ -63,40 +69,6 @@ function sleep(ms: number, signal?: AbortSignal): Promise<void> {
       { once: true }
     );
   });
-}
-
-/**
- * Reference media arrives as public URLs (uploads and examples both
- * live in object storage) or as data URIs. Anything else can't be read from a
- * Worker, so it's rejected instead of silently failing upstream.
- */
-export function resolveReferenceImage(src: string): string {
-  const value = src.trim();
-  if (value.startsWith('data:')) return value;
-  if (/^https?:\/\//i.test(value)) {
-    let hostname: string;
-    try {
-      hostname = new URL(value).hostname.toLowerCase();
-    } catch {
-      throw new Error(`unsupported image reference: ${src}`);
-    }
-    if (
-      hostname === 'localhost' ||
-      hostname.endsWith('.localhost') ||
-      hostname === '0.0.0.0' ||
-      hostname === '::1' ||
-      hostname === '[::1]' ||
-      /^127(?:\.\d{1,3}){3}$/.test(hostname)
-    ) {
-      throw new Error(`unsupported image reference: ${src}`);
-    }
-    return value;
-  }
-  // Site-relative and localhost URLs must be copied to public storage by the
-  // composer first. Converting them to app_url here only hides the problem in
-  // local development and lets the provider fail later with a 422 download
-  // error.
-  throw new Error(`unsupported image reference: ${src}`);
 }
 
 function extFromUrl(url: string): string {
@@ -212,7 +184,7 @@ function createVideoProvider(
  * Stop durable provider jobs for a chat. This works after refresh because the
  * chat id and upstream task id live in `ai_task`, not only in browser memory.
  */
-export async function cancelVideoGenerationsForSession(params: {
+export async function cancelGenerationsForSession(params: {
   userId: string;
   sessionId: string;
 }): Promise<{ canceled: number; upstreamCanceled: number }> {
@@ -241,14 +213,15 @@ export async function cancelVideoGenerationsForSession(params: {
       await provider.cancel({
         taskId: task.taskId,
         model: task.model,
-        mediaType: AIMediaType.VIDEO,
+        mediaType:
+          task.mediaType === 'image' ? AIMediaType.IMAGE : AIMediaType.VIDEO,
       });
       upstreamCanceled += 1;
     } catch (error) {
       // The local task is still canceled and refunded. Some providers cannot
       // interrupt a job that crossed from queued to completed concurrently.
       console.error(
-        `failed to cancel ${providerName} video task ${task.taskId}:`,
+        `failed to cancel ${providerName} ${task.mediaType} task ${task.taskId}:`,
         error
       );
     }
@@ -515,49 +488,6 @@ async function runVideoGeneration(params: {
       message: summarizeProviderError(raw),
     });
   }
-}
-
-/**
- * Providers report failures by pasting the upstream response body into their
- * error message, which drags in the echoed request (prompt, image sizes, even
- * `openai_api_key: null`). Pull out the sentence a human needs — fal's
- * `detail[].msg`, an OpenAI-style `error.message`, or a plain `detail` — and
- * keep the prefix that says who failed and with what status.
- */
-function summarizeProviderError(message: string): string {
-  const start = message.search(/[[{]/);
-  if (start === -1) return truncate(message);
-
-  const prefix = message
-    .slice(0, start)
-    .trim()
-    .replace(/[:\s]+$/, '');
-  let payload: any;
-  try {
-    payload = JSON.parse(message.slice(start));
-  } catch {
-    return truncate(message);
-  }
-
-  const detail = payload?.detail ?? payload;
-  const first = Array.isArray(detail) ? detail[0] : detail;
-  const summary =
-    (typeof first?.msg === 'string' && first.msg) ||
-    (typeof first?.message === 'string' && first.message) ||
-    (typeof payload?.error?.message === 'string' && payload.error.message) ||
-    (typeof detail === 'string' && detail) ||
-    '';
-  if (!summary) return truncate(message);
-
-  const type = typeof first?.type === 'string' ? ` (${first.type})` : '';
-  return truncate(
-    prefix ? `${prefix}: ${summary}${type}` : `${summary}${type}`
-  );
-}
-
-function truncate(value: string, max = 300): string {
-  const trimmed = value.trim();
-  return trimmed.length > max ? `${trimmed.slice(0, max)}…` : trimmed;
 }
 
 /**
@@ -1000,5 +930,5 @@ export function createAgentTools(ctx: AgentToolContext): ToolDefinition[] {
     },
   });
 
-  return [generateVideo, animateImage];
+  return [createImageTool(ctx), generateVideo, animateImage];
 }

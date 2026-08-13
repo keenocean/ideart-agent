@@ -1,13 +1,20 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  AGENT_IMAGE_MODEL_OPTIONS,
   AGENT_MODEL_OPTIONS,
   aspectRatiosForModel,
   creditsForGeneration,
+  creditsForImageGeneration,
+  DEFAULT_IMAGE_MODEL,
   defaultComposerSettings,
   durationsForModel,
+  imageProviderModelFor,
   labelForGeneratedModel,
   normalizeClientGenerationSettings,
+  normalizeImageAspectRatio,
+  normalizeImageQuality,
+  normalizeImageResolution,
   providerModelFor,
   resolutionsForModel,
   resolveGenerationSettings,
@@ -81,6 +88,51 @@ describe('creditsForGeneration', () => {
     expect(creditsForGeneration('not-a-model', 5)).toBe(expected);
     expect(creditsForGeneration(undefined, 5)).toBe(expected);
     expect(creditsForGeneration('', 5)).toBe(expected);
+  });
+});
+
+describe('image generation catalog', () => {
+  it('exposes GPT Image 2 under exact provider ids', () => {
+    expect(AGENT_IMAGE_MODEL_OPTIONS.map((option) => option.label)).toEqual([
+      'GPT Image 2',
+    ]);
+    expect(
+      imageProviderModelFor(DEFAULT_IMAGE_MODEL, 'evolink', 'generate')
+    ).toBe('gpt-image-2');
+    expect(imageProviderModelFor(DEFAULT_IMAGE_MODEL, 'fal', 'edit')).toBe(
+      'openai/gpt-image-2/edit'
+    );
+    expect(
+      imageProviderModelFor(DEFAULT_IMAGE_MODEL, 'replicate', 'generate')
+    ).toBe('openai/gpt-image-2');
+  });
+
+  it('uses the EvoLink resolution and quality rate card', () => {
+    const expected = {
+      '1K': { low: 6, medium: 48, high: 190 },
+      '2K': { low: 11, medium: 97, high: 386 },
+      '4K': { low: 18, medium: 161, high: 641 },
+    } as const;
+    for (const [resolution, qualities] of Object.entries(expected)) {
+      for (const [quality, credits] of Object.entries(qualities)) {
+        expect(
+          creditsForImageGeneration(DEFAULT_IMAGE_MODEL, resolution, quality)
+        ).toBe(credits);
+      }
+    }
+  });
+
+  it('normalizes image options to safe defaults', () => {
+    expect(normalizeImageAspectRatio('16:9')).toBe('16:9');
+    expect(normalizeImageAspectRatio('invalid')).toBe('1:1');
+    expect(normalizeImageResolution('2k')).toBe('2K');
+    expect(normalizeImageResolution('8K')).toBe('1K');
+    expect(normalizeImageQuality('HIGH')).toBe('high');
+    expect(normalizeImageQuality('ultra')).toBe('medium');
+  });
+
+  it('fails expensive for an unknown image model', () => {
+    expect(creditsForImageGeneration('unknown', '1K', 'low')).toBe(641);
   });
 });
 
@@ -241,6 +293,10 @@ describe('labelForGeneratedModel', () => {
     expect(
       labelForGeneratedModel('fal-ai/minimax/hailuo-2.3/pro/image-to-video')
     ).toBe('MiniMax H3');
+    expect(labelForGeneratedModel('gpt-image-2')).toBe('GPT Image 2');
+    expect(labelForGeneratedModel('openai/gpt-image-2/edit')).toBe(
+      'GPT Image 2'
+    );
   });
 
   it('shows the raw id for a model no longer sold', () => {

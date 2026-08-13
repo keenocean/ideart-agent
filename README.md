@@ -1,9 +1,9 @@
 # Ideart
 
-A production-ready conversational AI video SaaS, built to rebrand and ship.
+A production-ready conversational AI image and video SaaS, built to rebrand and ship.
 Users describe a shot or attach source media; the agent decides how to use the
-material, chooses the right video tool, writes the cinematic prompt, renders
-the clip, and charges credits for it. Payments, subscriptions, credits, auth,
+material, chooses the right generation tool, writes the production prompt,
+renders the result, and charges credits for it. Payments, subscriptions, credits, auth,
 admin, sharing, media library, and i18n are already wired.
 
 Built on [ShipAny](https://shipany.ai) (TanStack Start + Drizzle + better-auth).
@@ -11,9 +11,10 @@ It runs on Node or Cloudflare Workers without relying on a writable filesystem.
 
 ## What it does
 
-The chat is an agent loop, not a prompt box. A message goes to an LLM that has
-two tools — `generate_video` (text-to-video) and `animate_image`
-(image-to-video) — and it picks one, writes the cinematic prompt, and calls it.
+The chat is an agent loop, not a prompt box. A message goes to an LLM with
+three tools — `generate_image` (generation and reference-based editing),
+`generate_video` (text-to-video), and `animate_image` (image-to-video). It
+picks the right tool, writes the production prompt, and calls it.
 That's why a user can say "slow push in on her while the background goes soft"
 and get a clip back instead of a form to fill in.
 
@@ -29,23 +30,22 @@ Around that loop:
 - **Living showcase** — examples use a responsive masonry layout, load and
   autoplay only near the viewport, and open in a full-screen preview with
   “Use this prompt” and “Use as reference” actions.
-- **Credits** — priced per model _and per second_ from a catalog, deducted
-  atomically, refunded when a render fails or is canceled. A 10-second clip
-  costs twice a 5-second one before resolution multipliers. The turn is
-  refused up front when the balance is short, so nobody pays for an LLM turn
-  that ends in a paywall.
+- **Credits** — image prices come from a server-owned resolution/quality rate
+  card; video prices are calculated per model and second. Credits are deducted
+  atomically and refunded when a render fails or is canceled. The server
+  verifies the exact tool price before submitting work to a provider.
 - **Paywall that fits** — someone without a plan is shown plans; someone on a
   plan who ran dry is shown top-ups. The server decides which.
-- **Providers** — gRouter, Fal, and Replicate, all configured in the admin
-  panel. The model catalog maps a single UI choice to the id each provider
-  expects, so switching providers does not change what the user selected.
+- **Providers** — EvoLink, gRouter, Fal, and Replicate, all configured in the
+  admin panel. Separate image and video catalogs map each product model to the
+  id its provider expects.
 - **Renders take minutes, not seconds** — the tool polls for up to 15 minutes
   at a 5-second interval. The upstream and local task ids are persisted; the
   composer becomes a stop button while work is active, cancellation is sent
   upstream when supported, and stale unfinished transcript rows are shown as
   interrupted instead of spinning forever.
 - **Stateless** — conversation history replays from the database each turn, and
-  generated clips go straight to object storage. No session files, no disk.
+  generated media goes straight to object storage. No session files, no disk.
 - **Product shell included** — chat history, reusable media library, clip
   preview/download, public share pages, bilingual UI, billing, top-ups, and an
   admin settings/test surface are included.
@@ -54,10 +54,10 @@ Around that loop:
 
 ```text
 User message + uploaded/library media
-  → agent chooses generate_video or animate_image
+  → agent chooses generate_image, generate_video, or animate_image
   → provider accepts an asynchronous task
   → server stores both task ids and polls every 5 seconds over the chat SSE
-  → completed clip is copied to object storage
+  → completed media is copied to object storage
   → tool result and final answer are persisted in the conversation
 ```
 
@@ -79,7 +79,7 @@ pnpm dev                             # http://localhost:3000
 ```
 
 Then sign in and open `/admin/settings` — **the app cannot generate anything
-until you configure a chat model, video provider, and object storage there.**
+until you configure a chat model, media provider, and object storage there.**
 Provider credentials are stored in the database rather than baked into env.
 
 ## Configure
@@ -91,22 +91,26 @@ Admin → Settings → **AI**:
 | **Chat Model**       | Default provider (`auto` prefers OpenAI, falls back to Anthropic), plus its model id       |
 | **OpenAI**           | Base URL + API key. OpenAI-compatible gateways such as OpenRouter or Together also work    |
 | **Anthropic**        | Base URL + API key when Claude should drive the agent                                      |
-| **Video Generation** | Default route: `auto` prefers gRouter, then Fal, then Replicate                            |
+| **Image Generation** | GPT Image 2 route: `auto` prefers EvoLink, gRouter, Replicate, then Fal                    |
+| **Video Generation** | Default route: `auto` prefers EvoLink, gRouter, then Fal, then Replicate                   |
+| **EvoLink**          | Base URL + API key for GPT Image 2 and supported Seedance video models                     |
 | **gRouter**          | Gateway base URL + API key for MiniMax, Seedance, and multimodal reference-to-video inputs |
 | **Fal**              | API key for supported MiniMax and Seedance video routes                                    |
 | **Replicate**        | API token for supported MiniMax routes                                                     |
 
 Current model/provider support:
 
-| Model        | gRouter | Fal | Replicate | Duration | Resolution     |
-| ------------ | :-----: | :-: | :-------: | -------- | -------------- |
-| MiniMax H3   |    ✓    |  ✓  |     ✓     | 5–15s    | 768P / 2K / 4K |
-| Seedance 2.5 |    ✓    |  ✓  |     —     | 4–30s    | 480p / 720p    |
+| Model        | EvoLink | gRouter | Fal | Replicate | Output                |
+| ------------ | :-----: | :-----: | :-: | :-------: | --------------------- |
+| GPT Image 2  |    ✓    |    ✓    |  ✓  |     ✓     | 1K / 2K / 4K images   |
+| MiniMax H3   |    —    |    ✓    |  ✓  |     ✓     | 5–15s, 768P / 2K / 4K |
+| Seedance 2.0 |    ✓    |    —    |  —  |     —     | 4–15s video           |
+| Seedance 2.5 |    —    |    ✓    |  ✓  |     —     | 4–30s, 480p / 720p    |
 
-Admin → Settings → **Storage** (Cloudflare R2 / S3). Generated clips are uploaded there,
+Admin → Settings → **Storage** (Cloudflare R2 / S3). Generated media is uploaded there,
 and **on Cloudflare Workers this is not optional** — there is no disk to fall
-back to. Video files are far larger than images were, so budget storage
-accordingly. Composer attachments and bundled example media are published to
+back to. Video files are much larger than images, so budget storage accordingly.
+Composer attachments and bundled example media are published to
 the same storage first, ensuring video providers receive a downloadable public
 URL instead of a localhost or site-relative path.
 
@@ -126,21 +130,20 @@ Email) for verification mail, and Google OAuth.
 | Theme colour        | `src/styles/globals.css` — one `oklch` hue drives accent and neutrals      |
 | Landing copy        | `messages/en.json` + `messages/zh.json`, keys under `landing.*`            |
 | Example gallery     | `src/components/agent/prompt-examples.ts`, `public/videos/showcase/`       |
-| Models and prices   | `AGENT_MODEL_OPTIONS` in `src/lib/agent-settings.ts`                       |
+| Models and prices   | Image/video model catalogs in `src/lib/agent-settings.ts`                  |
 | Plans and top-ups   | `src/config/pricing.ts`                                                    |
 
 A category's examples end at the first missing translation, so removing one is
 an edit to `messages/*.json` — no code change.
 
 **Set your credit prices against real cost — and check them before launch.**
-`AGENT_MODEL_OPTIONS` carries a `creditsPerSecond` figure plus each model's
-supported durations. The server rounds the resulting clip price to ten
-credits. The figures shipped here are approximations of Fal/Replicate's
-published rates at the time of writing; **video pricing moves fast, so verify
-each one against the provider's current page before you take money.** Change
-the models and you must redo that arithmetic, or you will sell clips below
-cost. Note that plans hand out credits more cheaply than the top-up rate, so
-check the cheapest tier, not the standard one.
+The image catalog carries a server-owned resolution/quality credit matrix;
+`AGENT_MODEL_OPTIONS` carries each video model's `creditsPerSecond` and
+supported durations. The server rounds video prices to ten credits. Provider
+pricing moves fast, so verify every rate before taking money. Change a model
+and you must redo that arithmetic, or you may sell generations below cost.
+Plans can hand out credits more cheaply than the top-up rate, so check the
+cheapest tier, not only the standard one.
 
 Also revisit **Admin → Settings → General → Credits**. With the catalog shipped
 here, a default 5-second MiniMax H3 render at 2K costs 550 credits; signup
@@ -265,7 +268,7 @@ and the baked env change.
 `pnpm build && pnpm start` runs the Node build on any host. A `Dockerfile` is
 included. Postgres and MySQL are supported via `DATABASE_PROVIDER` — run
 `pnpm db:setup` after changing it to swap the schema template. Object storage
-is still required for generated clips.
+is still required for generated media.
 
 ## Commands
 

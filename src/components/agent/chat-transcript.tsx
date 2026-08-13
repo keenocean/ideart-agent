@@ -5,6 +5,7 @@ import {
   FileText,
   Film,
   FolderOpen,
+  Image as ImageIcon,
   Loader2,
   PenLine,
   Search,
@@ -384,6 +385,19 @@ function toolPresentation(
 
   // Rendering is the slow step — minutes, not seconds — so the label tracks
   // progress instead of claiming the work is already done.
+  if (name.includes('generate_image'))
+    return {
+      icon: ImageIcon,
+      label: canceled
+        ? m['agent.chat.generation_stopped']()
+        : interrupted
+          ? m['agent.chat.generation_interrupted']()
+          : failed
+            ? m['agent.chat.generation_failed']()
+            : running
+              ? m['agent.chat.tool_generating_image']()
+              : m['agent.chat.tool_generated_image'](),
+    };
   if (name.includes('generate_video'))
     return {
       icon: Sparkles,

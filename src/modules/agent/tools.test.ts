@@ -1,12 +1,23 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  createAgentTools,
   durationSeconds,
   normalizeProviderAspectRatio,
   pickVideoProvider,
   providerOptionsFor,
   resolveReferenceImage,
 } from './tools';
+
+describe('createAgentTools', () => {
+  it('exposes still-image and video generation tools', () => {
+    expect(
+      createAgentTools({ userId: 'user-1', sessionId: 'session-1' }).map(
+        (tool) => tool.name
+      )
+    ).toEqual(['generate_image', 'generate_video', 'animate_image']);
+  });
+});
 
 describe('resolveReferenceImage', () => {
   it('passes absolute URLs through untouched', () => {
@@ -36,6 +47,11 @@ describe('resolveReferenceImage', () => {
       'http://127.0.0.1/a.png',
       'http://0.0.0.0/a.png',
       'http://[::1]/a.png',
+      'http://10.0.0.1/a.png',
+      'http://172.16.0.1/a.png',
+      'http://192.168.1.1/a.png',
+      'http://169.254.169.254/latest/meta-data',
+      'http://metadata.local/a.png',
     ]) {
       expect(() => resolveReferenceImage(local)).toThrow(
         /unsupported image reference/

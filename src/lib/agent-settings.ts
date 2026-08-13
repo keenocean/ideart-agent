@@ -1,5 +1,6 @@
 /** The video backends an admin can route generation through. */
 export type VideoProviderName = 'evolink' | 'grouter' | 'fal' | 'replicate';
+export type ImageProviderName = 'evolink' | 'grouter' | 'fal' | 'replicate';
 
 export interface AgentGenerationSettings {
   /** Picker key (`minimax-h3`) — resolved to a provider model server-side. */
@@ -131,6 +132,61 @@ export const AGENT_MODEL_OPTIONS = [
   },
 ] as const;
 
+/** Image models are separate from the video composer catalog. */
+export const AGENT_IMAGE_MODEL_OPTIONS = [
+  {
+    value: 'gpt-image-2',
+    label: 'GPT Image 2',
+    defaultAspectRatio: '1:1',
+    defaultResolution: '1K',
+    defaultQuality: 'medium',
+    maxImages: 16,
+    providers: {
+      evolink: { model: 'gpt-image-2', editModel: 'gpt-image-2' },
+      grouter: { model: 'gpt-image-2', editModel: 'gpt-image-2' },
+      fal: {
+        model: 'openai/gpt-image-2',
+        editModel: 'openai/gpt-image-2/edit',
+      },
+      replicate: {
+        model: 'openai/gpt-image-2',
+        editModel: 'openai/gpt-image-2',
+      },
+    },
+  },
+] as const;
+
+export type AgentImageModelOptionValue =
+  (typeof AGENT_IMAGE_MODEL_OPTIONS)[number]['value'];
+
+export const DEFAULT_IMAGE_MODEL: AgentImageModelOptionValue = 'gpt-image-2';
+export const AGENT_IMAGE_ASPECT_RATIOS = [
+  'auto',
+  '1:1',
+  '1:2',
+  '2:1',
+  '1:3',
+  '3:1',
+  '2:3',
+  '3:2',
+  '3:4',
+  '4:3',
+  '4:5',
+  '5:4',
+  '9:16',
+  '16:9',
+  '21:9',
+  '9:21',
+] as const;
+export const AGENT_IMAGE_RESOLUTIONS = ['1K', '2K', '4K'] as const;
+export const AGENT_IMAGE_QUALITIES = ['low', 'medium', 'high'] as const;
+
+const GPT_IMAGE_2_CREDITS = {
+  '1K': { low: 6, medium: 48, high: 190 },
+  '2K': { low: 11, medium: 97, high: 386 },
+  '4K': { low: 18, medium: 161, high: 641 },
+} as const;
+
 export type AgentModelOptionValue =
   (typeof AGENT_MODEL_OPTIONS)[number]['value'];
 
@@ -168,6 +224,70 @@ export interface AgentComposerSettings {
 
 export function modelOptionFor(value: string | undefined) {
   return AGENT_MODEL_OPTIONS.find((item) => item.value === value);
+}
+
+export function imageModelOptionFor(value: string | undefined) {
+  return AGENT_IMAGE_MODEL_OPTIONS.find((item) => item.value === value);
+}
+
+export function isImageModelOptionValue(
+  value: string | undefined
+): value is AgentImageModelOptionValue {
+  return !!imageModelOptionFor(value);
+}
+
+export function normalizeImageAspectRatio(value: unknown): string {
+  const requested = String(value ?? '');
+  return (AGENT_IMAGE_ASPECT_RATIOS as readonly string[]).includes(requested)
+    ? requested
+    : imageModelOptionFor(DEFAULT_IMAGE_MODEL)!.defaultAspectRatio;
+}
+
+export function normalizeImageResolution(value: unknown): string {
+  const requested = String(value ?? '').toUpperCase();
+  return (AGENT_IMAGE_RESOLUTIONS as readonly string[]).includes(requested)
+    ? requested
+    : imageModelOptionFor(DEFAULT_IMAGE_MODEL)!.defaultResolution;
+}
+
+export function normalizeImageQuality(value: unknown): string {
+  const requested = String(value ?? '').toLowerCase();
+  return (AGENT_IMAGE_QUALITIES as readonly string[]).includes(requested)
+    ? requested
+    : imageModelOptionFor(DEFAULT_IMAGE_MODEL)!.defaultQuality;
+}
+
+/** Server-authoritative GPT Image 2 cost for one output image. */
+export function creditsForImageGeneration(
+  modelKey: string | undefined,
+  resolution?: unknown,
+  quality?: unknown
+): number {
+  if (!isImageModelOptionValue(modelKey)) {
+    return Math.max(
+      ...Object.values(GPT_IMAGE_2_CREDITS).flatMap((prices) =>
+        Object.values(prices)
+      )
+    );
+  }
+  const normalizedResolution = normalizeImageResolution(resolution);
+  const normalizedQuality = normalizeImageQuality(quality);
+  return (GPT_IMAGE_2_CREDITS as Record<string, Record<string, number>>)[
+    normalizedResolution
+  ][normalizedQuality];
+}
+
+export function imageProviderModelFor(
+  modelKey: string | undefined,
+  provider: ImageProviderName,
+  kind: 'generate' | 'edit',
+  overrides?: Record<string, string>
+): string | undefined {
+  if (!isImageModelOptionValue(modelKey)) return undefined;
+  const override = overrides?.[modelKey];
+  if (override) return override;
+  const ids = imageModelOptionFor(modelKey)?.providers[provider];
+  return kind === 'edit' ? ids?.editModel : ids?.model;
 }
 
 export function isModelOptionValue(
@@ -340,6 +460,14 @@ export function creditsForGeneration(
 
 /** Friendly name for a picker key or a provider id recorded on a task. */
 export function labelForGeneratedModel(modelId: string): string {
+  const imageOption = AGENT_IMAGE_MODEL_OPTIONS.find(
+    (item) =>
+      item.value === modelId ||
+      Object.values(item.providers).some(
+        (ids) => ids.model === modelId || ids.editModel === modelId
+      )
+  );
+  if (imageOption) return imageOption.label;
   const option = AGENT_MODEL_OPTIONS.find(
     (item) =>
       item.value === modelId ||

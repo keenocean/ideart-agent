@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
 
 import { getAuth } from '@/core/auth';
-import { cancelVideoGenerationsForSession } from '@/modules/agent/tools';
+import { cancelGenerationsForSession } from '@/modules/agent/tools';
 import { cancelPendingToolCalls, findChat } from '@/modules/chats/service';
 import { isAgentSessionId } from '@/lib/agent';
 import { respData, respErr } from '@/lib/resp';
@@ -20,7 +20,7 @@ async function POST({ request, params }: Ctx) {
   if (!ownedChat) return respErr('Chat not found');
 
   const [tasks, toolCalls] = await Promise.all([
-    cancelVideoGenerationsForSession({
+    cancelGenerationsForSession({
       userId: session.user.id,
       sessionId: params.sessionId,
     }),
