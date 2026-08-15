@@ -15,6 +15,7 @@ import { locales } from '@/paraglide/runtime.js';
 
 import { hasToolContent, loadToolContentOrNull } from './tools/manifest';
 import type { ToolPageContent } from './tools/types';
+import { validateToolPageContent } from './tools/validate';
 
 export type LoadableCatalogLlmsEntry = ResolvedCatalogRoute & {
   title: string;
@@ -43,10 +44,12 @@ async function isCatalogPageContentLoadable(
 ): Promise<boolean> {
   if (!isCatalogPageContentAvailable(definition, locale)) return false;
   switch (definition.kind) {
-    case 'tool':
-      return (
-        (await loadToolContentOrNull(definition.entityId, locale)) !== null
-      );
+    case 'tool': {
+      const content = await loadToolContentOrNull(definition.entityId, locale);
+      if (!content) return false;
+      validateToolPageContent(definition, content);
+      return true;
+    }
     case 'model':
       return false;
   }
@@ -60,6 +63,7 @@ async function loadCatalogLlmsCopy(
   switch (definition.kind) {
     case 'tool':
       content = await loadToolContentOrNull(definition.entityId, locale);
+      if (content) validateToolPageContent(definition, content);
       break;
     case 'model':
       return null;

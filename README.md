@@ -240,20 +240,35 @@ your Cloudflare account:
 "routes": [{ "pattern": "your-domain.com", "custom_domain": true }]
 ```
 
-### 7. Publish Agent Skills to private R2
+### 7. Publish private R2 releases
 
-The Worker reads prompt-only Agent Skills from a dedicated private R2 bucket;
-Skill bodies are not part of the Worker bundle.
+The Worker reads prompt-only Agent Skills and long-form Marketing Content from
+two dedicated private R2 bindings. Neither body set is part of the Worker or
+client bundle, and neither bucket should expose `r2.dev` or a public domain.
 
 ```bash
-npx wrangler r2 bucket create <worker-name>-agent-skills
-pnpm skills:publish -- --bucket=<worker-name>-agent-skills
+WORKER_NAME=your-worker-name
+SKILLS_BUCKET="${WORKER_NAME}-agent-skills"
+MARKETING_BUCKET="${WORKER_NAME}-marketing-content"
+
+pnpm exec wrangler r2 bucket info "$SKILLS_BUCKET" || \
+  pnpm exec wrangler r2 bucket create "$SKILLS_BUCKET"
+pnpm exec wrangler r2 bucket info "$MARKETING_BUCKET" || \
+  pnpm exec wrangler r2 bucket create "$MARKETING_BUCKET"
+
+pnpm skills:publish -- --bucket="$SKILLS_BUCKET"
+pnpm marketing:publish-content-release -- --dry-run --bucket="$MARKETING_BUCKET"
+pnpm marketing:publish-content-release -- --bucket="$MARKETING_BUCKET"
 ```
 
-Keep the binding name `AGENT_SKILLS`. The publish command verifies the release
-and updates `vars.AGENT_SKILLS_RELEASE` in `wrangler.jsonc`. See
+Keep the binding names exactly `AGENT_SKILLS` and `MARKETING_CONTENT`. The
+publish commands verify immutable releases and update
+`vars.AGENT_SKILLS_RELEASE` / `vars.MARKETING_CONTENT_RELEASE` in the gitignored
+`wrangler.jsonc`. The deployment Skill probes each exact bucket first, so these
+steps are idempotent for future template clones. See
 [`docs/agent-skills-r2.md`](docs/agent-skills-r2.md) for the reusable release
-format and rollback procedure.
+format, and [`docs/marketing-content-r2.md`](docs/marketing-content-r2.md) for
+Marketing Content bootstrap, publishing, verification, and rollback.
 
 ### 8. Deploy
 
@@ -282,8 +297,9 @@ travels with the deploy.
 
 ### Redeploying
 
-`pnpm cf:deploy` again. Secrets, database and settings persist; only the code
-and the baked env change.
+Run the two release publishers, then `pnpm cf:deploy` again. Secrets, database,
+settings, private buckets, and older immutable releases persist; code, pinned
+release IDs, and baked env can change.
 
 ## Deploy elsewhere
 

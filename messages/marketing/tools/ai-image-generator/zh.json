@@ -1,0 +1,415 @@
+{
+  "schemaVersion": 1,
+  "contentModifiedAt": "2026-08-15",
+  "content": {
+    "entityId": "ai-image-generator",
+    "locale": "zh",
+    "template": "image-generator",
+    "seo": {
+      "title": "AI 图片生成器与在线文生图 | UGC Mind",
+      "description": "用文字描述生成图片，选择画面比例、分辨率和质量，并在同一个 AI Agent 会话中继续修改与迭代。"
+    },
+    "directory": {
+      "title": "AI 图片生成器",
+      "description": "把文字提示变成静态图片，并在同一个 Agent 对话中继续调整方向。"
+    },
+    "hero": {
+      "eyebrow": "在线文生图",
+      "title": "把清晰的视觉需求变成一张 AI 图片",
+      "description": "说明主体、构图、光线、材质和风格，在生成面板中选择图片参数，提交后可在同一会话里继续修改。"
+    },
+    "workbench": {
+      "title": "描述你想生成的画面",
+      "description": "可以只输入文字；如果加入参考图，任务会更接近参考引导或生成式编辑。",
+      "placeholder": "一只半透明橙色运动水壶放在浅色石材上，柔和窗边光，轻微投影，杂志感产品构图……"
+    },
+    "inputOutput": {
+      "title": "输入要求与输出控制",
+      "description": "这个入口会把生成模态锁定为图片，同时保留运行时已经支持的图片参数。",
+      "items": [
+        {
+          "title": "必需输入",
+          "description": "至少提供一段文字提示。参考图片不是必需项，加入后会转向参考生成或图片编辑。"
+        },
+        {
+          "title": "图片参数",
+          "description": "可以选择受支持的画面比例、1K/2K/4K 分辨率，以及低、中、高质量。"
+        },
+        {
+          "title": "继续迭代",
+          "description": "首次提交会创建一个聊天会话，后续可以直接描述要修改的部分，不必重新开始。"
+        }
+      ]
+    },
+    "examples": {
+      "title": "AI 图片提示词案例",
+      "description": "浏览产品、编辑、社媒和电影概念等静态图片方向，并把任一提示词直接带回生成器。",
+      "labels": {
+        "quickStart": "快速开始",
+        "image": "图片",
+        "video": "视频",
+        "prompt": "提示词",
+        "download": "下载原文件",
+        "previous": "上一个案例",
+        "next": "下一个案例",
+        "close": "关闭预览",
+        "usePrompt": "使用这个提示词",
+        "expand": "查看全部案例"
+      },
+      "items": [
+        {
+          "title": "产品广告概念",
+          "description": "适合明确主体、材质、灯光和商业画面方向。",
+          "prompt": "一瓶高端护肤精华放在浅水镜面上，冷银色调，柔和漫射棚拍光，近景产品构图，干净克制的奢华广告摄影，不出现其他物体。",
+          "media": {
+            "assetId": "tools-ai-image-generator-0241fe76c3058fcd",
+            "alt": "无品牌玻璃精华瓶立在浅水中，冷银色棚拍光照亮瓶身"
+          }
+        },
+        {
+          "title": "编辑插画",
+          "description": "用可识别的场景、有限色板和版面要求表达抽象主题。",
+          "prompt": "一幅关于跨时区远程协作的编辑插画，三张相连的办公桌漂浮在夜晚城市上空，深蓝与珊瑚红限定配色，几何造型，为标题保留大面积留白。",
+          "media": {
+            "assetId": "tools-ai-image-generator-5d01838c8320ab5f",
+            "alt": "三张亮着灯的办公桌连接在夜晚城市上空，采用深蓝与珊瑚红编辑插画风格"
+          }
+        },
+        {
+          "title": "社媒发布视觉",
+          "description": "同时说明画幅、焦点物体、动势和后续排版空间。",
+          "prompt": "9:16 竖版跑鞋新品发布视觉，一只跑鞋悬浮在红色跑道上方，白色粉尘锐利爆开，强烈侧光，现代运动摄影风格，顶部留出清晰文案区域。",
+          "media": {
+            "assetId": "tools-ai-image-generator-eee9f320ac365d1e",
+            "alt": "无品牌黑色跑鞋悬浮在红色跑道上方，身后扬起白色粉尘"
+          }
+        },
+        {
+          "title": "月夜怪兽面包房",
+          "description": "同时明确角色、动作、暖色焦点光和冷色夜景环境。",
+          "prompt": "一只橙色小角怪兽惊讶地看着面包从魔法烤箱中漂浮起来，月光窗户，铜色炉火，面粉悬浮在空气里，电影级家庭动画质感，宽幅故事构图。",
+          "media": {
+            "assetId": "tools-ai-image-generator-c59b7a4f2cbfdc3b",
+            "alt": "橙色小角怪兽在月夜面包房里看着面包漂浮到发光烤箱上方"
+          }
+        },
+        {
+          "title": "乘地铁的温柔怪兽",
+          "description": "把醒目的中心角色、纪实构图和通勤者的克制反应组合起来。",
+          "prompt": "清晨拥挤的地铁里，一只温柔的苔绿色毛绒怪兽拎着小皮质公文包，通勤者坐在两侧，自然窗光，电影纪录片构图，写实材质。",
+          "media": {
+            "assetId": "tools-ai-image-generator-39da1e8785d8efb2",
+            "alt": "高大的绿色温柔怪兽拎着公文包站在地铁通勤者之间"
+          }
+        },
+        {
+          "title": "夜间温室里的蓝色萤火虫",
+          "description": "用全景环境、单一强调色、倒影和氛围光建立画面尺度。",
+          "prompt": "午夜雨后的废弃玻璃温室被积水淹没，一位穿黄色雨衣的访客独自站立，数百只蓝色萤火虫飞过水面，月光倒影，全景电影写实风格。",
+          "media": {
+            "assetId": "tools-ai-image-generator-f2570c70c73667db",
+            "alt": "黄色雨衣访客面对倒映在月夜积水温室里的蓝色萤火虫"
+          }
+        },
+        {
+          "title": "瓷鲤列车",
+          "description": "通过材质、动作、天气和对称构图控制超现实编辑场景。",
+          "prompt": "一位芭蕾舞者在空荡的复古列车车厢中起舞，瓷器质感的锦鲤漂浮在她周围，窗外落雨，深蓝夜色，暖色台灯，对称电影构图。",
+          "media": {
+            "assetId": "tools-ai-image-generator-4465b33d8cac5a5f",
+            "alt": "芭蕾舞者和漂浮的瓷器锦鲤出现在雨夜复古列车车厢中"
+          }
+        },
+        {
+          "title": "火山小行星带",
+          "description": "通过材质、尺度、色彩和空间层次建立高对比科幻场景。",
+          "prompt": "深空中的密集小行星带，炭黑岩石裂缝中发出电蓝晶体和橙色岩浆光，多层景深，戏剧性轮廓光，电影级科幻写实风格。",
+          "media": {
+            "assetId": "tools-ai-image-generator-db46761ada6e3d50",
+            "alt": "深空中被电蓝晶体与橙色岩浆裂开的黑色小行星"
+          }
+        },
+        {
+          "title": "沙漠中苏醒的虞美人",
+          "description": "用克制的荒漠环境和逐渐出现的单一强调色表现变化。",
+          "prompt": "罕见降雨后的安静沙漠平原，小朵红色虞美人从枯草间长出，远处沙丘，淡蓝色清晨天空，低机位自然视角，诗意电影写实风格。",
+          "media": {
+            "assetId": "tools-ai-image-generator-f9c7a08a07b871e0",
+            "alt": "明亮沙漠平原上红色小花从枯草之间长出"
+          }
+        },
+        {
+          "title": "冰川巨物",
+          "description": "以航拍尺度、破裂冰面和冷色环境光表现巨大主体。",
+          "prompt": "一个巨大的石质形体从破裂冰川中向上隆起，航拍广角，积雪与蓝色冰隙，阴天极地光线，宏大的环境尺度，电影级照片写实细节。",
+          "media": {
+            "assetId": "tools-ai-image-generator-3c275d1ea7d9223d",
+            "alt": "巨大的圆形石质形体冲破布满裂缝和积雪的冰川"
+          }
+        },
+        {
+          "title": "雨街镜面球",
+          "description": "通过反射、雨天、交通色彩和街道低机位控制超现实城市焦点。",
+          "prompt": "一个无缝镜面球悬浮在雨后的伦敦街道上方，红色巴士映在弧形表面，行人与店铺灯光轻微虚化，街道低机位电影摄影。",
+          "media": {
+            "assetId": "tools-ai-image-generator-126e53051fa7c68f",
+            "alt": "悬浮镜面球映出湿润城市街道上的红色巴士"
+          }
+        },
+        {
+          "title": "纸艺故事书景观",
+          "description": "明确手工材质、简单造型和温暖的方向光。",
+          "prompt": "一本打开的手工纸艺故事书变成层叠的粉彩风景，周围散落彩色铅笔，温暖午后窗光，可触摸的剪纸质感，轻快定格动画美术方向。",
+          "media": {
+            "assetId": "tools-ai-image-generator-fb51d0665ffb5fbf",
+            "alt": "桌面上的纸艺故事书展开成粉彩风景，周围放着彩色铅笔"
+          }
+        },
+        {
+          "title": "水洼里的夜市",
+          "description": "用普通前景、微缩尺度和冷暖对比揭示不可能的隐藏场景。",
+          "prompt": "空荡城市街道上的雨水洼，水面下显现热闹的微缩夜市，暖色灯笼帐篷，湿润沥青倒影，低位微距视角，魔幻电影写实风格。",
+          "media": {
+            "assetId": "tools-ai-image-generator-5664a0dee41494f4",
+            "alt": "黑暗湿润街道的水洼下显现发光的微缩夜市"
+          }
+        },
+        {
+          "title": "帆布洗衣房",
+          "description": "用熟悉的对称空间和单一超现实材质变化形成明确概念画面。",
+          "prompt": "夜间空荡的荧光灯洗衣房，长条白色帆布从打开的洗衣机中流出，窗外能看到海洋，居中对称构图，冷色超现实电影灯光。",
+          "media": {
+            "assetId": "tools-ai-image-generator-02b0b7a8d6d66167",
+            "alt": "冷色夜间洗衣房里白色帆布在洗衣机之间流动"
+          }
+        },
+        {
+          "title": "潮汐图书馆",
+          "description": "让有秩序的室内空间、缓慢侵入的环境和安静实用光形成平衡。",
+          "prompt": "一间历史阅读室逐渐被清澈海水淹没，书架和两张木桌保持原样，暖色台灯，冷色日光从中央窗户进入，平静对称的电影构图。",
+          "media": {
+            "assetId": "tools-ai-image-generator-bf2655c56961d96f",
+            "alt": "海水覆盖对称老图书馆的地板，两盏台灯仍然亮着"
+          }
+        }
+      ]
+    },
+    "showcase": {
+      "workflows": {
+        "title": "AI 图片工具",
+        "description": "从一个明确的图片工作流开始，再在同一个私密 Agent 对话中持续调整结果。",
+        "items": [
+          {
+            "id": "text-to-image",
+            "entityId": "ai-image-generator",
+            "title": "文生图生成器",
+            "description": "把文字视觉需求转成构图完整的静态图片。",
+            "prompt": "一瓶高端护肤精华放在浅水镜面上，冷银色调，柔和漫射棚拍光，近景产品构图，干净克制的奢华广告摄影，不出现其他物体。",
+            "media": [
+              {
+                "assetId": "tools-ai-image-generator-0241fe76c3058fcd",
+                "alt": "冷银色棚拍环境中的玻璃精华瓶"
+              },
+              {
+                "assetId": "tools-ai-image-generator-5d01838c8320ab5f",
+                "alt": "城市上空的深蓝与珊瑚红编辑插画"
+              }
+            ]
+          },
+          {
+            "id": "campaign-visuals",
+            "entityId": "campaign-image-generator",
+            "title": "广告图片生成器",
+            "description": "用明确构图控制产品、发布和社媒视觉。",
+            "prompt": "9:16 竖版跑鞋新品发布视觉，一只跑鞋悬浮在红色跑道上方，白色粉尘锐利爆开，强烈侧光，现代运动摄影风格，顶部留出清晰文案区域。",
+            "media": [
+              {
+                "assetId": "tools-ai-image-generator-eee9f320ac365d1e",
+                "alt": "红色跑道上方的跑鞋发布视觉"
+              },
+              {
+                "assetId": "tools-ai-image-generator-c59b7a4f2cbfdc3b",
+                "alt": "电影感月夜面包房里的橙色怪兽"
+              }
+            ]
+          },
+          {
+            "id": "reference-guided-edit",
+            "entityId": "ai-image-editor",
+            "title": "参考图引导编辑",
+            "description": "添加图片来约束主体、构图或视觉方向。",
+            "prompt": "使用我的参考图作为构图依据。保留主要主体和画面结构，以电影感自然光、写实材质和克制色板重新构建场景。",
+            "media": [
+              {
+                "assetId": "tools-ai-image-generator-39da1e8785d8efb2",
+                "alt": "绿色怪兽与通勤者一起乘坐地铁"
+              },
+              {
+                "assetId": "tools-ai-image-generator-f2570c70c73667db",
+                "alt": "布满蓝色萤火虫的积水夜间温室"
+              }
+            ]
+          },
+          {
+            "id": "style-transform",
+            "entityId": "style-transformation",
+            "title": "风格转换",
+            "description": "在保留核心主体辨识度的同时重塑参考图风格。",
+            "prompt": "把我的参考图重塑成可触摸的手工纸艺插画。保留中心主体和整体轮廓，使用层叠剪纸形状、柔和暖色方向光和克制粉彩色板。",
+            "media": [
+              {
+                "assetId": "tools-ai-image-generator-4465b33d8cac5a5f",
+                "alt": "电影感列车车厢中的舞者与瓷器锦鲤"
+              },
+              {
+                "assetId": "tools-ai-image-generator-fb51d0665ffb5fbf",
+                "alt": "手工纸艺故事书景观"
+              }
+            ]
+          }
+        ]
+      },
+      "models": {
+        "title": "AI 图片模型",
+        "description": "GPT Image 2 是当前已经接入这个生成器的图片模型。其他模型只有在运行时路由可用后才会出现在这里。",
+        "items": [
+          {
+            "id": "gpt-image-2",
+            "entityId": "gpt-image-2",
+            "runtimeModelKey": "gpt-image-2",
+            "title": "GPT Image 2",
+            "description": "忠实遵循提示词的图片生成与参考图引导编辑，支持灵活比例和质量控制。",
+            "media": {
+              "assetId": "tools-ai-image-generator-126e53051fa7c68f",
+              "alt": "镜面球映出雨天城市街道"
+            }
+          }
+        ]
+      }
+    },
+    "workflow": {
+      "title": "文生图工作流程",
+      "description": "工具页会准备一个明确的图片任务，再交给现有 Agent 运行时执行。",
+      "items": [
+        {
+          "title": "1. 写清视觉需求",
+          "description": "先说明主体，再补充场景、构图、光线、材质、氛围和最终用途。"
+        },
+        {
+          "title": "2. 选择图片参数",
+          "description": "提交前选择适合使用场景的比例、分辨率和质量。"
+        },
+        {
+          "title": "3. 在会话中继续修改",
+          "description": "开始生成后，继续在同一会话里提出局部调整或尝试另一种方向。"
+        }
+      ]
+    },
+    "features": {
+      "title": "为连续迭代设计的图片入口",
+      "description": "这里复用真实 Agent 生成链路，不是与产品能力脱节的营销演示。",
+      "items": [
+        {
+          "title": "锁定图片模态",
+          "description": "页面把任务限定为图片，服务端会在执行前根据 Catalog 再次验证入口身份。"
+        },
+        {
+          "title": "实用输出选项",
+          "description": "比例、分辨率和质量控制保持可见，便于让输出适配海报、社媒或演示文稿。"
+        },
+        {
+          "title": "生成后继续对话",
+          "description": "首次请求会成为会话的第一轮，后续修改可以继承已有上下文。"
+        }
+      ]
+    },
+    "promptGuide": {
+      "title": "怎样写出更容易控制的提示词",
+      "description": "有效提示词要明确关键视觉决策，不需要堆满所有能想到的形容词。",
+      "items": [
+        {
+          "title": "先写主体与用途",
+          "description": "先说清画面必须出现什么、最终用在哪里，再补充风格语言。"
+        },
+        {
+          "title": "说明构图与光线",
+          "description": "景别、视角、留白和光线方向，通常比笼统的“高质量”更有控制力。"
+        },
+        {
+          "title": "把硬性要求单独写清",
+          "description": "明确不要出现的物体、指定文字、品牌颜色或排版区域，看到结果后只修改偏差最大的部分。"
+        }
+      ]
+    },
+    "useCases": {
+      "title": "适合使用文生图的场景",
+      "description": "适用于需要视觉探索、方案讨论和多轮审核的创作任务。",
+      "items": [
+        {
+          "id": "campaign-concepts",
+          "title": "广告与活动概念",
+          "description": "在正式拍摄或设计前探索灯光、构图、道具和整体美术方向。",
+          "media": {
+            "assetId": "tools-ai-image-generator-eee9f320ac365d1e",
+            "alt": "悬浮在红色广告跑道上方的无品牌跑鞋"
+          }
+        },
+        {
+          "id": "product-brand-visuals",
+          "title": "产品与品牌视觉",
+          "description": "生成产品场景、包装概念、演示封面和社媒版式的视觉方向。",
+          "media": {
+            "assetId": "tools-ai-image-generator-0241fe76c3058fcd",
+            "alt": "冷银色棚拍环境中的玻璃护肤瓶"
+          }
+        },
+        {
+          "id": "editorial-story-frames",
+          "title": "编辑插画与故事分镜",
+          "description": "把抽象主题转成可以讨论的插画或故事画面。",
+          "media": {
+            "assetId": "tools-ai-image-generator-5d01838c8320ab5f",
+            "alt": "夜间城市上空相连桌面的编辑插画"
+          }
+        }
+      ]
+    },
+    "limitations": {
+      "title": "使用输出前需要检查什么",
+      "description": "图片生成具有随机性。结果需要人工检查，不能把提示词当作像素级还原保证。",
+      "items": [
+        "小字号文字、大量重复物体、手部、镜面反射和精确空间关系可能需要再次生成或修改。",
+        "同一提示词在不同生成中可能得到不同构图；尝试新方向前应先保存可用结果。",
+        "参考图并不保证原像素完全不变；如果源图必须主导结果，应使用专门的图片编辑流程。",
+        "生成会根据图片参数消耗积分；服务端会重新计算费用，不接受浏览器提交的价格。"
+      ]
+    },
+    "faq": {
+      "title": "AI 图片生成常见问题",
+      "items": [
+        {
+          "question": "必须上传图片吗？",
+          "answer": "不需要。只输入文字就能使用这个工具。加入参考图后，任务会更偏向参考引导或图片编辑。"
+        },
+        {
+          "question": "可以选择哪些图片参数？",
+          "answer": "当前图片运行时提供受支持的画面比例、1K/2K/4K 分辨率，以及低、中、高质量选项。"
+        },
+        {
+          "question": "第一张图片生成后还能继续改吗？",
+          "answer": "可以。首次请求会创建聊天会话，你可以继续描述修改要求，并沿用已有上下文。"
+        },
+        {
+          "question": "相同提示词会得到完全相同的图片吗？",
+          "answer": "不会。不同生成结果可能存在差异。可以把构图和光线写得更具体，再针对重要偏差继续调整。"
+        }
+      ]
+    },
+    "cta": {
+      "title": "从一个明确的视觉决策开始",
+      "description": "先写主体和用途，再选择输出参数，把下一轮对话留给真正需要修改的部分。",
+      "primaryLabel": "打开图片生成面板",
+      "secondaryLabel": "查看价格"
+    }
+  }
+}

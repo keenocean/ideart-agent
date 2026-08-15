@@ -25,10 +25,23 @@ function ensureCloudflareEnv(): Promise<void> {
   return cfEnvPromise;
 }
 
-function normalizeBlogFailure(req: Request, response: Response): Response {
+function normalizeExternalContentFailure(
+  req: Request,
+  response: Response
+): Response {
   if (response.status !== 500) return response;
   const pathname = deLocalizeUrl(new URL(req.url)).pathname;
-  if (pathname !== '/blog' && !pathname.startsWith('/blog/')) return response;
+  const externalContentRoute =
+    pathname === '/blog' ||
+    pathname.startsWith('/blog/') ||
+    pathname === '/tools' ||
+    pathname.startsWith('/tools/') ||
+    pathname === '/models' ||
+    pathname.startsWith('/models/') ||
+    pathname === '/sitemap.xml' ||
+    pathname === '/llms.txt' ||
+    pathname === '/llms-full.txt';
+  if (!externalContentRoute) return response;
 
   const headers = new Headers(response.headers);
   headers.set('Cache-Control', 'no-store');
@@ -60,6 +73,6 @@ export default {
         );
       }
     }
-    return normalizeBlogFailure(req, response);
+    return normalizeExternalContentFailure(req, response);
   },
 };

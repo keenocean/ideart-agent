@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "seo": {
+    "title": "AI Creation Tools | {appName}",
+    "description": "Browse focused AI creation tools that hand real image and video tasks to the UGC Mind agent runtime."
+  },
+  "hero": {
+    "title": "Tools for creating with an AI agent",
+    "description": "Start with a focused image workflow, then continue refining the result in the same conversation."
+  }
+}

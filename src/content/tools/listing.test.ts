@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 
-import { getMarketingAsset, marketingAssets } from '@/config/catalog/assets';
 import { catalogRouteSegment } from '@/config/catalog/paths';
 import { hasLocalePage } from '@/config/catalog/selectors';
 import { toolCatalog } from '@/config/catalog/tools';
@@ -22,6 +21,8 @@ import {
   loadToolContent,
   toolContentManifestKeys,
 } from './manifest';
+import type { ToolPageContent } from './types';
+import { validateToolPageContent } from './validate';
 
 describe('tool content manifest', () => {
   it('opens only the first en/zh vertical slice without language fallback', async () => {
@@ -36,7 +37,7 @@ describe('tool content manifest', () => {
     expect(await loadToolContent('ai-image-editor', 'zh')).toBeNull();
   });
 
-  it('loads every convention-discovered module with matching identity', async () => {
+  it('loads every release-indexed page with matching identity', async () => {
     for (const key of toolContentManifestKeys) {
       const [entityId, locale] = key.split(':') as [string, AppLocale];
       expect(await loadToolContent(entityId, locale), key).toMatchObject({
@@ -46,7 +47,42 @@ describe('tool content manifest', () => {
     }
   });
 
-  it('keeps every discovered content module behind a Catalog locale page', () => {
+  it('fails closed when content selects the wrong template or media kind', async () => {
+    const definition = toolCatalog[0];
+    const content = await loadToolContent('ai-image-generator', 'en');
+    if (!content || content.template !== 'image-generator') {
+      throw new Error('Expected the image-generator fixture');
+    }
+
+    expect(() => validateToolPageContent(definition, content)).not.toThrow();
+    expect(() =>
+      validateToolPageContent(definition, {
+        ...content,
+        template: 'text-to-video',
+      } as unknown as ToolPageContent)
+    ).toThrow(/template mismatch/);
+    expect(() =>
+      validateToolPageContent(definition, {
+        ...content,
+        examples: {
+          ...content.examples,
+          items: [
+            {
+              ...content.examples.items[0]!,
+              media: {
+                ...content.examples.items[0]!.media,
+                kind: 'video',
+                mimeType: 'video/mp4',
+                poster: content.examples.items[0]!.media,
+              },
+            },
+          ],
+        },
+      } as unknown as ToolPageContent)
+    ).toThrow(/must reference a image asset/);
+  });
+
+  it('keeps every release-indexed page behind a Catalog locale page', () => {
     for (const key of toolContentManifestKeys) {
       const [entityId, locale] = key.split(':') as [string, AppLocale];
       const definition = toolCatalog.find(
@@ -146,6 +182,7 @@ describe('tool route content gate', () => {
         locale,
         path: '/tools/ai-image-generator',
         indexing: 'noindex',
+        archetype: 'image-generator',
         contentModifiedAt: '2026-08-15',
         availableLocales: ['en', 'zh'],
         localeRoutes: [
@@ -154,26 +191,24 @@ describe('tool route content gate', () => {
         ],
         alternates: [],
       });
-      const examples = detail?.content.examples.items ?? [];
-      expect(examples).toHaveLength(27);
+      if (!detail || detail.content.template !== 'image-generator') {
+        throw new Error(`Expected image-generator content for ${locale}`);
+      }
+      const examples = detail.content.examples.items;
+      expect(detail?.content.template).toBe('image-generator');
+      expect(examples).toHaveLength(15);
       const exampleAssetIds = new Set(
-        examples.map((example) => example.media.assetId)
+        examples.map((example) => example.media.id)
       );
       expect(exampleAssetIds.size).toBe(examples.length);
       for (const example of examples) {
         expect(example.media.alt.trim().length).toBeGreaterThan(0);
-        expect(getMarketingAsset(example.media.assetId)).toMatchObject({
-          id: example.media.assetId,
-        });
+        expect(example.media.id.trim().length).toBeGreaterThan(0);
+        expect(example.media.url).toMatch(/^https:\/\//);
       }
-      expect(
-        examples.filter(
-          (example) => getMarketingAsset(example.media.assetId).kind === 'video'
-        )
-      ).toHaveLength(12);
-      expect(
-        marketingAssets.filter((asset) => exampleAssetIds.has(asset.id))
-      ).toHaveLength(examples.length);
+      expect(examples.every((example) => example.media.kind === 'image')).toBe(
+        true
+      );
       expect(detail?.content.showcase.workflows.items).toHaveLength(4);
       for (const workflow of detail?.content.showcase.workflows.items ?? []) {
         expect(workflow.entityId.trim().length).toBeGreaterThan(0);
@@ -181,14 +216,14 @@ describe('tool route content gate', () => {
         expect(workflow.media).toHaveLength(2);
         for (const media of workflow.media) {
           expect(media.alt.trim().length).toBeGreaterThan(0);
-          expect(getMarketingAsset(media.assetId).kind).toBe('image');
+          expect(media.kind).toBe('image');
         }
       }
       expect(detail?.content.showcase.models.items).toHaveLength(1);
       for (const model of detail?.content.showcase.models.items ?? []) {
         expect(model.entityId.trim().length).toBeGreaterThan(0);
         expect(imageModelOptionFor(model.runtimeModelKey)).toBeDefined();
-        expect(getMarketingAsset(model.media.assetId).kind).toBe('image');
+        expect(model.media.kind).toBe('image');
       }
       expect(detail?.showcaseRoutes).toEqual({
         workflows: [
@@ -199,9 +234,11 @@ describe('tool route content gate', () => {
         ],
         models: [],
       });
-      expect(
-        detail?.content.videoInspiration.title.trim().length
-      ).toBeGreaterThan(0);
+      expect(detail?.content.useCases.items).toHaveLength(3);
+      for (const useCase of detail?.content.useCases.items ?? []) {
+        expect(useCase.id.trim().length).toBeGreaterThan(0);
+        expect(useCase.media.kind).toBe('image');
+      }
       expect(detail?.content.faq.items.length).toBeGreaterThanOrEqual(3);
       expect(detail?.related).toEqual([]);
     }

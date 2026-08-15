@@ -1,89 +1,43 @@
-import { catalogRouteSegment } from '@/config/catalog/paths';
-import { isSupportedLocale, type AppLocale } from '@/config/locale';
+import type { AppLocale } from '@/config/locale';
 import { locales } from '@/paraglide/runtime.js';
+import {
+  hasMarketingPage,
+  marketingContentPageKeys,
+} from '@/content/marketing';
+import { MarketingContentUnavailableError } from '@/content/marketing/registry';
+import { getDefaultMarketingContentRegistry } from '@/content/marketing/store';
 
 import type { ToolPageContent } from './types';
 
-type ToolContentModule = { content: ToolPageContent };
-type ToolContentLoader = () => Promise<ToolContentModule>;
-
-function contentKey(entityId: string, locale: AppLocale): string {
-  return `${entityId}:${locale}`;
-}
-
-const contentPathPattern = /^\.\/pages\/([^/]+)\/([^/]+)\.ts$/;
-
-function indexToolContentModules(
-  modules: Record<string, ToolContentLoader>
-): Readonly<Record<string, ToolContentLoader>> {
-  const loaders: Record<string, ToolContentLoader> = {};
-  for (const [path, loader] of Object.entries(modules)) {
-    const match = contentPathPattern.exec(path);
-    if (!match) throw new Error(`Invalid tool content path: ${path}`);
-    const [, entityId, locale] = match;
-    try {
-      if (catalogRouteSegment(entityId) !== entityId) throw new Error();
-    } catch {
-      throw new Error(`Invalid tool content entity id: ${path}`);
-    }
-    if (!isSupportedLocale(locale)) {
-      throw new Error(`Unsupported tool content locale: ${path}`);
-    }
-    const key = contentKey(entityId, locale);
-    if (loaders[key]) throw new Error(`Duplicate tool content: ${key}`);
-    loaders[key] = loader;
-  }
-  return Object.freeze(loaders);
-}
-
-const toolContentLoaders = indexToolContentModules(
-  import.meta.glob<ToolContentModule>('./pages/*/*.ts', { eager: false })
-);
-
 export const toolContentManifestKeys = Object.freeze(
-  Object.keys(toolContentLoaders).sort()
+  marketingContentPageKeys.flatMap((key) =>
+    key.startsWith('tool:') ? [key.slice('tool:'.length)] : []
+  )
 );
 
 export function hasToolContent(entityId: string, locale: AppLocale): boolean {
-  return contentKey(entityId, locale) in toolContentLoaders;
+  return hasMarketingPage('tool', entityId, locale);
 }
 
 export function availableToolContentLocales(entityId: string): AppLocale[] {
   return locales.filter((locale) => hasToolContent(entityId, locale));
 }
 
-/** Exact-locale lookup. Missing content never falls back to another language. */
+/** Exact-locale lookup. Unregistered content is 404; published failures throw. */
 export async function loadToolContent(
   entityId: string,
   locale: AppLocale
 ): Promise<ToolPageContent | null> {
-  const key = contentKey(entityId, locale);
-  const loader = (
-    toolContentLoaders as Record<string, ToolContentLoader | undefined>
-  )[key];
-  if (!loader) return null;
-  const { content } = await loader();
-  if (!content || typeof content !== 'object') {
-    throw new Error(`Invalid tool content module: ${key}`);
+  if (!hasToolContent(entityId, locale)) return null;
+  const registry = await getDefaultMarketingContentRegistry();
+  const page = await registry.getToolPage(entityId, locale);
+  if (!page) {
+    throw new MarketingContentUnavailableError(
+      `Published marketing page is absent from the pinned release: tool:${entityId}:${locale}`
+    );
   }
-  if (content.entityId !== entityId || content.locale !== locale) {
-    throw new Error(`Tool content identity mismatch: ${key}`);
-  }
-  return content;
+  return page.content;
 }
 
-/** Runtime-facing fail-closed lookup; strict callers/tests can use loadToolContent. */
-export async function loadToolContentOrNull(
-  entityId: string,
-  locale: AppLocale
-): Promise<ToolPageContent | null> {
-  try {
-    return await loadToolContent(entityId, locale);
-  } catch (error) {
-    console.error(
-      `[catalog] Invalid tool content: ${entityId}:${locale}`,
-      error
-    );
-    return null;
-  }
-}
+/** Compatibility alias: null means unpublished only; release errors propagate. */
+export const loadToolContentOrNull = loadToolContent;

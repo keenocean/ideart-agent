@@ -1,20 +1,18 @@
 import { useMemo, useRef } from 'react';
 
-import {
-  getMarketingAsset,
-  getMarketingImageAsset,
-} from '@/config/catalog/assets';
 import { generationPresetFor } from '@/config/catalog/generation';
 import { toolCatalog } from '@/config/catalog/tools';
-import type { DeploymentReadiness } from '@/config/catalog/types';
+import type {
+  DeploymentReadiness,
+  MarketingImageAsset,
+} from '@/config/catalog/types';
 import { m } from '@/paraglide/messages.js';
 import { useGenerationEntry } from '@/hooks/use-generation-entry';
+import { ToolDetailTemplate } from '@/blocks/tool-detail-variants';
 import { GenerationWorkbench } from '@/components/agent/generation-workbench';
-import {
-  ToolDetailPage,
-  type ToolDetailRelatedItem,
-} from '@/components/catalog/tool-detail-page';
+import type { ToolDetailRelatedItem } from '@/components/catalog/tool-detail-shell';
 import type { ToolDetailPageData } from '@/content/tools/listing';
+import type { ToolMediaReference } from '@/content/tools/types';
 
 function availabilityLabel(availability: ToolDetailPageData['availability']) {
   switch (availability) {
@@ -25,6 +23,15 @@ function availabilityLabel(availability: ToolDetailPageData['availability']) {
     case 'coming-soon':
       return m['tools.availability.coming_soon']();
   }
+}
+
+function showcaseImage(
+  media: ToolMediaReference
+): MarketingImageAsset & { alt: string } {
+  if (media.kind !== 'image') {
+    throw new Error(`Showcase media must be an image: ${media.id}`);
+  }
+  return media;
 }
 
 export function ToolDetail({
@@ -54,58 +61,39 @@ export function ToolDetail({
     ...item,
     actionLabel: m['tools.directory.view_tool'](),
   }));
-  const resolveShowcaseImage = (media: {
-    assetId: Parameters<typeof getMarketingImageAsset>[0];
-    alt: string;
-  }) => ({ ...getMarketingImageAsset(media.assetId), alt: media.alt });
   const workflowHrefs = new Map(
     page.showcaseRoutes.workflows.map((item) => [item.entityId, item.href])
   );
   const modelHrefs = new Map(
     page.showcaseRoutes.models.map((item) => [item.entityId, item.href])
   );
-  const content = {
-    ...page.content,
-    examples: {
-      ...page.content.examples,
-      items: page.content.examples.items.map(({ media, ...item }) => ({
-        ...item,
-        media: {
-          ...getMarketingAsset(media.assetId),
-          alt: media.alt,
-        },
-      })),
+  const showcase = {
+    workflows: {
+      ...page.content.showcase.workflows,
+      items: page.content.showcase.workflows.items.flatMap((item) => {
+        const href = workflowHrefs.get(item.entityId);
+        return href
+          ? [
+              {
+                ...item,
+                href,
+                media: [
+                  showcaseImage(item.media[0]),
+                  showcaseImage(item.media[1]),
+                ] as const,
+              },
+            ]
+          : [];
+      }),
     },
-    showcase: {
-      workflows: {
-        ...page.content.showcase.workflows,
-        items: page.content.showcase.workflows.items.flatMap((item) => {
-          const href = workflowHrefs.get(item.entityId);
-          return href
-            ? [
-                {
-                  ...item,
-                  href,
-                  media: [
-                    resolveShowcaseImage(item.media[0]),
-                    resolveShowcaseImage(item.media[1]),
-                  ] as const,
-                },
-              ]
-            : [];
-        }),
-      },
-      models: {
-        ...page.content.showcase.models,
-        items: page.content.showcase.models.items.flatMap(
-          ({ media, ...item }) => {
-            const href = modelHrefs.get(item.entityId);
-            return href
-              ? [{ ...item, href, media: resolveShowcaseImage(media) }]
-              : [];
-          }
-        ),
-      },
+    models: {
+      ...page.content.showcase.models,
+      items: page.content.showcase.models.items.flatMap(
+        ({ media, ...item }) => {
+          const href = modelHrefs.get(item.entityId);
+          return href ? [{ ...item, href, media: showcaseImage(media) }] : [];
+        }
+      ),
     },
   };
   function focusWorkbench(value: string) {
@@ -124,8 +112,10 @@ export function ToolDetail({
   }
 
   return (
-    <ToolDetailPage
-      content={content}
+    <ToolDetailTemplate
+      archetype={definition.archetype}
+      content={page.content}
+      showcase={showcase}
       availabilityLabel={availabilityLabel(page.availability)}
       breadcrumbHomeLabel={m['tools.breadcrumb.home']()}
       breadcrumbToolsLabel={m['tools.breadcrumb.tools']()}

@@ -104,10 +104,11 @@ The SEO map is an operational decision record, not a keyword-stuffing brief. A r
 - Update the canonical page/entity registry when one exists instead of maintaining separate homepage, directory, sitemap, and discovery-feed lists.
 - Reuse existing UI primitives before adding marketing components.
 - Make core H1, explanatory copy, limitations, evidence, and internal links available in SSR HTML. Lazy-load heavy Workbench/gallery panels when appropriate.
-- Use one typed content source for visible FAQ and FAQ JSON-LD, visible breadcrumbs and `BreadcrumbList`, and social metadata inputs.
+- Use one schema-validated content source/release for visible FAQ and FAQ JSON-LD, visible breadcrumbs and `BreadcrumbList`, and social metadata inputs.
 - Route all page metadata through the shared SEO helper when it exists. If project guidance calls for one but it is absent, implement it once rather than proliferating route-local copies.
 - Update every affected locale, but do not register or synthesize a missing locale merely for parity. Add an alternate only when that locale has substantive, indexable content and an accurate canonical path.
 - Follow the adapter's media-host and local-asset allowlist for page images, videos, posters, and OG/Twitter assets. Keep rendered URLs public, absolute, stable, accessible, dimensioned, and truthful; upload/verify external objects before merging their page references.
+- When the adapter defines an external content-release architecture, keep editable sources out of Worker/client bundles, publish immutable content before pinning the application release, and preserve the adapter's 404-versus-503 semantics. Do not replace that contract with client-side JSON fetching or a mutable latest pointer.
 
 ### 6. Apply the release gate
 
@@ -127,6 +128,7 @@ For changed routes verify, as applicable:
 
 - status code and redirect behavior;
 - zero unexpected 404s in the site's published/discovered URL inventory, while negative route fixtures return their deliberate 404/410 status;
+- temporary content-store/release faults use the adapter's availability status (normally 503), rather than being misreported as absent pages;
 - one title, description, robots directive, and canonical;
 - canonical/current-locale URL and `og:url` equality;
 - reciprocal hreflang only between indexable real translations;

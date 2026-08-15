@@ -16,7 +16,15 @@ function availabilityLabel(availability: ToolDirectoryItem['availability']) {
   }
 }
 
-export function ToolDirectory({ items }: { items: ToolDirectoryItem[] }) {
+export function ToolDirectory({
+  items,
+  title,
+  description,
+}: {
+  items: ToolDirectoryItem[];
+  title: string;
+  description: string;
+}) {
   const cards: CatalogDirectoryCard[] = items.map((item) => ({
     ...item,
     statusLabel: availabilityLabel(item.availability),
@@ -25,8 +33,8 @@ export function ToolDirectory({ items }: { items: ToolDirectoryItem[] }) {
   return (
     <CatalogDirectory
       eyebrow={m['tools.directory.eyebrow']()}
-      title={m['tools.directory.title']()}
-      description={m['tools.directory.description']()}
+      title={title}
+      description={description}
       items={cards}
       emptyText={m['tools.directory.empty']()}
     />

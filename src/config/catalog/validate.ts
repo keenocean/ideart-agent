@@ -109,6 +109,18 @@ export function validateCatalog(
     }
     if (entry.kind === 'tool') {
       const { minimum, maximum, accepts } = entry.execution.inputPolicy;
+      const expectsImageOutput =
+        entry.archetype === 'image-generator' ||
+        entry.archetype === 'image-editor' ||
+        entry.archetype === 'background-editor';
+      if (
+        (expectsImageOutput && entry.execution.mediaMode !== 'image') ||
+        (!expectsImageOutput && entry.execution.mediaMode !== 'video')
+      ) {
+        throw new Error(
+          `Tool archetype/media mode mismatch: ${entry.entityId}`
+        );
+      }
       assertOrder(minimum, `${entry.entityId} input minimum`);
       if (maximum !== undefined) {
         assertOrder(maximum, `${entry.entityId} input maximum`);

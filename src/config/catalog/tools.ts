@@ -26,12 +26,7 @@ export const toolCatalog = [
       home: { featured: true, order: 10 },
     },
     related: ['ai-image-editor', 'gpt-image-2'],
-    variant: {
-      hero: 'centered',
-      workbench: 'composer',
-      examples: 'gallery',
-      sections: ['workflow', 'prompt-guide', 'use-cases', 'limitations'],
-    },
+    archetype: 'image-generator',
     execution: {
       kind: 'agent-preset',
       mediaMode: 'image',
@@ -46,12 +41,7 @@ export const toolCatalog = [
     localePages: localePages('ai-image-editor'),
     placement: { directoryOrder: 20 },
     related: ['ai-image-generator', 'background-remover', 'gpt-image-2'],
-    variant: {
-      hero: 'split',
-      workbench: 'upload-first',
-      examples: 'comparison',
-      sections: ['workflow', 'use-cases', 'limitations'],
-    },
+    archetype: 'image-editor',
     execution: {
       kind: 'agent-preset',
       mediaMode: 'image',
@@ -69,12 +59,7 @@ export const toolCatalog = [
       home: { featured: true, order: 20 },
     },
     related: ['image-to-video', 'reference-to-video', 'minimax-h3'],
-    variant: {
-      hero: 'visual-first',
-      workbench: 'composer',
-      examples: 'gallery',
-      sections: ['workflow', 'prompt-guide', 'use-cases', 'limitations'],
-    },
+    archetype: 'text-to-video',
     execution: {
       kind: 'agent-preset',
       mediaMode: 'video',
@@ -92,12 +77,7 @@ export const toolCatalog = [
       home: { featured: true, order: 30 },
     },
     related: ['text-to-video', 'reference-to-video', 'seedance-2-0'],
-    variant: {
-      hero: 'split',
-      workbench: 'upload-first',
-      examples: 'timeline',
-      sections: ['workflow', 'prompt-guide', 'use-cases', 'limitations'],
-    },
+    archetype: 'image-to-video',
     execution: {
       kind: 'agent-preset',
       mediaMode: 'video',
@@ -112,12 +92,7 @@ export const toolCatalog = [
     localePages: localePages('reference-to-video'),
     placement: { directoryOrder: 50 },
     related: ['image-to-video', 'text-to-video', 'seedance-2-0'],
-    variant: {
-      hero: 'split',
-      workbench: 'upload-first',
-      examples: 'timeline',
-      sections: ['capabilities', 'workflow', 'use-cases', 'limitations'],
-    },
+    archetype: 'reference-to-video',
     execution: {
       kind: 'agent-preset',
       mediaMode: 'video',
@@ -136,12 +111,7 @@ export const toolCatalog = [
     localePages: localePages('background-remover'),
     placement: { directoryOrder: 60 },
     related: ['ai-image-editor', 'gpt-image-2'],
-    variant: {
-      hero: 'split',
-      workbench: 'before-after',
-      examples: 'comparison',
-      sections: ['workflow', 'before-after', 'use-cases', 'limitations'],
-    },
+    archetype: 'background-editor',
     execution: {
       kind: 'agent-preset',
       mediaMode: 'image',

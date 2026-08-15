@@ -58,6 +58,7 @@ describe('Catalog contract', () => {
         },
       },
       placement: { directoryOrder: 1 },
+      archetype: 'image-generator',
       execution: {
         kind: 'agent-preset',
         mediaMode: 'image',
@@ -214,6 +215,22 @@ describe('Catalog contract', () => {
       },
     } as CatalogDefinition;
     expect(() => validateCatalog([invalidRange], [])).toThrow(/input range/);
+
+    const invalidArchetypeMode = {
+      ...base,
+      entityId: 'invalid-archetype-mode',
+      localePages: {
+        en: {
+          slug: catalogRouteSegment('invalid-archetype-mode'),
+          indexing: 'noindex',
+        },
+      },
+      related: [],
+      execution: { ...base.execution, mediaMode: 'video' },
+    } as CatalogDefinition;
+    expect(() => validateCatalog([invalidArchetypeMode], [])).toThrow(
+      /archetype\/media mode mismatch/
+    );
   });
 
   it('validates legacy sources and current-locale redirect targets', () => {

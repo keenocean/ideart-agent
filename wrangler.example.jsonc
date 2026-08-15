@@ -1,6 +1,6 @@
 // Cloudflare Workers deploy config — TEMPLATE.
 // The /deploy-cloudflare skill copies this to wrangler.jsonc (gitignored, your
-// working copy) and fills in the real values (D1 database_id, production URL).
+// working copy) and fills in D1, private release buckets/IDs, and production URL.
 // `pnpm cf:build` (NITRO_PRESET=cloudflare_module) merges wrangler.jsonc into
 // the generated .output/server/wrangler.json; deploy with `pnpm cf:deploy`.
 {
@@ -23,6 +23,9 @@
     // Immutable content hash printed by `pnpm skills:build`. Publish it to
     // the private bucket with `pnpm skills:publish -- --bucket=<name>`.
     "AGENT_SKILLS_RELEASE": "REPLACE_WITH_OUTPUT_OF_PNPM_SKILLS_BUILD",
+    // Built from messages/marketing. Publish objects before the manifest, then
+    // pin this id and deploy so Catalog + content switch atomically.
+    "MARKETING_CONTENT_RELEASE": "REPLACE_WITH_OUTPUT_OF_PNPM_MARKETING_SYNC_CONTENT_RELEASE",
   },
   "d1_databases": [
     {
@@ -32,12 +35,16 @@
       "migrations_dir": "drizzle",
     },
   ],
-  // Dedicated private content store for Agent Skills. Keep it separate from
-  // the admin-configured bucket used for generated user media.
+  // Dedicated private release stores. Keep both separate from the public CDN
+  // media origin and the admin-configured bucket used for generated user media.
   "r2_buckets": [
     {
       "binding": "AGENT_SKILLS",
       "bucket_name": "REPLACE_WITH_AGENT_SKILLS_BUCKET_NAME",
+    },
+    {
+      "binding": "MARKETING_CONTENT",
+      "bucket_name": "REPLACE_WITH_MARKETING_CONTENT_BUCKET_NAME",
     },
   ],
   // ── Postgres via Hyperdrive (instead of D1) ────────────────────────────────

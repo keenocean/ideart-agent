@@ -1,4 +1,4 @@
-import { createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, notFound } from '@tanstack/react-router';
 
 import { envConfigs } from '@/config';
 import {
@@ -6,28 +6,25 @@ import {
   getFixedRouteAlternates,
 } from '@/config/seo/public-routes';
 import { buildSeoHead } from '@/lib/seo';
-import { m } from '@/paraglide/messages.js';
 import { getLocale } from '@/paraglide/runtime.js';
 import { Footer } from '@/blocks/footer';
 import { Header } from '@/blocks/header';
 import { ToolDirectory } from '@/blocks/tool-directory';
-import { loadToolDirectoryItems } from '@/content/tools/listing';
+import { loadToolDirectoryPage } from '@/content/tools/listing';
 
 export const Route = createFileRoute('/tools/')({
   loader: async () => {
     const locale = getLocale();
     const page = getFixedLocalePage('tools', locale);
     if (!page) throw new Error(`Tools is not registered for locale ${locale}`);
-    const items = await loadToolDirectoryItems(locale);
-    const title = m['tools.directory.seo_title'](
-      { appName: envConfigs.app_name },
-      { locale }
-    );
-    const description = m['tools.directory.seo_description']({}, { locale });
-    const directoryName = m['tools.directory.title']({}, { locale });
+    const directory = await loadToolDirectoryPage(locale);
+    if (!directory || directory.items.length === 0) throw notFound();
+    const title = directory.seo.title.replace('{appName}', envConfigs.app_name);
+    const description = directory.seo.description;
+    const directoryName = directory.hero.title;
     return {
       locale,
-      items,
+      directory,
       seo: {
         kind: 'website' as const,
         title,
@@ -53,12 +50,16 @@ export const Route = createFileRoute('/tools/')({
 });
 
 function ToolsPage() {
-  const { items } = Route.useLoaderData();
+  const { directory } = Route.useLoaderData();
   return (
     <div className="bg-background text-foreground flex min-h-screen flex-col">
       <Header />
       <main className="flex-1">
-        <ToolDirectory items={items} />
+        <ToolDirectory
+          items={directory.items}
+          title={directory.hero.title}
+          description={directory.hero.description}
+        />
       </main>
       <Footer />
     </div>

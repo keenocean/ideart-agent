@@ -9,6 +9,18 @@ export type Publication = 'listed' | 'unlisted' | 'hidden';
 export type Availability = 'live' | 'beta' | 'coming-soon';
 export type Indexing = 'index' | 'noindex';
 
+/**
+ * Semantic tool-page templates. Catalog selects an information architecture;
+ * React components remain owned by the Block layer.
+ */
+export type ToolArchetype =
+  | 'image-generator'
+  | 'image-editor'
+  | 'text-to-video'
+  | 'image-to-video'
+  | 'reference-to-video'
+  | 'background-editor';
+
 export type CatalogRouteSegment = string & {
   readonly __brand: 'CatalogRouteSegment';
 };
@@ -100,7 +112,6 @@ type CatalogDefinitionCore = CatalogVisibility & {
   entityId: string;
   availability: Availability;
   related?: readonly string[];
-  variant?: DetailPageVariant;
 };
 
 export type ToolExecution = {
@@ -115,11 +126,13 @@ export type ToolExecution = {
 
 export type ToolDefinition = CatalogDefinitionCore & {
   kind: 'tool';
+  archetype: ToolArchetype;
   execution: ToolExecution;
 };
 
-export type ModelDefinition = CatalogDefinitionCore &
-  (
+export type ModelDefinition = CatalogDefinitionCore & {
+  variant?: DetailPageVariant;
+} & (
     | {
         kind: 'model';
         modality: 'image';

@@ -6,11 +6,12 @@ import {
   assertMarketingAssetUrl,
   verifyMarketingPublishedAsset,
 } from '@/core/storage/marketing';
-import {
-  marketingAssetPublicDomain,
-  marketingAssets,
-} from '@/config/catalog/assets';
 import type { MarketingAsset } from '@/config/catalog/types';
+import {
+  marketingAssetsSourceSchema,
+  parseMarketingAsset,
+  type MarketingAssetsSource,
+} from '@/content/marketing/schema';
 
 type QualityConfig = {
   publicAssets: {
@@ -26,6 +27,23 @@ type QualityConfig = {
 };
 
 const cwd = process.cwd();
+const assetSource = marketingAssetsSourceSchema.parse(
+  JSON.parse(
+    readFileSync(path.join(cwd, 'messages/marketing/assets.json'), 'utf8')
+  )
+) as MarketingAssetsSource;
+const sourceAssets = new Map(
+  assetSource.assets.map((asset) => [asset.id, asset] as const)
+);
+const marketingAssets: MarketingAsset[] = assetSource.assets.map((asset) => {
+  if (asset.kind === 'image') return parseMarketingAsset(asset);
+  const poster = sourceAssets.get(asset.posterAssetId);
+  if (!poster || poster.kind !== 'image') {
+    throw new Error(`Video poster image is missing: ${asset.id}`);
+  }
+  const { posterAssetId: _, ...video } = asset;
+  return parseMarketingAsset({ ...video, poster });
+});
 const config = JSON.parse(
   readFileSync(path.join(cwd, 'config/marketing-quality.json'), 'utf8')
 ) as QualityConfig;
@@ -115,13 +133,13 @@ const requestedDomain = process.argv
   .find((arg) => arg.startsWith('--r2-domain='))
   ?.slice('--r2-domain='.length)
   .trim();
-const publicDomain = requestedDomain || marketingAssetPublicDomain;
+const publicDomain = requestedDomain || assetSource.publicDomain;
 
 const assets = new Map<string, MarketingAsset>();
 function registerAsset(asset: MarketingAsset): void {
   const existing = assets.get(asset.id);
   if (existing) {
-    if (existing !== asset) {
+    if (JSON.stringify(existing) !== JSON.stringify(asset)) {
       failures.push(`duplicate marketing asset id: ${asset.id}`);
     }
     return;

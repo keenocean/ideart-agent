@@ -4,6 +4,12 @@ Captured on 2026-08-14 before the phase 0/1 infrastructure edits. The worktree
 already contained the in-progress Blog/i18n changes listed by `git status
 --short`; implementation preserved them and did not assume a clean branch.
 
+This is historical measurement evidence, not the current scale architecture.
+The 100+ page target in `docs/marketing-pages-guide.md` supersedes the earlier
+future recommendation for lazy `slug + locale` client modules: editable bodies
+now belong under `messages/marketing/**` and must be published as immutable,
+server-loaded content releases outside Worker/client bundles.
+
 ## Repository checks
 
 | Check                    | Baseline result                             |
@@ -65,8 +71,8 @@ client imports. Raw/gzip bytes include the root chain once per route.
 
 The main compiled messages chunk was 238,799 raw / 72,081 gzip bytes and was
 preloaded by the root route. This confirms that long future Catalog bodies must
-not be added to the global messages graph; they remain planned as lazy
-`slug + locale` content modules.
+not be added to the global messages graph. The later implementation superseded
+the interim lazy-module idea with immutable, server-loaded content releases.
 
 The public marketing import scan found no `tDynamic` calls or runtime-built
 message keys. The only eager content glob is the existing, small legal-page MDX

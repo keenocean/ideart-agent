@@ -1,15 +1,12 @@
 import { catalog } from '@/config/catalog/registry';
 import { resolveCatalogRoute } from '@/config/catalog/resolver';
-import {
-  selectDirectoryEntries,
-  selectRelatedEntries,
-} from '@/config/catalog/selectors';
-import { toolCatalog } from '@/config/catalog/tools';
+import { selectRelatedEntries } from '@/config/catalog/selectors';
 import type {
   Availability,
   CatalogDefinition,
   CatalogLocalePage,
   Indexing,
+  ToolArchetype,
   ToolDefinition,
 } from '@/config/catalog/types';
 import type { AppLocale } from '@/config/locale';
@@ -18,9 +15,16 @@ import {
   isCatalogPageContentAvailable,
   selectContentBackedCatalogLocaleRoutes,
 } from '@/content/catalog-pages';
+import { hasMarketingDirectory } from '@/content/marketing';
+import {
+  MarketingContentUnavailableError,
+  MarketingContentValidationError,
+} from '@/content/marketing/registry';
+import { getDefaultMarketingContentRegistry } from '@/content/marketing/store';
 
 import { loadToolContentOrNull } from './manifest';
 import type { ToolPageContent } from './types';
+import { validateToolPageContent } from './validate';
 
 export type ToolDirectoryItem = {
   entityId: string;
@@ -28,6 +32,13 @@ export type ToolDirectoryItem = {
   title: string;
   description: string;
   availability: Availability;
+};
+
+export type ToolDirectoryPageData = {
+  locale: AppLocale;
+  seo: { title: string; description: string };
+  hero: { title: string; description: string };
+  items: ToolDirectoryItem[];
 };
 
 export type ToolShowcaseRoute = {
@@ -41,6 +52,7 @@ export type ToolDetailPageData = {
   path: string;
   indexing: Indexing;
   availability: Availability;
+  archetype: ToolArchetype;
   contentModifiedAt?: string;
   availableLocales: AppLocale[];
   localeRoutes: SeoRouteRef[];
@@ -64,6 +76,23 @@ function asListedTool(entry: CatalogDefinition): ListedToolDefinition | null {
     : null;
 }
 
+async function loadValidatedToolContent(
+  definition: ListedToolDefinition,
+  locale: AppLocale
+): Promise<ToolPageContent | null> {
+  const content = await loadToolContentOrNull(definition.entityId, locale);
+  if (!content) return null;
+  try {
+    validateToolPageContent(definition, content);
+    return content;
+  } catch (error) {
+    throw new MarketingContentValidationError(
+      `Tool content contract failed: ${definition.entityId}:${locale}`,
+      { cause: error }
+    );
+  }
+}
+
 async function showcaseRouteFor(
   kind: CatalogDefinition['kind'],
   entityId: string,
@@ -80,11 +109,11 @@ async function showcaseRouteFor(
   ) {
     return null;
   }
-  if (
-    definition.kind === 'tool' &&
-    (await loadToolContentOrNull(entityId, locale)) === null
-  ) {
-    return null;
+  if (definition.kind === 'tool') {
+    const listedTool = asListedTool(definition);
+    if (!listedTool || !(await loadValidatedToolContent(listedTool, locale))) {
+      return null;
+    }
   }
   return {
     entityId,
@@ -99,7 +128,7 @@ async function cardFor(
 ): Promise<ToolDirectoryItem | null> {
   const page = definition.localePages[locale];
   if (!page) return null;
-  const content = await loadToolContentOrNull(definition.entityId, locale);
+  const content = await loadValidatedToolContent(definition, locale);
   if (!content) return null;
   const resolved = resolveCatalogRoute('tool', locale, page.slug);
   return {
@@ -114,17 +143,27 @@ async function cardFor(
 export async function loadToolDirectoryItems(
   locale: AppLocale
 ): Promise<ToolDirectoryItem[]> {
-  const definitions = selectDirectoryEntries(
-    toolCatalog,
+  return (await loadToolDirectoryPage(locale))?.items ?? [];
+}
+
+/** One projected release object keeps directory reads O(1) at 100+ pages. */
+export async function loadToolDirectoryPage(
+  locale: AppLocale
+): Promise<ToolDirectoryPageData | null> {
+  if (!hasMarketingDirectory('tools', locale)) return null;
+  const registry = await getDefaultMarketingContentRegistry();
+  const directory = await registry.getToolDirectory(locale);
+  if (!directory) {
+    throw new MarketingContentUnavailableError(
+      `Published marketing directory is absent from the pinned release: tools:${locale}`
+    );
+  }
+  return {
     locale,
-    isCatalogPageContentAvailable
-  )
-    .map(asListedTool)
-    .filter((entry): entry is ListedToolDefinition => Boolean(entry));
-  const items = await Promise.all(
-    definitions.map((definition) => cardFor(definition, locale))
-  );
-  return items.filter((item): item is ToolDirectoryItem => Boolean(item));
+    seo: directory.seo,
+    hero: directory.hero,
+    items: directory.items,
+  };
 }
 
 function indexableAlternates(
@@ -150,7 +189,7 @@ export async function loadToolDetailPage(
   }
   const definition = asListedTool(resolved.definition);
   if (!definition) return null;
-  const content = await loadToolContentOrNull(definition.entityId, locale);
+  const content = await loadValidatedToolContent(definition, locale);
   if (!content) return null;
   const page = definition.localePages[locale];
   if (!page) return null;
@@ -194,6 +233,7 @@ export async function loadToolDetailPage(
     path: resolved.path,
     indexing: page.indexing,
     availability: definition.availability,
+    archetype: definition.archetype,
     contentModifiedAt: page.contentModifiedAt,
     availableLocales: localeRoutes.map((route) => route.locale),
     localeRoutes,

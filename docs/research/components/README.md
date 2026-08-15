@@ -4,37 +4,45 @@ Start here before adding or reusing a public tool/model-page section. The
 components in `src/components/catalog/` are durable, pure-props UI; localized
 content and product wiring stay outside them.
 
+The ownership table describes the implemented 100+ page boundary. The current
+image tool slice reads a Worker-pinned content release built from
+`messages/marketing/**`; add new pages and media through that source and its
+release compiler, never by importing page JSON or a global asset registry.
+
 ## Ownership boundaries
 
-| Layer            | Responsibility                                                    | Canonical location                            |
-| ---------------- | ----------------------------------------------------------------- | --------------------------------------------- |
-| Route            | Load the localized tool/model entry and metadata                  | `src/routes/tools/$slug.tsx`                  |
-| Block            | Read shared i18n, resolve R2 asset IDs, connect generator actions | `src/blocks/tool-detail.tsx`                  |
-| Page composition | Arrange the durable catalog sections                              | `src/components/catalog/tool-detail-page.tsx` |
-| Content          | Supply localized copy, prompts, asset references, and inventories | `src/content/tools/pages/<slug>/{en,zh}.ts`   |
-| Media registry   | Define verified immutable R2 images/videos and metadata           | `src/config/catalog/assets.ts`                |
-| Components       | Render props without reading i18n or importing runtime modules    | `src/components/catalog/*.tsx`                |
+| Layer          | Responsibility                                                         | Canonical location                                  |
+| -------------- | ---------------------------------------------------------------------- | --------------------------------------------------- |
+| Route          | Load the localized tool/model entry and metadata                       | `src/routes/tools/$slug.tsx`                        |
+| Block wiring   | Read shared i18n, consume resolved assets, connect generator actions   | `src/blocks/tool-detail.tsx`                        |
+| Tool template  | Own the section order for each semantic tool type                      | `src/blocks/tool-detail-variants.tsx`               |
+| Shared chassis | Render Hero/Workbench slots, Related, FAQ, and CTA                     | `src/components/catalog/tool-detail-shell.tsx`      |
+| Content source | Supply localized copy, prompts, asset IDs, and inventories             | `messages/marketing/tools/<entityId>/<locale>.json` |
+| Media source   | Define verified immutable R2 images/videos and metadata                | `messages/marketing/assets.json`                    |
+| Runtime data   | Server-only exact page payload from the Worker-pinned content release  | `src/content/marketing/registry.ts` + `store.ts`    |
+| Components     | Render props without reading i18n or importing runtime/content modules | `src/components/catalog/*.tsx`                      |
 
 ## Component index
 
-| Component                   | Use it for                                               | Important inputs                                              | Media                                         |
-| --------------------------- | -------------------------------------------------------- | ------------------------------------------------------------- | --------------------------------------------- |
-| `ToolDetailPage`            | A complete tool detail/marketing page                    | `content`, `workbench`, prompt/model callbacks, related items | Image + video                                 |
-| `CatalogShowcaseCardGrid`   | Reference-aligned Tools and Models card groups           | Dynamic workflow/model groups and real selection callbacks    | Workflow: two images; model: one image        |
-| `CatalogMasonryGallery`     | A quantity-driven example gallery with optional collapse | `items`, preview labels, optional prompt callback             | Image + video                                 |
-| `CatalogMediaCarousel`      | “Get Inspired” horizontal snap rail                      | `items`, preview labels, optional prompt callback             | Image + video; intended for video inspiration |
-| `CatalogMediaFeatureList`   | Reusable alternating use-case rows                       | `items`, `mediaPosition`, `variant`                           | Image + video                                 |
-| `CatalogMediaExplainer`     | One split copy/media explainer card                      | title/copy/optional eyebrow and footnote                      | Image + video                                 |
-| `CatalogExploreSection`     | Grouped input/output and workflow cards                  | Copy groups                                                   | No required media                             |
-| `CatalogFeatureGrid`        | Responsive feature cards                                 | Heading and copy items                                        | Optional icons                                |
-| `CatalogSteps`              | Numbered process cards                                   | Heading and ordered copy items                                | No required media                             |
-| `ToolQuickStarts`           | Compact prompt presets next to the workbench             | Gallery items and selection callback                          | Image + video                                 |
-| `CatalogLimitations`        | Safety or limitation bullets                             | Heading and string items                                      | None                                          |
-| `CatalogFaq`                | Accessible native FAQ disclosures                        | Heading and question/answer items                             | None                                          |
-| `CatalogFinalCta`           | Final locale-aware CTA card                              | Copy, links, and layout variant                               | None                                          |
-| `CatalogMedia`              | Typed responsive media primitive                         | `CatalogMediaAsset`                                           | Image + viewport-aware video                  |
-| `CatalogMediaPreviewDialog` | Shared full-screen media/prompt viewer                   | Active item, labels, navigation, actions                      | Image + video                                 |
-| `CatalogSectionHeading`     | Consistent compact/editorial section heading             | Title, description, alignment, size                           | None                                          |
+| Component                    | Use it for                                               | Important inputs                                           | Media                                         |
+| ---------------------------- | -------------------------------------------------------- | ---------------------------------------------------------- | --------------------------------------------- |
+| `ToolDetailShell`            | Shared detail-page framing                               | hero, workbench/hero slots, related items, FAQ, CTA        | Slot-owned                                    |
+| `CatalogShowcaseCardGrid`    | Reference-aligned Tools and Models card groups           | Dynamic workflow/model groups and real selection callbacks | Workflow: two images; model: one image        |
+| `CatalogMasonryGallery`      | A quantity-driven example gallery with optional collapse | `items`, preview labels, optional prompt callback          | Image + video                                 |
+| `CatalogMediaCarousel`       | “Get Inspired” horizontal snap rail                      | `items`, preview labels, optional prompt callback          | Image + video; intended for video inspiration |
+| `CatalogMediaComparisonGrid` | Source/result evidence for editor and animation tools    | pairs, source/result labels, optional prompt callback      | Image + video                                 |
+| `CatalogMediaFeatureList`    | Reusable alternating use-case rows                       | `items`, `mediaPosition`, `variant`                        | Image + video                                 |
+| `CatalogMediaExplainer`      | One split copy/media explainer card                      | title/copy/optional eyebrow and footnote                   | Image + video                                 |
+| `CatalogExploreSection`      | Grouped input/output and workflow cards                  | Copy groups                                                | No required media                             |
+| `CatalogFeatureGrid`         | Responsive feature cards                                 | Heading and copy items                                     | Optional icons                                |
+| `CatalogSteps`               | Numbered process cards                                   | Heading and ordered copy items                             | No required media                             |
+| `ToolQuickStarts`            | Compact prompt presets next to the workbench             | Gallery items and selection callback                       | Image + video                                 |
+| `CatalogLimitations`         | Safety or limitation bullets                             | Heading and string items                                   | None                                          |
+| `CatalogFaq`                 | Accessible native FAQ disclosures                        | Heading and question/answer items                          | None                                          |
+| `CatalogFinalCta`            | Final locale-aware CTA card                              | Copy, links, and layout variant                            | None                                          |
+| `CatalogMedia`               | Typed responsive media primitive                         | `CatalogMediaAsset`                                        | Image + viewport-aware video                  |
+| `CatalogMediaPreviewDialog`  | Shared full-screen media/prompt viewer                   | Active item, labels, navigation, actions                   | Image + video                                 |
+| `CatalogSectionHeading`      | Consistent compact/editorial section heading             | Title, description, alignment, size                        | None                                          |
 
 Detailed geometry and behavior:
 
@@ -45,24 +53,29 @@ Detailed geometry and behavior:
 ## Preferred reuse path: a complete tool page
 
 Do not copy the existing AI image page JSX. Add the new page's localized
-content and asset references to the content layer, then let `ToolDetail` resolve
-assets and pass the result to `ToolDetailPage`. This preserves the shared
-workbench, gallery, tools/models cards, video carousel, use cases, FAQ, and CTA
-without creating a page-specific component fork.
+content and asset references to the content layer, select a semantic `archetype`
+in the Tool Catalog, and set the same `template` discriminator in the content.
+`ToolDetail` wires the workbench; `tool-detail-variants.tsx` chooses the
+code-owned composition; `ToolDetailShell` supplies the stable framing. Never put
+a React component name or an arbitrary section array in Catalog/content.
 
 The current composition derives sections as follows:
 
 ```text
-examples.items (image) -> quick starts + masonry gallery
-examples.items (video) -> CatalogMediaCarousel
+image-generator examples.items -> quick starts + masonry gallery
+text-to-video examples.items    -> CatalogMediaCarousel
+comparison template pairs       -> CatalogMediaComparisonGrid
 showcase.workflows      -> content-backed tool links
 showcase.models         -> content-backed model links
-useCases.items          -> alternating CatalogMediaFeatureList rows
+useCases.items + media   -> alternating CatalogMediaFeatureList rows
 ```
 
-Only publish a card when its target Catalog page has loadable content in the
-active locale. Runtime support alone does not make a marketing page real.
-Inventory counts remain dynamic; do not pad a grid with fake items.
+Only publish a card when its target Catalog page has a valid entry in the
+Worker-pinned content release for the active locale. The release compiler and
+content loader verify that `template` matches the Catalog `archetype` and that
+the referenced media kinds match the template.
+Runtime support alone does not make a marketing page real. Inventory counts
+remain dynamic; do not pad a grid with fake items.
 
 ## Standalone alternating image/video rows
 
@@ -143,9 +156,10 @@ unpublished pages.
 
 1. Upload production page media to R2 first, then register its immutable URL,
    kind, MIME type, dimensions, byte size, and video poster in
-   `src/config/catalog/assets.ts`.
-2. Content files store typed asset IDs plus localized alt text. Blocks resolve
-   those IDs; reusable components never receive unverified raw URLs.
+   `messages/marketing/assets.json`.
+2. Locale page JSON stores asset IDs plus localized alt text. The release
+   compiler resolves those IDs into the page-local payload; reusable components
+   never receive unverified raw URLs and runtime does not load the global registry.
 3. Components use semantic theme tokens such as `background`, `card`, `muted`,
    `foreground`, `border`, `primary`, and their foreground/ring variants. Do
    not copy reference-site hex, RGB, black, or white colors.
@@ -157,6 +171,10 @@ unpublished pages.
 ## Verification for a new consumer
 
 - Check English and Chinese content.
+- Run `pnpm marketing:build-content-release` and verify source/schema/Catalog/asset/hash identity.
+- Use `pnpm marketing:publish-content-release -- --dry-run` before any external write; actual publication also requires the private `MARKETING_CONTENT` R2 binding and a pinned `MARKETING_CONTENT_RELEASE` in the Worker configuration.
+- Confirm page JSON is absent from Worker Static Assets and client chunks.
+- For a batch, run `pnpm marketing:check-scale`; its isolated 100-page fixture cannot publish or replace the real availability index.
 - Check desktop and mobile geometry with the actual inventory count.
 - Check light and dark theme colors.
 - Exercise prompt/model callbacks and the preview dialog.

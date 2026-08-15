@@ -1,7 +1,7 @@
 ---
 name: deploy-cloudflare
-description: "Deploy this project to Cloudflare Workers (nitro cloudflare_module preset + wrangler). Auto-handles D1 setup, secrets, schema push, and redeploy. Use when the user says 'deploy to cloudflare', 'ship to workers', 'push to cf', '部署到 cloudflare', or asks how to publish to Workers."
-argument-hint: "[--admin-email=X --admin-password=Y | --admin=X | --domain=X | --rotate-secrets | --force-rbac]"
+description: "Deploy this project to Cloudflare Workers (nitro cloudflare_module preset + wrangler). Auto-handles D1 setup, private release buckets, secrets, schema push, and redeploy. Use when the user says 'deploy to cloudflare', 'ship to workers', 'push to cf', '部署到 cloudflare', or asks how to publish to Workers."
+argument-hint: '[--admin-email=X --admin-password=Y | --admin=X | --domain=X | --rotate-secrets | --force-rbac]'
 user-invocable: true
 ---
 
@@ -13,13 +13,13 @@ You are driving a Cloudflare Workers deployment of this TanStack Start project. 
 
 Two supported backends on Workers, chosen by `wrangler.jsonc` `vars.DATABASE_PROVIDER`:
 
-| | **D1** (`d1`) | **Postgres + Hyperdrive** (`postgresql`) |
-|---|---|---|
-| When | Default. Zero external infra. | User already has a Postgres (Neon/Supabase/RDS/self-hosted) or needs PG features |
-| Binding | `d1_databases` → `DB` | `hyperdrive` → `HYPERDRIVE` (`src/core/db/postgres.ts` reads `connectionString` from the stashed Workers env at runtime) |
-| Schema push | `wrangler d1 migrations apply --remote` | `pnpm db:migrate` directly against the real PG (NOT through Hyperdrive) |
-| RBAC seed / admin | local-sqlite dump dance (Phase 4.5 / 9) | `pnpm rbac:init` directly against PG — no dance needed |
-| Bundle | postgres driver stubbed out | postgres driver kept (vite.config.ts reads `vars.DATABASE_PROVIDER`) |
+|                   | **D1** (`d1`)                           | **Postgres + Hyperdrive** (`postgresql`)                                                                                 |
+| ----------------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| When              | Default. Zero external infra.           | User already has a Postgres (Neon/Supabase/RDS/self-hosted) or needs PG features                                         |
+| Binding           | `d1_databases` → `DB`                   | `hyperdrive` → `HYPERDRIVE` (`src/core/db/postgres.ts` reads `connectionString` from the stashed Workers env at runtime) |
+| Schema push       | `wrangler d1 migrations apply --remote` | `pnpm db:migrate` directly against the real PG (NOT through Hyperdrive)                                                  |
+| RBAC seed / admin | local-sqlite dump dance (Phase 4.5 / 9) | `pnpm rbac:init` directly against PG — no dance needed                                                                   |
+| Bundle            | postgres driver stubbed out             | postgres driver kept (vite.config.ts reads `vars.DATABASE_PROVIDER`)                                                     |
 
 **Backend selection:** if `wrangler.jsonc` already has a populated `hyperdrive` or `d1_databases` binding, keep that backend (incremental run). On first-time setup, default to D1 unless the user mentioned Postgres/Hyperdrive/Neon/Supabase or `$ARGUMENTS` contains `--db=postgres` — then use the **Phase 3-PG** variant below.
 
@@ -33,23 +33,25 @@ The skill is designed to be run **any number of times**. A repeat invocation aut
 2. **Final deploy confirmation** — always asked; deploy is irreversible.
 3. **(Optional) Admin credentials** — only asked on first deploy when no `super_admin` exists yet. User picks one of: `email password` (agent creates the account directly so user can log in immediately), `email` (promote an existing user — requires prior sign-up via web), or `skip` (assign later with `/deploy-cloudflare --admin-email=X --admin-password=Y` or `--admin=X`).
 
-Every other step (D1/R2 create, schema migrations, RBAC seed, Skill release,
-secrets, URL fixup) is automatic AND idempotent. So **"再发布一下" / "ship
-again"** = run `/deploy-cloudflare` again.
+Every other step (D1/private R2 create, schema migrations, RBAC seed, Agent
+Skill release, Marketing Content release, secrets, URL fixup) is automatic AND
+idempotent. So **"再发布一下" / "ship again"** = run
+`/deploy-cloudflare` again.
 
 ### Idempotency cheat sheet
 
-| Phase | Skip when | Re-run action |
-|---|---|---|
-| 0.2 Login | `wrangler whoami` is authed | No-op |
-| 3 First-time setup | D1 (name from `wrangler.jsonc` `database_name`) exists AND `database_id` is a real UUID AND Worker deployed before | Skip the entire Phase 3 block |
-| 4 Schema migrations | local `drizzle/meta/_journal.json` entry count == remote applied count | Skip apply (wrangler is idempotent, skip is for speed) |
-| 4.5 RBAC seed | `SELECT COUNT(*) FROM role` ≥ 1 on remote D1 | Skip local-sqlite dance entirely |
-| 5 Secrets | `wrangler secret list` already contains the name | Skip per-secret upload (`--rotate-secrets` forces) |
-| 5.5 Production URL | `.env.production` `VITE_APP_URL` AND `wrangler.jsonc` `vars.VITE_APP_URL` are both consistent with routes (workers.dev + no routes, OR custom domain matching a routes pattern) | Skip the prompt (`--domain=X` overrides) |
-| 6 Skill release + deploy | R2 objects are immutable; repeated publish is safe | Publish/verify Skills, pin release, then run `pnpm run cf:deploy` |
-| 7 URL fix | Both `.env.production` AND `wrangler.jsonc` vars already match the deployed URL | Skip redeploy |
-| 9 Admin | `SELECT COUNT(*) FROM user_role ur JOIN role r ON r.id=ur.role_id WHERE r.name='super_admin'` ≥ 1 | Don't prompt (explicit `--admin*` flags still run) |
+| Phase                           | Skip when                                                                                                                                                                       | Re-run action                                                                                       |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| 0.2 Login                       | `wrangler whoami` is authed                                                                                                                                                     | No-op                                                                                               |
+| 3 First-time setup              | D1 (name from `wrangler.jsonc` `database_name`) exists AND `database_id` is a real UUID AND Worker deployed before                                                              | Skip the entire Phase 3 block                                                                       |
+| 3.4/3.5 Private release buckets | Exact bucket exists and the matching `AGENT_SKILLS` / `MARKETING_CONTENT` binding is populated                                                                                  | Create/configure only the missing bucket or binding                                                 |
+| 4 Schema migrations             | local `drizzle/meta/_journal.json` entry count == remote applied count                                                                                                          | Skip apply (wrangler is idempotent, skip is for speed)                                              |
+| 4.5 RBAC seed                   | `SELECT COUNT(*) FROM role` ≥ 1 on remote D1                                                                                                                                    | Skip local-sqlite dance entirely                                                                    |
+| 5 Secrets                       | `wrangler secret list` already contains the name                                                                                                                                | Skip per-secret upload (`--rotate-secrets` forces)                                                  |
+| 5.5 Production URL              | `.env.production` `VITE_APP_URL` AND `wrangler.jsonc` `vars.VITE_APP_URL` are both consistent with routes (workers.dev + no routes, OR custom domain matching a routes pattern) | Skip the prompt (`--domain=X` overrides)                                                            |
+| 6 Content releases + deploy     | R2 objects are immutable; repeated publish is safe                                                                                                                              | Publish/verify Agent Skills and Marketing Content, pin both releases, then run `pnpm run cf:deploy` |
+| 7 URL fix                       | Both `.env.production` AND `wrangler.jsonc` vars already match the deployed URL                                                                                                 | Skip redeploy                                                                                       |
+| 9 Admin                         | `SELECT COUNT(*) FROM user_role ur JOIN role r ON r.id=ur.role_id WHERE r.name='super_admin'` ≥ 1                                                                               | Don't prompt (explicit `--admin*` flags still run)                                                  |
 
 Narrate auto-picked resource names BEFORE acting so the user can interject with "rename to X".
 
@@ -74,7 +76,7 @@ grep -q '"cf:deploy"' package.json && echo deploy script OK
 git status --short
 ```
 
-`wrangler.example.jsonc` is the committed template; `wrangler.jsonc` is the gitignored working copy holding the real D1 `database_id` and production URL (same pattern as `schema.ts`). If the example or the `cf:deploy` script is missing, this clone predates the Cloudflare wiring — pull the latest template (`/sync-upstream`).
+`wrangler.example.jsonc` is the committed template; `wrangler.jsonc` is the gitignored working copy holding the real D1 `database_id`, private bucket names, pinned release IDs, and production URL (same pattern as `schema.ts`). If the example or the `cf:deploy` script is missing, this clone predates the Cloudflare wiring — pull the latest template (`/sync-upstream`).
 
 ### 0.2 Wrangler login (Interruption #1)
 
@@ -125,7 +127,9 @@ grep -q 'REPLACE_WITH_OUTPUT_OF_WRANGLER_D1_CREATE' wrangler.jsonc && echo "data
 npx wrangler deployments list --name "$WORKER" 2>&1 | head -5                    # ever deployed?
 
 SKILLS_BUCKET=$(node -e "const fs=require('fs');const s=fs.readFileSync('wrangler.jsonc','utf8');const m=s.match(/\"binding\"\s*:\s*\"AGENT_SKILLS\"[\\s\\S]*?\"bucket_name\"\s*:\s*\"([^\"]+)\"/);console.log(m?.[1]||'')")
-npx wrangler r2 bucket list 2>&1 | grep -w "$SKILLS_BUCKET"                       # private Skill bucket created?
+MARKETING_BUCKET=$(node -e "const fs=require('fs');const s=fs.readFileSync('wrangler.jsonc','utf8');const m=s.match(/\"binding\"\s*:\s*\"MARKETING_CONTENT\"[\\s\\S]*?\"bucket_name\"\s*:\s*\"([^\"]+)\"/);console.log(m?.[1]||'')")
+npx wrangler r2 bucket info "$SKILLS_BUCKET"                                      # private Skill bucket created?
+npx wrangler r2 bucket info "$MARKETING_BUCKET"                                   # private Marketing Content bucket created?
 
 LOCAL_MIGRATIONS=$(node -e "console.log(require('./drizzle/meta/_journal.json').entries.length)" 2>/dev/null || echo 0)
 REMOTE_MIGRATIONS=$(npx wrangler d1 migrations list "$DB_NAME" --remote 2>&1 | grep -cE '[0-9]{4}_' || echo 0)
@@ -142,21 +146,20 @@ test -f .env.production && grep "^VITE_APP_URL=" .env.production | cut -d= -f2-
 Narrate the detection table (one line each: D1 / wrangler.jsonc / prior deploy / migrations N÷M / RBAC / secrets names / admin / run mode), then branch:
 
 - **First-time** if ANY core resource missing (no D1, placeholder `database_id`, or no prior deployment) → Phase 3.
-- **Incremental** otherwise → create/configure only the private Skill bucket
-  from Phase 3.4 when it is missing, then continue to Phase 4. Later phases
-  auto-skip.
+- **Incremental** otherwise → create/configure only the missing private release
+  buckets from Phases 3.4–3.5, then continue to Phase 4. Later phases auto-skip.
 
 ## Phase 3: First-time setup — announce, pause once, then auto-execute
 
 **Skip Phases 3.1-3.3 if:** Phase 2 found D1 + real database_id + prior
-deployment. Still run Phase 3.4 when the private Skill bucket/binding is
-missing, then jump to Phase 4.
+deployment. Still run Phases 3.4–3.5 for any missing private release
+bucket/binding, then jump to Phase 4.
 
 ### 3.1 Show the plan and pause for a single OK
 
 > First-time Cloudflare setup. I'll do all of this in one shot — interject only if you want different names.
 >
-> **Resources to create:** Worker `<name from wrangler.jsonc>`, D1 `<database_name>`, private R2 `<worker-name>-agent-skills`
+> **Resources to create:** Worker `<name from wrangler.jsonc>`, D1 `<database_name>`, private R2 `<worker-name>-agent-skills` and `<worker-name>-marketing-content`
 > **Then:** push schema → seed RBAC → set secrets (AUTH_SECRET, CONFIG_ENCRYPTION_KEY, never shown) → ask for production URL → deploy (with confirmation) → fix baked URL if needed → optional admin setup.
 >
 > Reply `ok` or `rename worker=X db=Y`.
@@ -176,7 +179,8 @@ Edit the working copy `wrangler.jsonc` (materialized from `wrangler.example.json
 ### 3.4 Create the private Agent Skills bucket (auto; also runs incrementally when missing)
 
 Use `<worker-name>-agent-skills` unless the working config already names a
-different bucket. The bucket stays private; do not enable `r2.dev` or attach a
+different non-placeholder bucket. Treat an empty value or a `REPLACE_WITH_*`
+value as missing. The bucket stays private; do not enable `r2.dev` or attach a
 custom public domain.
 
 ```bash
@@ -186,6 +190,26 @@ npx wrangler r2 bucket create <worker-name>-agent-skills
 Set `r2_buckets[].binding` to exactly `AGENT_SKILLS`, replace the bucket-name
 placeholder, and leave `vars.AGENT_SKILLS_RELEASE` for Phase 6 to pin after a
 verified publish. This dedicated bucket is separate from generated user media.
+
+### 3.5 Create the private Marketing Content bucket (auto; also runs incrementally when missing)
+
+Use `<worker-name>-marketing-content` unless the working config already names a
+different non-placeholder bucket. Treat an empty value or a
+`REPLACE_WITH_*` value as missing. Probe the exact name with
+`wrangler r2 bucket info`; do not rely on a possibly paginated bucket list. The
+bucket stays private: do not enable `r2.dev` or attach a custom public domain.
+Public page images/videos use their separately configured CDN bucket; this
+bucket stores private JSON release objects only.
+
+```bash
+npx wrangler r2 bucket create <worker-name>-marketing-content
+```
+
+Set `r2_buckets[].binding` to exactly `MARKETING_CONTENT`, replace the
+bucket-name placeholder, and leave `vars.MARKETING_CONTENT_RELEASE` unchanged
+until Phase 6 has uploaded and verified the release. Never point the Worker at
+an empty bucket or use a mutable `latest`/`current.json` object as production
+truth.
 
 ## Phase 3-PG: First-time setup — Postgres + Hyperdrive variant
 
@@ -211,6 +235,7 @@ test -f wrangler.jsonc || cp wrangler.example.jsonc wrangler.jsonc
 ```
 
 Edit `wrangler.jsonc`:
+
 - `name` ← chosen worker name
 - `vars.DATABASE_PROVIDER` ← `"postgresql"` (this also tells vite.config.ts to keep the postgres driver in the Worker bundle)
 - REMOVE the `d1_databases` block
@@ -245,8 +270,8 @@ DATABASE_PROVIDER=postgresql DATABASE_URL="$PG_URL" pnpm rbac:assign "$EMAIL" su
 ```
 
 Then continue with Phase 5 (secrets), 5.5 (URL), 6 (deploy) unchanged.
-Run the shared Phase 3.4 private Agent Skills bucket setup before Phase 5 when
-the binding or bucket is missing.
+Run the shared Phases 3.4–3.5 private Agent Skills and Marketing Content bucket
+setup before Phase 5 when either binding or bucket is missing.
 
 ## Phase 4: Schema push to D1 (auto, incremental)
 
@@ -310,6 +335,7 @@ Provider credentials (Stripe/Resend/R2/AI/OAuth) normally live in admin → Sett
 Otherwise prompt:
 
 > 生产 URL 用哪个?
+>
 > 1. **默认 workers.dev**(`https://<worker>.<your-subdomain>.workers.dev`,首次部署后才知道确切子域,我会先用占位符再修正)
 > 2. **自有域名**(粘贴,如 `app.example.com` — 该域名或其父 zone 必须已在你的 Cloudflare 账号里)
 
@@ -327,20 +353,26 @@ Same two files but with the exact URL, plus:
 
 Warn: the zone must already exist in the account, else deploy fails with "not a zone in your account".
 
-## Phase 6: Publish Skills and deploy — Interruption #2 (the only confirmation)
+## Phase 6: Publish content releases and deploy — Interruption #2 (the only confirmation)
 
 > Ready to deploy `<worker>`:
+>
 > - Account: `<name>` (`<id>`)
 > - D1: `<db>` (N migrations) · RBAC ✓ · Secrets: `<names>`
 > - Agent Skills: private R2 `<skills-bucket>` · immutable release will be published and verified
+> - Marketing Content: private R2 `<marketing-bucket>` · immutable release will be published and verified
 > - This creates a live URL and replaces any previous deployment. Proceed? (yes/no)
 
 On `yes`:
 
 ```bash
 # Upload immutable Skill objects, verify every object, then atomically pin the
-# release id in wrangler.jsonc. This command does not deploy by itself.
+# release id in wrangler.jsonc. Upload Marketing page/directory objects first,
+# its manifest last, verify every object, then pin that release too. Neither
+# publish command deploys the Worker by itself.
+pnpm marketing:publish-content-release -- --dry-run --bucket=<marketing-bucket>
 pnpm skills:publish -- --bucket=<skills-bucket>
+pnpm marketing:publish-content-release -- --bucket=<marketing-bucket>
 pnpm run cf:deploy
 ```
 
@@ -363,6 +395,18 @@ curl -sS --noproxy '*' -o /dev/null -w "/api  HTTP=%{http_code}\n" "$URL/api/con
 ```
 
 Both 200 → report success with the live URL. Any 500 → one-shot `npx wrangler tail` to capture the first error (print the command for the user too, don't keep it running).
+
+When the pinned Marketing Content release contains the template tool directory,
+also smoke the content-backed routes and negative status contract:
+
+```bash
+curl -sS --noproxy '*' -o /dev/null -w "/tools HTTP=%{http_code}\n" "$URL/tools"
+curl -sS --noproxy '*' -o /dev/null -w "/tools/missing HTTP=%{http_code}\n" "$URL/tools/missing"
+```
+
+Expect `200` for the released directory and `404` for the unknown slug. A `503`
+on a released route means the binding, pinned release, or published object/hash
+is wrong; do not convert it to 404.
 
 ## Phase 9: First super_admin (optional — Interruption #3)
 
@@ -407,35 +451,36 @@ Just the `INSERT OR IGNORE ... SELECT` + verify from above. 0 rows → user hasn
 
 ## Force flags
 
-| Flag | Effect |
-|---|---|
-| (none) | Idempotent re-run; only the deploy confirmation fires |
-| `--admin-email=X --admin-password=Y` | Phase 9.A create-account mode |
-| `--admin=email@x.com` | Phase 9.B promote-existing mode |
-| `--domain=app.example.com` | Switch to custom domain (routes + env + redeploy); `--domain=default` reverts to workers.dev |
-| `--rotate-secrets` | Re-upload all secrets |
-| `--force-rbac` | Re-run Phase 4.5 even if `role` is non-empty |
+| Flag                                 | Effect                                                                                       |
+| ------------------------------------ | -------------------------------------------------------------------------------------------- |
+| (none)                               | Idempotent re-run; only the deploy confirmation fires                                        |
+| `--admin-email=X --admin-password=Y` | Phase 9.A create-account mode                                                                |
+| `--admin=email@x.com`                | Phase 9.B promote-existing mode                                                              |
+| `--domain=app.example.com`           | Switch to custom domain (routes + env + redeploy); `--domain=default` reverts to workers.dev |
+| `--rotate-secrets`                   | Re-upload all secrets                                                                        |
+| `--force-rbac`                       | Re-run Phase 4.5 even if `role` is non-empty                                                 |
 
 ## Troubleshooting cheatsheet
 
-| Symptom | Likely cause | Fix |
-|---|---|---|
-| `D1 binding "DB" not found` at runtime | `wrangler.jsonc` `d1_databases` placeholder id, or server entry didn't stash the env | Phase 3.3; check `src/server.ts` `ensureCloudflareEnv` |
-| 500 on every page | AUTH_SECRET unset/placeholder, or `vars.DATABASE_PROVIDER` ≠ `d1` | Phase 5.1 / 3.3 |
-| Sign-in 403 `Invalid origin` from a browser (curl works) | localhost URL baked into the bundle — `.env.local`/`.env.development` beat `.env.production` because `loadEnvFiles` doesn't overwrite existing keys and prefers `.env.local` | Deploy via `pnpm run cf:deploy` (sources `.env.production` first), ensure `wrangler.jsonc` `vars.VITE_APP_URL` is set; verify with `grep -o 'https://[^"]*' .output/server/_ssr/*.mjs \| head` |
-| `wrangler d1 migrations apply` finds no migrations | `migrations_dir` missing from the `d1_databases` entry | Set `"migrations_dir": "drizzle"` |
-| Bundle > limit (3 MiB free / 10 MiB paid, gzip) | Heavy server deps | Paid plan, or dynamic-import heavy modules |
-| `/api/agent/skills` returns 503 | `AGENT_SKILLS` binding/release missing, or release was not published | Run `pnpm skills:publish -- --bucket=<skills-bucket>`, verify the binding name, then redeploy |
-| Image upload fails on Workers | No-storage local-disk fallback needs a filesystem | Configure R2 in admin → Settings → Storage |
-| drizzle-kit "Interactive prompts require a TTY" | Column-conflict resolution needed | User runs `pnpm db:generate` in their terminal once |
-| `sqlite3: command not found` (Phase 4.5/9.A) | CLI missing | `brew install sqlite` / `apt-get install sqlite3` |
-| Deploy fails `not a zone in your account` | Custom domain isn't a Cloudflare zone | Add the zone, or `--domain=default` |
-| 522/1014 right after custom-domain deploy | DNS record still propagating | Wait ~30 s, retry |
-| `/admin` 403 after Phase 9 | Stale session claims | Sign out and back in |
-| Runtime throws "This DB driver was stubbed out of the Cloudflare Workers build" | `wrangler.jsonc` `vars.DATABASE_PROVIDER` was changed AFTER the last build (vite.config.ts bakes the driver choice at build time) | Rebuild + redeploy (`pnpm run cf:deploy`) so the bundle matches the provider |
-| Postgres mode: every query fails with connection errors but `wrangler hyperdrive create` succeeded | `hyperdrive` binding missing from `wrangler.jsonc`, or binding name ≠ `HYPERDRIVE` | `src/core/db/postgres.ts` expects binding name exactly `HYPERDRIVE`; fix wrangler.jsonc and redeploy |
-| Postgres mode: intermittent `Cannot perform I/O on behalf of a different request` | A postgres client got cached across requests (e.g. someone re-added a module-level cache for TCP drivers) | `src/core/db/index.ts` deliberately skips the singleton cache for postgres/mysql on Workers — restore that behavior |
-| `wrangler hyperdrive create` fails with connection error | Postgres unreachable from Cloudflare: IP allowlist, no TLS, or blocked port | Allow Cloudflare egress / enable TLS on the DB; for Neon/Supabase use the direct (non-pooler) connection string |
+| Symptom                                                                                            | Likely cause                                                                                                                                                                 | Fix                                                                                                                                                                                            |
+| -------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `D1 binding "DB" not found` at runtime                                                             | `wrangler.jsonc` `d1_databases` placeholder id, or server entry didn't stash the env                                                                                         | Phase 3.3; check `src/server.ts` `ensureCloudflareEnv`                                                                                                                                         |
+| 500 on every page                                                                                  | AUTH_SECRET unset/placeholder, or `vars.DATABASE_PROVIDER` ≠ `d1`                                                                                                            | Phase 5.1 / 3.3                                                                                                                                                                                |
+| Sign-in 403 `Invalid origin` from a browser (curl works)                                           | localhost URL baked into the bundle — `.env.local`/`.env.development` beat `.env.production` because `loadEnvFiles` doesn't overwrite existing keys and prefers `.env.local` | Deploy via `pnpm run cf:deploy` (sources `.env.production` first), ensure `wrangler.jsonc` `vars.VITE_APP_URL` is set; verify with `grep -o 'https://[^"]*' .output/server/_ssr/*.mjs \| head` |
+| `wrangler d1 migrations apply` finds no migrations                                                 | `migrations_dir` missing from the `d1_databases` entry                                                                                                                       | Set `"migrations_dir": "drizzle"`                                                                                                                                                              |
+| Bundle > limit (3 MiB free / 10 MiB paid, gzip)                                                    | Heavy server deps                                                                                                                                                            | Paid plan, or dynamic-import heavy modules                                                                                                                                                     |
+| `/api/agent/skills` returns 503                                                                    | `AGENT_SKILLS` binding/release missing, or release was not published                                                                                                         | Run `pnpm skills:publish -- --bucket=<skills-bucket>`, verify the binding name, then redeploy                                                                                                  |
+| `/tools` or a released marketing page returns 503                                                  | `MARKETING_CONTENT` binding/release missing, release not uploaded, or object/hash/schema validation failed                                                                   | Run the Marketing Content dry-run, publish/verify to the bound bucket, confirm `MARKETING_CONTENT_RELEASE`, then redeploy                                                                      |
+| Image upload fails on Workers                                                                      | No-storage local-disk fallback needs a filesystem                                                                                                                            | Configure R2 in admin → Settings → Storage                                                                                                                                                     |
+| drizzle-kit "Interactive prompts require a TTY"                                                    | Column-conflict resolution needed                                                                                                                                            | User runs `pnpm db:generate` in their terminal once                                                                                                                                            |
+| `sqlite3: command not found` (Phase 4.5/9.A)                                                       | CLI missing                                                                                                                                                                  | `brew install sqlite` / `apt-get install sqlite3`                                                                                                                                              |
+| Deploy fails `not a zone in your account`                                                          | Custom domain isn't a Cloudflare zone                                                                                                                                        | Add the zone, or `--domain=default`                                                                                                                                                            |
+| 522/1014 right after custom-domain deploy                                                          | DNS record still propagating                                                                                                                                                 | Wait ~30 s, retry                                                                                                                                                                              |
+| `/admin` 403 after Phase 9                                                                         | Stale session claims                                                                                                                                                         | Sign out and back in                                                                                                                                                                           |
+| Runtime throws "This DB driver was stubbed out of the Cloudflare Workers build"                    | `wrangler.jsonc` `vars.DATABASE_PROVIDER` was changed AFTER the last build (vite.config.ts bakes the driver choice at build time)                                            | Rebuild + redeploy (`pnpm run cf:deploy`) so the bundle matches the provider                                                                                                                   |
+| Postgres mode: every query fails with connection errors but `wrangler hyperdrive create` succeeded | `hyperdrive` binding missing from `wrangler.jsonc`, or binding name ≠ `HYPERDRIVE`                                                                                           | `src/core/db/postgres.ts` expects binding name exactly `HYPERDRIVE`; fix wrangler.jsonc and redeploy                                                                                           |
+| Postgres mode: intermittent `Cannot perform I/O on behalf of a different request`                  | A postgres client got cached across requests (e.g. someone re-added a module-level cache for TCP drivers)                                                                    | `src/core/db/index.ts` deliberately skips the singleton cache for postgres/mysql on Workers — restore that behavior                                                                            |
+| `wrangler hyperdrive create` fails with connection error                                           | Postgres unreachable from Cloudflare: IP allowlist, no TLS, or blocked port                                                                                                  | Allow Cloudflare egress / enable TLS on the DB; for Neon/Supabase use the direct (non-pooler) connection string                                                                                |
 
 ## What this skill never does
 
@@ -444,4 +489,5 @@ Just the `INSERT OR IGNORE ... SELECT` + verify from above. 0 rows → user hasn
 - Write secrets into `wrangler.jsonc` `vars` (vars are public)
 - Hand-edit generated files (`.output/**`, `.wrangler/**`)
 - Put Skill bodies in D1, Worker vars, static assets, or the Worker bundle
+- Put Marketing Content bodies in Worker vars, public Static Assets, Paraglide, or the Worker/client bundle
 - Make the user copy-paste routine wrangler/openssl/db commands — those are agent-executed

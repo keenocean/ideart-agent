@@ -3,12 +3,15 @@ import { createFileRoute, notFound } from '@tanstack/react-router';
 import { LocaleSwitchProvider } from '@/core/i18n/locale-switch';
 import { envConfigs } from '@/config';
 import { buildSeoHead } from '@/lib/seo';
-import { m } from '@/paraglide/messages.js';
 import { getLocale } from '@/paraglide/runtime.js';
 import { Footer } from '@/blocks/footer';
 import { Header } from '@/blocks/header';
 import { ToolDetail } from '@/blocks/tool-detail';
-import { loadToolDetailPage } from '@/content/tools/listing';
+import { MarketingContentUnavailableError } from '@/content/marketing/registry';
+import {
+  loadToolDetailPage,
+  loadToolDirectoryPage,
+} from '@/content/tools/listing';
 import { getImageToolReadinessFn } from '@/content/tools/server';
 
 export const Route = createFileRoute('/tools/$slug')({
@@ -16,10 +19,15 @@ export const Route = createFileRoute('/tools/$slug')({
     const locale = getLocale();
     const page = await loadToolDetailPage(locale, params.slug);
     if (!page) throw notFound();
+    const directory = await loadToolDirectoryPage(locale);
+    if (!directory) {
+      throw new MarketingContentUnavailableError(
+        `Parent tools directory is not published for ${locale}`
+      );
+    }
     const readiness = await getImageToolReadinessFn({
       data: { entityId: page.entityId },
     });
-    const toolsName = m['tools.directory.title']({}, { locale });
     return {
       page,
       readiness,
@@ -36,7 +44,7 @@ export const Route = createFileRoute('/tools/$slug')({
             route: { locale, path: '/' },
           },
           {
-            name: toolsName,
+            name: directory.hero.title,
             route: { locale, path: '/tools' },
           },
           {
