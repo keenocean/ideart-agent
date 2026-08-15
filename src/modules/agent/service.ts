@@ -12,6 +12,7 @@ import {
   normalizeOpenAIBaseUrl,
 } from '@/lib/llm-base-url';
 
+import type { EffectiveGenerationPolicy } from './entry-policy';
 import { loadAgentHistory, LONG_RUNNING_MEDIA_TOOL_NAMES } from './history';
 import { resolveAgentProfile } from './profile';
 import { buildSkillSystemPrompt, type PromptSkill } from './skills';
@@ -48,6 +49,7 @@ export interface RunAgentTurnParams {
   settings?: AgentGenerationSettings;
   signal?: AbortSignal;
   prepared?: PreparedAgentTurn;
+  policy?: EffectiveGenerationPolicy;
 }
 
 type LlmProvider = 'openai' | 'anthropic';
@@ -69,6 +71,7 @@ export interface PrepareAgentTurnParams {
   skill?: PromptSkill | null;
   settings?: AgentGenerationSettings;
   leaseOwner?: PreparedAgentTurn['leaseOwner'];
+  policy?: EffectiveGenerationPolicy;
 }
 
 export async function prepareAgentTurn(
@@ -81,6 +84,7 @@ export async function prepareAgentTurn(
     skill: params.skill,
     turnId: params.turnId,
     requireTurnLease: Boolean(params.leaseOwner),
+    policy: params.policy,
   });
   const toolNames = tools.map((tool) => tool.name);
   if (new Set(toolNames).size !== toolNames.length) {
@@ -157,6 +161,7 @@ export async function prepareAgentTurn(
       skillReleaseId: params.skill?.releaseId ?? null,
       toolNames,
       longRunningToolNames,
+      ...(params.policy ? { generationEntrySource: params.policy.source } : {}),
     },
   };
 }
@@ -238,6 +243,7 @@ export async function* runAgentTurn(
         persistedUserMessageId,
         skill,
         settings,
+        policy: params.policy,
       }));
   } catch (error: any) {
     yield {

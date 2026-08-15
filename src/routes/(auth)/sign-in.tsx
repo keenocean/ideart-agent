@@ -6,7 +6,10 @@ import { z } from 'zod';
 import { authClient, signIn, useSession } from '@/core/auth/client';
 import { Link, useRouter } from '@/core/i18n/navigation';
 import { envConfigs } from '@/config';
-import { sanitizeAuthCallback } from '@/lib/auth-callback';
+import {
+  sanitizeAuthCallback,
+  verificationCompletionPath,
+} from '@/lib/auth-callback';
 import { m } from '@/paraglide/messages.js';
 import { localizeHref } from '@/paraglide/runtime.js';
 import { usePublicConfig } from '@/hooks/use-public-config';
@@ -37,25 +40,25 @@ function SignInPage() {
   // Where to land after signing in. `redirect` is accepted as an alias so a
   // link written either way works; both are held to the same same-site rule.
   const [callbackUrl, setCallbackUrl] = useState<string | null>(null);
+  const [paramsReady, setParamsReady] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     setCallbackUrl(params.get('callbackUrl') || params.get('redirect'));
+    setParamsReady(true);
   }, []);
 
-  // Already signed in (visited /sign-in directly, or a stale callbackUrl looped
-  // back here) → go home. The auth pages never gate themselves, so this can't loop.
+  const safeCallbackUrl = sanitizeAuthCallback(callbackUrl);
+  const afterLoginUrl = safeCallbackUrl || '/chat';
+
+  // Already signed in must follow the same sanitized callback contract.
   useEffect(() => {
-    if (sessionPending || navigatingRef.current) return;
+    if (!paramsReady || sessionPending || navigatingRef.current) return;
     if (session?.user) {
       navigatingRef.current = true;
-      router.push('/');
+      router.push(afterLoginUrl);
     }
-  }, [sessionPending, session?.user, router]);
-
-  const safeCallbackUrl = sanitizeAuthCallback(callbackUrl);
-
-  const afterLoginUrl = safeCallbackUrl || '/chat';
+  }, [paramsReady, sessionPending, session?.user, router, afterLoginUrl]);
 
   // Carry callbackUrl/redirect across to sign-up so the destination survives the switch.
   const switchQuery = (() => {
@@ -99,7 +102,9 @@ function SignInPage() {
             )}&callbackUrl=${encodeURIComponent(afterLoginUrl)}`;
             void authClient.sendVerificationEmail({
               email: value.email,
-              callbackURL: localizeHref(afterLoginUrl),
+              callbackURL: localizeHref(
+                verificationCompletionPath(afterLoginUrl)
+              ),
             });
             router.push(verifyPath);
             return;

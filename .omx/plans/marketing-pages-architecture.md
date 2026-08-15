@@ -61,6 +61,22 @@
 
 JSON 只负责 i18n 文案；重复卡片和页面实体由 Typed Catalog 驱动。
 
+#### 内容载体与所有权
+
+“内容数据化”不等于“页面 JSON 化”。本次实施固定使用以下边界：
+
+| 内容/规则                                                          | 权威位置                                               | 格式与加载方式                                             |
+| ------------------------------------------------------------------ | ------------------------------------------------------ | ---------------------------------------------------------- |
+| 页面 section 顺序、交互和特殊布局                                  | `src/routes/*` + `src/blocks/*`                        | React/TypeScript 显式 composition                          |
+| 导航、按钮、状态、短标题和短 metadata                              | `messages/<locale>.json`                               | flat JSON key，已知 key 静态调用                           |
+| entityId、slug、publication、indexing、placement、related、variant | `src/config/catalog/*`                                 | Typed TypeScript Catalog                                   |
+| 介绍、案例说明、Prompt 教程、限制、长 FAQ 等 SEO 正文              | `tool-content/<slug>.<locale>.ts`、`model-content/...` | 可序列化 typed module，按 `slug + locale` 懒加载并参与 SSR |
+| 模型能力、参数、积分、Provider、权限和执行限制                     | Runtime/服务端权威源                                   | 运行时派生并在服务端验证                                   |
+| 图片、视频、poster 和分享图                                        | R2 + typed asset ref                                   | 代码只保存已验证的稳定公网引用和展示 metadata              |
+| Blog 正文                                                          | 数据库                                                 | 按 `(slug, locale)` 精确读取                               |
+
+不得建立包含任意 `sections[]`、component name 或 props 的通用页面 JSON，也不得把长正文、Base64 媒体或业务能力复制进 messages/Catalog。typed content module 只提供内容数据；最终 section 顺序仍由 React 决定。若生产 bundle 证明某段长正文能保持 route-local，允许继续使用静态 Paraglide message functions，但必须以 route bundle 报告为证据，不能凭源码 import 形态推断。
+
 ### 3.2 模板底盘与项目内容包分离
 
 建议目录：
@@ -89,6 +105,7 @@ src/
 │   ├── hero.tsx
 │   ├── features.tsx
 │   ├── models-strip.tsx
+│   ├── catalog-content.ts             # lazy module key manifest + 同语言内容 resolver
 │   ├── tool-directory.tsx
 │   ├── tool-detail.tsx
 │   ├── tool-content/                # 按 slug + locale 懒加载的长正文
@@ -200,6 +217,13 @@ URL 与路由规则必须复用本项目及 `shipany-tanstack` 已验证的三�
 
 新项目无需改页面代码即可调整展示集合和顺序；类型校验与 selector 测试共同阻止各消费端状态漂移。测试必须证明 `localePages` 非空、同一 kind/locale 下 slug 唯一、placement 组合合法、每个 selector 返回的 path 都能被同一个 resolver 反向解析。
 
+`localePages[locale]` 只证明 Catalog 有意注册该语言 route，不单独证明同语言正文已经存在。页面展示和 SEO 使用双门禁：
+
+1. Catalog resolver 证明 entity、locale route、publication/indexing 状态合法。
+2. 内容 resolver 的 lazy module key manifest 证明对应 `kind + entityId + locale` 内容存在，并能按需加载。
+
+内容 manifest 只能保存模块 key 与动态 loader，禁止 eager import 全部正文。首页、目录和 Related 在真正渲染链接前组合 selector 结果与 content availability；详情 loader 先解析 Catalog，再加载同语言内容，任一门禁失败即 404。`indexing: 'index'` 的注册校验和发布 smoke 还必须证明内容模块、真实文件路由、SSR 正文与发现面同时存在，避免仅修改 Catalog 就把薄页或 404 放入 sitemap。
+
 ### 3.4 Catalog 不成为业务权威
 
 `ModelDefinition` 使用按模态区分的 runtime model ref，只能引用 `src/lib/agent-settings.ts` 对应 Catalog 已存在的模型 key。模型规格、分辨率、时长、参考图数量和积分由运行时 Catalog 派生，不在页面 Catalog 复制。
@@ -247,6 +271,20 @@ type DeploymentReadiness = {
 | UI primitives  | 跨项目长期复用       | SectionHeading、FAQList、Steps、CardGrid       |
 | Page shells    | 工具/模型页共享      | ToolDetailPage、ModelDetailPage、DirectoryPage |
 | Project blocks | 按项目或重点页面重写 | 首页 sections、专属案例、深度 Prompt 教程      |
+
+页面之间的预期复用边界：
+
+| 能力/组件                                        | 首页           | 工具页                 | 模型页            | 约束                                                         |
+| ------------------------------------------------ | -------------- | ---------------------- | ----------------- | ------------------------------------------------------------ |
+| `GenerationWorkbench`                            | default preset | 工具 media/input locks | 模态与 model lock | UI/controller 共用，服务端 policy 按 entryContext 重建       |
+| `DirectoryCardGrid` / Catalog card               | 精选工具与模型 | 目录、Related          | 目录、Related     | 使用受控 `featured/directory/related` 密度，不复制 slug 规则 |
+| `ExampleGallery`                                 | 综合作品       | 任务案例               | 模型案例          | 媒体组件共用，内容与 alt 按 locale 独立                      |
+| `SectionHeading`、`Steps`、`FAQList`、`FinalCTA` | 可用           | 可用                   | 可用              | 至少两个真实消费者后再抽取                                   |
+| `DetailPageShell`                                | 不使用         | 使用                   | 使用              | 只提供稳定 slots/variant，不承载项目文案                     |
+| `BeforeAfterSlider`                              | 可选           | 编辑类工具             | 可选              | 仅真实 before/after 数据使用                                 |
+| `ModelSpecsTable`                                | 不使用         | 不使用                 | 使用              | 规格只从 Runtime 派生                                        |
+
+`HomeHero`、`ToolDetail`、`ModelDetail` 继续是独立 Block；它们可以共享 Workbench、卡片、Gallery 和 section primitives，但不能合并成带大量 boolean props 的万能 `MarketingPage`。首页负责产品定位，工具页负责完成任务，模型页负责能力评估，三类页面的内容、loader 和 SEO 意图必须保持独立。
 
 普通详情页可把约 70% 公共骨架、30% 内容与变体作为内部设计启发，不把比例当作硬性验收指标；重点 SEO 页面允许增加专属 Block。差异化通过受控 variant 和 optional sections 表达：
 
@@ -354,7 +392,7 @@ type GenerationPreset = {
 - 工具/模型页内的修改默认只影响本次 handoff，不写全局 `localStorage`；只有用户显式执行“保存为默认设置”时才持久化。
 - source tracking 只记录 `home | tool:<slug> | model:<slug>` 等来源信息，不参与权限、计费或工具选择。
 
-当前 `AgentComposerSettings` 只有视频 `modelOption`，图片路径在 `resolveGenerationSettings()` 中硬编码 `DEFAULT_IMAGE_MODEL`。阶段 3 必须先增加并贯通 `imageModelOption: AgentImageModelOptionValue`：composer state → normalization → session handoff → `AgentGenerationSettings.imageModelName` → API validation → Agent tool context。完成前，图片模型页只能使用当前默认图片模型，不能声称通用的“锁定图片模型”已经实现。
+阶段 2 已增加并贯通 `imageModelOption: AgentImageModelOptionValue`：composer state → normalization → session handoff → `AgentGenerationSettings.imageModelName` → API validation → Agent tool context。图片模型页仍必须使用 Catalog 中已登记且 Runtime 可解析的图片模型 key，不能用客户端字符串扩展模型 allowlist。
 
 Catalog preset 不是安全边界。首轮 handoff 额外保存稳定的 `entryContext`（`home`，或 `tool/model + entityId + locale`）；这里的 locale 只用于验证用户进入的页面版本真实存在，不决定 Provider、积分或工具权限。客户端不得发送整份 preset 作为权威配置。`POST /api/agent/chat` 根据 `entryContext` 从服务端可用的 Catalog 重新解析 `EffectiveGenerationPolicy`，然后再执行以下顺序：
 
@@ -405,6 +443,20 @@ Catalog preset 不是安全边界。首轮 handoff 额外保存稳定的 `entryC
 11. `Footer`
 12. `SupportWidget`
 
+首页数据与渲染流固定为：
+
+```text
+index route loader
+  → getLocale + fixed-route SEO state
+  → selectHomeEntries(tool/model)
+  → 用 content manifest 过滤并加载当前语言卡片摘要
+  → 返回可序列化 loaderData
+  → Home* Blocks 组装 i18n/品牌内容
+  → durable Components 渲染
+```
+
+`src/routes/index.tsx` 不实现卡片、FAQ 或 Gallery UI，也不手写工具/模型 slug；它只负责 loader/head 和显式 Block composition。首页精选卡片与目录/Related 共用 Catalog card primitive，但首页 Block 独立决定 section 节奏、精选数量和 `featured` 展示密度。`HomeHero` 与工具/模型详情 Hero 不合并；它只复用 `GenerationWorkbench`，并使用不会覆盖用户合法持久化设置的 home default policy。
+
 首页不嵌入完整 PricingTable；继续保留 `/pricing` 独立页，并在 Header/CTA 中链接。原因是参考站首页主要围绕生成能力和 SEO 内容展开，完整价格表会打断主任务。
 
 首页登录行为改为继承 `shipany-tanstack`：登录用户仍可访问 `/`，Header 根据 session 显示进入工作台的入口，不自动重定向 `/chat`。
@@ -452,6 +504,25 @@ Background Remover 页面必须明确：
 
 `/tools` 与 `/models` 只展示 `selectDirectoryEntries(locale)` 返回的条目，即 `publication === 'listed'` 且当前 locale route 与同语言内容真实存在。`/tools/$slug`、`/models/$slug` loader 统一通过 `resolveCatalogRoute(kind, locale, slug)` 精确解析；当前语言缺路由/内容、不存在或 hidden 时调用 `notFound()`。
 
+工具目录与详情的数据流：
+
+```text
+/tools loader
+  → selectDirectoryEntries(toolCatalog, locale)
+  → content manifest 过滤 + 加载当前语言卡片摘要
+  → DirectoryPage / DirectoryCardGrid
+
+/tools/$slug loader
+  → resolveCatalogRoute('tool', locale, slug)
+  → loadToolContent(entityId, locale)
+  → derive DeploymentReadiness + related entries
+  → 构造 SeoHeadInput
+  → ToolDetail Block
+  → DetailPageShell + GenerationWorkbench + 可选专属 Block
+```
+
+详情 loader 必须在生成 metadata 前完成 route 与内容双门禁，只返回可序列化数据；React component、message function 和 server-only provider 配置不得进入 loaderData。目录卡片、Related 和详情 canonical 必须从同一个 resolver 产生 path，不能各自拼接 slug。
+
 ## 7. 模型目录与详情页
 
 ### 7.1 初始模型 Catalog
@@ -478,6 +549,8 @@ Background Remover 页面必须明确：
 9. CTA
 
 模型页 Workbench 锁定与 image/video modality 匹配的 `modelKey`，但允许用户调整该模型支持的比例、分辨率、时长、质量和参考输入。无效参数继续由现有 normalization 修正，服务端再次验证。
+
+模型页沿用工具页的数据流和共享 shell，但 `loadModelContent()` 只提供当前语言的定位、案例、Prompt、适用场景和限制；规格、参数范围、模型能力和成本继续从 Runtime 投影。`ModelSpecsTable` 接收派生后的纯数据，不能读取 Catalog 文案或复制 Runtime 常量。工具页与模型页可以共用 UI，但前者的 SEO 意图是“完成任务”，后者是“评估模型”，两者不得使用仅替换名称的正文。
 
 ## 8. 文案与内容组织
 
@@ -671,7 +744,16 @@ Google 当前指导同样要求优先修复站点自己链接或提交的 404，
 - hash 对象可跨引用复用，替换/移除文章图片时不在交互请求内直接删 R2。当前未实现 reference-aware orphan GC；若存量需要治理，应另做全库引用扫描、保留期和 dry-run 后再删除，避免破坏其他语言文章或正文共享对象。
 - 本检查点不开放正文视频，也未在无凭据环境中写入真实 R2。自动验证覆盖图片字节解析、存储/Markdown round-trip、安全 SSR 和生产构建；上线前仍必须在目标 R2 配置下完成一次真实上传与 online asset check。
 
-### 阶段 2：共享生成入口安全链路
+#### 首页、工具页与模型页实施状态（2026-08-15）
+
+- 阶段 0/1 的 Catalog、resolver/selectors、SEO helper、固定公开路由、sitemap/llms 和 R2 检查底座已经落地；Catalog 中的工具/模型 locale route 当前仍全部为 `noindex` 基础设施登记。
+- 阶段 2 的共享生成入口安全链路已经完成：`PromptLauncher` 已成为复用 `useGenerationEntry` + `GenerationWorkbench` 的兼容 wrapper，图片模型状态已贯通，服务端会从 `entryContext` 重建 policy 并在 API/tool 两层执行锁定与附件约束，Agent guard/认证页/邮箱验证已保留原 session callback。
+- 阶段 3/4 尚未开始页面纵向切片：`src/routes/tools/*`、`src/routes/models/*`、`src/components/catalog/*`、同语言 tool/model content modules 均不存在，Block registry 和 marketing asset registry 仍为空。
+- 阶段 5 尚未开始：首页仍是旧的 `Header → Hero(PromptLauncher) → Blog → Footer → SupportWidget`，登录用户仍自动跳转 `/chat`。仓库中未接线的 `Features`、`ModelsStrip`、`Gallery`、`FAQ`、`CTA` 等旧/demo Blocks 不计为本计划首页实施，其中渐变 placeholder 不符合真实 R2 案例门禁。
+- Header/Footer 尚未接入 Tools/Models，Catalog home/directory/related selectors 尚无页面消费者；sitemap/llms 虽已接线，但因为 Catalog locale pages 均为 noindex，不输出这些 URL。
+- 阶段 2 完成后全量 46 个测试文件/267 项测试、`pnpm exec tsc --noEmit`、`pnpm format:check` 与 `pnpm build` 通过；构建仍有既有大 chunk warning。真实 OAuth/provider、跨标签邮箱浏览器 smoke、完整视觉、HTTP inventory、Lighthouse 与生产 R2 online check 仍只在具备相应环境时执行，不能据此宣告阶段 3–8 页面已完成。
+
+### 已完成：阶段 2 共享生成入口安全链路（2026-08-15）
 
 1. 在现有回归测试保护下抽取 controller/hook 与纯展示 `GenerationWorkbench`，保留 `/chat` 默认 wrapper 和当前默认行为。
 2. 先贯通 `imageModelOption` 的 composer state、normalization、handoff、runtime settings、API validation 和 Agent tool context，再允许图片模型页声明 locked model。
@@ -679,17 +761,26 @@ Google 当前指导同样要求优先修复站点自己链接或提交的 404，
 4. `POST /api/agent/chat` 根据 `entryContext` 重新解析服务端 policy，验证 entry/locale/execution/附件，并将 locks 传到 tool context，阻止显式工具参数绕过。
 5. 抽取统一 callback sanitizer，修复匿名提交 → 登录/注册/验证/OAuth → 原 session 回跳并覆盖已登录分支。邮箱验证采用“原标签页保存 sessionStorage 并等待完成”的明确契约；验证标签页不能伪造或读取 payload，原标签页关闭后的数据不承诺恢复。
 
+#### 阶段 2 实施检查点
+
+- `GenerationWorkbench` 只负责展示，`useGenerationEntry` 管理内存设置、Skill、上传、首轮 stash 与跳转；`PromptLauncher` 显式启用原有的“设置变化即持久化”，营销工具/模型入口默认不持久化，并暴露 `saveSettingsAsDefault()` 作为唯一显式写入动作。
+- `generationPresetFor()` 从客户端 Catalog 生成 modality-safe UI preset；它不进入服务端信任链。首轮 handoff 只携带 `home` 或 `tool/model + entityId + locale`，非法 context 不降级为 home。
+- `POST /api/agent/chat` 先正规化客户端设置，再从服务端 Catalog 解析 `EffectiveGenerationPolicy`、验证 locale route/availability/execution、结构化附件与消息附件块，然后覆盖 locked modality/model。validated attachment snapshot 与 locks 一并传入 Agent tool context，显式 tool model/reference 参数无法换模态、换模型、超上限或引用未声明媒体。
+- `imageModelOption` 已覆盖 composer 默认值与控件、持久化升级、handoff、runtime/API normalization、价格重算、系统 Prompt 和 `generate_image` tool fallback/lock；客户端价格字段仍会被服务端重算。
+- Agent auth guard 保留当前 locale-free path + query；sign-in/sign-up、已登录分支、邮箱验证和 OAuth callback 共用 `sanitizeAuthCallback()`。验证邮件落到无 payload 的 completion page，只通过 `BroadcastChannel` 发信号；原标签页确认 session 后才回到原 `/chat/$sessionId` 消费 stash，验证标签页明确说明原标签关闭后无法恢复草稿。
+- 自动验证覆盖 preset 优先级、图片模型规范化、handoff、Catalog policy、伪造 entry、附件绑定、tool 参数绕过、callback sanitizer 与跨标签 signal contract。真实 OAuth/provider 和浏览器跨标签 smoke 未在无凭据环境中伪造成功，留给有合法回调域的发布环境。
+
 ### 阶段 3：第一个工具纵向切片
 
-1. 只注册 `ai-image-generator` 的 en/zh locale routes，初始均为 `listed + noindex`；实现 `/tools`、`/tools/$slug`、同语言内容 resolver、404 和统一 SEO head。
+1. 以已经作为 noindex 基础设施登记的 `ai-image-generator` 作为唯一开放切片；实现 `/tools`、`/tools/$slug`、同语言 content manifest/resolver、404 和统一 SEO head。其他工具即使已存在 Catalog definition，也必须在同语言正文与 route inventory 完成前保持不可发现。
 2. 以这个真实页面实现最小目录卡片、详情 shell、案例 gallery、related 与 Workbench；组件只接收 props，不读 i18n、不访问 server modules。切片用到的图片、视频、poster 和分享图必须先进入 R2 typed asset ref，不得引用 `public/` 历史路径。
 3. 长正文先测 bundle：若 Paraglide 不能让该 route 独享内容，则迁移到按 `slug + locale` 懒加载的类型安全 content module；不允许 fallback 到另一语言。
 4. 运行该切片的 route inventory：en/zh 目录和详情为 200，missing/hidden 为 404，head/noindex/canonical 正确，页面产生的每个链接都能解析并返回预期状态。
 
 ### 阶段 4：第一个模型纵向切片与克制抽取
 
-1. 只注册当前 runtime 已支持的 `gpt-image-2` en/zh locale routes，初始均为 `listed + noindex`；实现 `/models`、`/models/$slug`、运行时规格派生、安全 preset、DeploymentReadiness 与同语言内容。
-2. 验证 locked image model 从页面 UI 到 Agent tool context 全链路生效；如果阶段 2 未完成，模型页保持不可提交且不能宣称锁定生效。
+1. 以已经作为 noindex 基础设施登记的 `gpt-image-2` 作为唯一开放切片；实现 `/models`、`/models/$slug`、运行时规格派生、安全 preset、DeploymentReadiness 与同语言 content manifest/resolver。其他模型保持不可发现，直到各自纵向切片完成。
+2. 消费阶段 2 已完成的 locked image model 链路，并在真实模型页再次验证页面 UI → handoff → API policy → Agent tool context；任一环节回归时模型页保持不可提交。
 3. 比较工具、图片模型两个真实消费者后，才抽取重复行为稳定的 SectionHeading、Steps、FeatureGrid、FAQList、FinalCTA 等；保留受控 variant/slot，不建设任意 JSON renderer 或巨型万能组件。
 4. 重跑 en/zh route inventory、SEO/head、404、资源与 route client JS 检查，确认新增模型内容没有进入工具页或根路由 preload。
 
@@ -740,8 +831,9 @@ Google 当前指导同样要求优先修复站点自己链接或提交的 404，
 ### 架构
 
 - 首页路由只负责 loader/head 和 block composition，不包含大段 section UI。
-- `components/catalog/*` 不读取 `m`，所有项目文案在扁平的 `blocks/*` 与 content resolver 中组装。
+- `components/catalog/*` 不读取 `m`、Catalog、R2/Admin 配置或 server-only modules，所有项目文案在扁平的 `blocks/*` 与 content resolver 中组装。
 - 不存在任意 JSON section renderer。
+- 短 UI/metadata、Typed Catalog、route-local 长正文、Runtime 事实、R2 媒体和 Blog 数据库分别位于规定的权威源；Catalog/messages 不复制业务能力或整页长正文。
 - 工具和模型 Catalog 无重复 entityId、同语言 slug 或失效 related 引用；每条 locale route 都能由 `catalogPath/catalogUrl` 生成并被 `resolveCatalogRoute` 反向解析。
 - 每个非 hidden 模型的 runtime key 都能按 image/video modality 在对应运行时 Catalog 中解析。
 - publication/availability/locale indexing/placement 不存在非法组合；unlisted/hidden 不能携带首页或目录 placement，未声明 locale route 不会因实体存在而凭空生成 URL。
@@ -749,7 +841,8 @@ Google 当前指导同样要求优先修复站点自己链接或提交的 404，
 
 ### 显示规则
 
-- listed 且当前 locale route/同语言内容存在的页面才出现在该 locale 目录；related 只显示显式引用、存在、非自身、listed 且当前 locale route/内容存在的目标。
+- listed 且当前 locale route/同语言 lazy content manifest key 存在的页面才出现在该 locale 首页或目录；related 只显示显式引用、存在、非自身、listed 且当前 locale route/内容存在的目标。
+- 详情 loader 在 metadata 之前完成 Catalog route 与同语言内容双门禁；缺任一门禁即 404。任何 `indexing: 'index'` entry 必须由自动检查证明内容模块、文件路由、SSR 正文和发现面同时存在。
 - sitemap 的 Catalog 部分只包含 `selectIndexableUrls()` 返回的 locale canonical；同一实体的另一语言处于 noindex、缺内容或未注册时不会被机械扩增。最终 sitemap 仍保留已验证的固定公开 routes 与已发布 Blog locale URLs，listed/noindex、unlisted、hidden Catalog 页面均不出现。
 - unlisted 的已注册 locale route 可访问但包含 `noindex`；hidden、未注册 locale、缺少同语言内容和未知 slug 均返回 404。
 - coming-soon 不显示可提交 Workbench；无实质预发布内容时必须 noindex。
@@ -775,7 +868,7 @@ Google 当前指导同样要求优先修复站点自己链接或提交的 404，
 - 所有公开页面通过统一 helper 输出唯一 title、description、canonical、robots、Open Graph 和 Twitter Card；`og:url` 等于 canonical，生产输出不含 localhost。
 - canonical 为当前语言 self URL；hreflang 只指向真实且可索引的语言版本，存在翻译组时互相返回，且仅在 base locale 版本真实存在并允许 index 时输出 x-default。
 - 追踪参数不进入 canonical；分页和筛选参数按页面类型执行显式 index/canonical 策略，不被全局错误折叠。
-- sitemap 合并固定公开 routes、Catalog 与已发布 Blog 的 indexable locale canonical URL，校验并去重，不输出 `priority`/`changefreq`；实验性 llms 端点只暴露允许公开发现的 locale URL 和内容，不泄露部署配置。
+- sitemap 合并固定公开 routes、Catalog 与已发布 Blog 的 indexable locale canonical URL，校验并去重，不输出 `priority`/`changefreq`；实验性 llms 端点只暴露允许公开发现的 locale URL 和内容，不泄露部署配置，标题/摘要来自同语言审核内容而不是 raw entityId 通用占位文案。
 - `llms.txt` 和 `llms-full.txt` 返回 `X-Robots-Tag: noindex`；noindex 页面没有被 robots.txt 屏蔽。
 - Sitemap 的 `lastmod` 来自真实内容更新时间或省略；已公开 slug 改名登记 `{ kind, locale, fromSlug }`，301 单跳到返回 200 的当前 canonical，永久删除仅在集成测试证明响应码后使用 410。
 - 正向 published URL inventory 中意外 404 为零；负向 fixtures 返回预期 404/410，二者不得混用。Search Console 404 结论包含发现来源和生命周期，不以总数清零驱动无关重定向。
@@ -813,6 +906,7 @@ Google 当前指导同样要求优先修复站点自己链接或提交的 404，
 | Background Remover 营销过度承诺            | beta 标识、限制说明；专用后端上线前不写透明 PNG 契约                                                   |
 | 工具/模型状态在多个页面不一致              | 所有消费端共用 selector 模块，并调用各自的命名投影                                                     |
 | listed、indexable 和 related 语义被混用    | 使用命名 selector 投影，并分别测试目录、关联、sitemap、llms                                            |
+| Catalog 注册了 locale route 但正文不存在   | lazy content key manifest 双门禁；首页/目录/Related 过滤；详情在 head 前 404；index 发布校验阻断       |
 | 大量双语文案进入全局 messages preload      | 报告 transitive preload；禁用动态 key；无法 route-local tree-shake 时改为按 slug+locale 懒加载内容模块 |
 | 机械扩增 locale URL 产生大量 404           | locale route 显式登记；所有发现面共用 resolver；全量 route inventory 检查真实状态                      |
 | 为清空 Search Console 批量错误跳转         | 区分正向 inventory 与负向 fixtures；按发现来源治理，禁止跳首页/目录/另一语言和 soft 404                |

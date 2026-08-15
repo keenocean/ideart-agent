@@ -1,4 +1,5 @@
 export * from './assets';
+export * from './generation';
 export * from './legacy-routes';
 export * from './models';
 export * from './paths';

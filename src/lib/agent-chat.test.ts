@@ -38,6 +38,11 @@ describe('composer reference media', () => {
     const raw = serializeInitialTurnHandoff({
       prompt: 'Create this',
       skillName: 'storyboard',
+      entryContext: {
+        kind: 'tool',
+        entityId: 'image-to-video',
+        locale: 'en',
+      },
       attachments: [
         uploaded,
         {
@@ -51,9 +56,29 @@ describe('composer reference media', () => {
     expect(parseInitialTurnHandoff(raw)).toMatchObject({
       prompt: 'Create this',
       skillName: 'storyboard',
+      entryContext: {
+        kind: 'tool',
+        entityId: 'image-to-video',
+        locale: 'en',
+      },
       attachments: [{ ...uploaded, preview: uploaded.url }],
     });
     expect(parseInitialTurnHandoff('{broken')).toBeNull();
+  });
+
+  it('rejects malformed entry context instead of downgrading it to home', () => {
+    const parsed = parseInitialTurnHandoff(
+      JSON.stringify({
+        prompt: 'Create this',
+        entryContext: {
+          kind: 'model',
+          entityId: '../forged',
+          locale: 'en',
+          settings: { creditCost: 0 },
+        },
+      })
+    );
+    expect(parsed).toBeNull();
   });
 
   it('keeps generic image material in order and hides its plumbing', () => {

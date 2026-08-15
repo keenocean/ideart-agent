@@ -41,6 +41,7 @@ import {
 } from '@/lib/agent-settings';
 import { apiGet, apiPatch, apiPost } from '@/lib/api-client';
 import { ChatAutoScroll } from '@/lib/chat-scroll';
+import type { GenerationEntryContext } from '@/lib/generation-entry';
 import { mediaNameFromUrl } from '@/lib/media';
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
@@ -123,7 +124,8 @@ function ChatSessionPage() {
   );
   const generationRunning = streaming || serverRunning || pendingGeneration;
   const [value, setValue] = useState('');
-  const [composerSettings, setComposerSettings] = useComposerSettings();
+  const [composerSettings, setComposerSettings, setTemporaryComposerSettings] =
+    useComposerSettings();
   const [skillName, setSkillName] = useComposerSkill();
   const [attachments, setAttachments] = useState<PendingAttachment[]>([]);
   const attachmentsRef = useRef<PendingAttachment[]>([]);
@@ -311,6 +313,7 @@ function ChatSessionPage() {
       imageAttachments: PendingAttachment[] = [],
       settings: AgentGenerationSettings = {},
       selectedSkillName?: string,
+      entryContext?: GenerationEntryContext,
       // Fired once the server has accepted the turn (and therefore persisted
       // the user message) — the caller uses it to drop its retry copy.
       onAccepted?: () => void
@@ -323,6 +326,7 @@ function ChatSessionPage() {
         attachments: imageAttachments,
         settings,
         skillName: selectedSkillName,
+        entryContext,
         onAccepted: () => {
           onAccepted?.();
           // The chat row exists the moment the server accepts the turn, so
@@ -370,7 +374,13 @@ function ChatSessionPage() {
         if (!payload) sessionStorage.removeItem(turnKey);
         if (payload) {
           const initialSettings = normalizeComposerSettings(payload.settings);
-          if (payload.settings) setComposerSettings(initialSettings);
+          if (payload.settings) {
+            if (payload.entryContext && payload.entryContext.kind !== 'home') {
+              setTemporaryComposerSettings(initialSettings);
+            } else {
+              setComposerSettings(initialSettings);
+            }
+          }
           if (payload.skillName !== undefined) setSkillName(payload.skillName);
           const initialAttachments = (payload.attachments ?? []).filter(
             (item) => item.status === 'uploaded' && item.url
@@ -384,6 +394,7 @@ function ChatSessionPage() {
               initialAttachments,
               resolveGenerationSettings(initialSettings),
               payload.skillName,
+              payload.entryContext,
               () => sessionStorage.removeItem(turnKey)
             );
             return;
@@ -398,13 +409,22 @@ function ChatSessionPage() {
           [],
           resolveGenerationSettings(composerSettings),
           skillName,
+          undefined,
           () => sessionStorage.removeItem(key)
         );
       }
     } catch {
       // ignore
     }
-  }, [sessionId, send, composerSettings, skillName, setSkillName]);
+  }, [
+    sessionId,
+    send,
+    composerSettings,
+    skillName,
+    setSkillName,
+    setComposerSettings,
+    setTemporaryComposerSettings,
+  ]);
 
   function handleSend() {
     const uploadedAttachments = attachments.filter(

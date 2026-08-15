@@ -64,3 +64,36 @@ export function sanitizeAuthCallback(
 ): string | null {
   return sanitizeCandidate(raw) ?? sanitizeCandidate(fallback);
 }
+
+export const EMAIL_VERIFICATION_CHANNEL = 'ugcmind:email-verification';
+
+export type EmailVerificationSignal = {
+  type: 'verified';
+  callbackUrl: string;
+};
+
+export function verificationCompletionPath(callbackUrl: string): string {
+  const safeCallback = sanitizeAuthCallback(callbackUrl, '/') ?? '/';
+  const query = new URLSearchParams({
+    verified: '1',
+    callbackUrl: safeCallback,
+  });
+  return `/verify-email?${query.toString()}`;
+}
+
+export function parseEmailVerificationSignal(
+  value: unknown,
+  expectedCallbackUrl: string
+): EmailVerificationSignal | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const record = value as Record<string, unknown>;
+  const expected = sanitizeAuthCallback(expectedCallbackUrl);
+  const callback =
+    typeof record.callbackUrl === 'string'
+      ? sanitizeAuthCallback(record.callbackUrl)
+      : null;
+  if (record.type !== 'verified' || !expected || callback !== expected) {
+    return null;
+  }
+  return { type: 'verified', callbackUrl: callback };
+}

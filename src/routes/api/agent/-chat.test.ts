@@ -14,10 +14,14 @@ const mocks = vi.hoisted(() => ({
   getCurrentSubscription: vi.fn(),
   getPromptSkill: vi.fn(),
   getSession: vi.fn(),
+  applyEffectiveGenerationPolicy: vi.fn(),
+  parseGenerationRequestAttachments: vi.fn(),
   prepareAgentTurn: vi.fn(),
+  resolveEffectiveGenerationPolicy: vi.fn(),
   releaseTurnLease: vi.fn(),
   renewTurnLease: vi.fn(),
   runAgentTurn: vi.fn(),
+  validateRequestAttachments: vi.fn(),
 }));
 
 vi.mock('@tanstack/react-router', () => ({
@@ -34,6 +38,13 @@ vi.mock('@/lib/agent', () => ({
 }));
 vi.mock('@/lib/agent-settings', () => ({
   normalizeClientGenerationSettings: vi.fn((settings) => settings ?? {}),
+}));
+vi.mock('@/modules/agent/entry-policy', () => ({
+  GenerationEntryPolicyError: class extends Error {},
+  applyEffectiveGenerationPolicy: mocks.applyEffectiveGenerationPolicy,
+  parseGenerationRequestAttachments: mocks.parseGenerationRequestAttachments,
+  resolveEffectiveGenerationPolicy: mocks.resolveEffectiveGenerationPolicy,
+  validateRequestAttachments: mocks.validateRequestAttachments,
 }));
 vi.mock('@/modules/agent/paywall', () => ({
   checkCredits: vi.fn(() => ({ allowed: true, required: 1, balance: 10 })),
@@ -80,6 +91,16 @@ describe('Agent chat database admission', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.getSession.mockResolvedValue({ user: { id: 'user-1' } });
+    mocks.resolveEffectiveGenerationPolicy.mockReturnValue({
+      entryContext: { kind: 'home' },
+      source: 'home',
+      inputPolicy: { minimum: 0, maximum: 16, accepts: ['image'] },
+    });
+    mocks.applyEffectiveGenerationPolicy.mockImplementation(
+      (settings) => settings
+    );
+    mocks.parseGenerationRequestAttachments.mockReturnValue([]);
+    mocks.validateRequestAttachments.mockReturnValue(null);
     mocks.findChatOwnerId.mockResolvedValue(undefined);
     mocks.getActiveTurnLease.mockResolvedValue(undefined);
     mocks.getActiveTasksForSession.mockResolvedValue([]);
@@ -158,6 +179,71 @@ describe('Agent chat database admission', () => {
     await expect(response.json()).resolves.toMatchObject({
       code: 'turn_in_progress',
     });
+  });
+
+  it('rejects forged entry context before acquiring a turn lease', async () => {
+    mocks.resolveEffectiveGenerationPolicy.mockImplementation(() => {
+      throw new Error('Generation entry is not available.');
+    });
+    const request = new Request('http://localhost/api/agent/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: 'session-1',
+        message: 'hello',
+        settings: {},
+        entryContext: {
+          kind: 'model',
+          entityId: 'retired-model',
+          locale: 'en',
+        },
+      }),
+    });
+    const response = await POST({ request });
+    expect(response.status).toBe(400);
+    expect(mocks.acquireTurnLease).not.toHaveBeenCalled();
+  });
+
+  it('passes only server-resolved settings and policy into preparation', async () => {
+    const locked = {
+      mediaMode: 'image',
+      imageModelName: 'gpt-image-2',
+    };
+    mocks.applyEffectiveGenerationPolicy.mockReturnValue(locked);
+    const request = new Request('http://localhost/api/agent/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: 'session-1',
+        message: 'hello',
+        settings: { mediaMode: 'video', modelName: 'seedance-2-0' },
+        entryContext: {
+          kind: 'model',
+          entityId: 'gpt-image-2',
+          locale: 'en',
+        },
+        attachments: [],
+      }),
+    });
+    const response = await POST({ request });
+    expect(response.status).toBe(200);
+    await response.text();
+    expect(mocks.prepareAgentTurn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        settings: locked,
+        policy: expect.objectContaining({ source: 'home' }),
+      })
+    );
+  });
+
+  it('rejects attachment payloads that fail the server policy', async () => {
+    mocks.validateRequestAttachments.mockReturnValue(
+      'This entry requires at least 1 attachment.'
+    );
+    const response = await POST({ request: chatRequest() });
+    expect(response.status).toBe(400);
+    expect(await response.text()).toContain('requires at least 1');
+    expect(mocks.acquireTurnLease).not.toHaveBeenCalled();
   });
 
   it('persists the prepared audit and releases the matching turn after streaming', async () => {

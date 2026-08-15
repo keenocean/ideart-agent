@@ -54,6 +54,75 @@ describe('createAgentTools', () => {
     ).toEqual(['read_skill_resource', 'generate_image']);
   });
 
+  it('prevents explicit tool model arguments from bypassing Catalog locks', async () => {
+    const videoTool = createAgentTools({
+      userId: 'user-1',
+      sessionId: 'session-1',
+      settings: { mediaMode: 'video', modelName: 'seedance-2-0' },
+      policy: {
+        entryContext: {
+          kind: 'model',
+          entityId: 'seedance-2-0',
+          locale: 'en',
+        },
+        source: 'model:seedance-2-0',
+        lockedMediaMode: 'video',
+        lockedVideoModel: 'seedance-2-0',
+        inputPolicy: { minimum: 0, maximum: 2, accepts: ['image'] },
+      },
+    }).find((tool) => tool.name === 'generate_video')!;
+    const videoResult = await videoTool.call(
+      { prompt: 'A product shot', model: 'minimax-h3' },
+      { cwd: '/' }
+    );
+    expect(videoResult.content).toContain('locked to seedance-2-0');
+
+    const imageTool = createAgentTools({
+      userId: 'user-1',
+      sessionId: 'session-1',
+      settings: { mediaMode: 'image', imageModelName: 'gpt-image-2' },
+      policy: {
+        entryContext: {
+          kind: 'model',
+          entityId: 'gpt-image-2',
+          locale: 'en',
+        },
+        source: 'model:gpt-image-2',
+        lockedMediaMode: 'image',
+        lockedImageModel: 'gpt-image-2',
+        inputPolicy: { minimum: 0, maximum: 16, accepts: ['image'] },
+      },
+    })[0];
+    const imageResult = await imageTool.call(
+      { prompt: 'A poster', model: 'minimax-h3' },
+      { cwd: '/' }
+    );
+    expect(imageResult.content).toContain('locked to gpt-image-2');
+  });
+
+  it('enforces page input policy again at the tool boundary', async () => {
+    const [imageTool] = createAgentTools({
+      userId: 'user-1',
+      sessionId: 'session-1',
+      settings: { mediaMode: 'image', imageModelName: 'gpt-image-2' },
+      policy: {
+        entryContext: {
+          kind: 'tool',
+          entityId: 'ai-image-editor',
+          locale: 'en',
+        },
+        source: 'tool:ai-image-editor',
+        lockedMediaMode: 'image',
+        inputPolicy: { minimum: 1, maximum: 1, accepts: ['image'] },
+      },
+    });
+    const result = await imageTool.call(
+      { prompt: 'Remove the object', reference_images: [] },
+      { cwd: '/' }
+    );
+    expect(result.content).toContain('requires at least 1 attachment');
+  });
+
   it('does not execute another generation after a same-turn failure', async () => {
     let calls = 0;
     const [tool] = guardGenerationRetries([

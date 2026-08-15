@@ -14,6 +14,10 @@ import type { StorageManager } from '@/core/storage';
 import { envConfigs } from '@/config';
 import type { AiTask } from '@/config/db/schema';
 import {
+  validateToolPolicyAttachments,
+  type EffectiveGenerationPolicy,
+} from '@/modules/agent/entry-policy';
+import {
   createTask,
   AITaskStatus as DbTaskStatus,
   findTask,
@@ -56,6 +60,8 @@ export interface AgentToolContext {
   requireTurnLease?: boolean;
   settings?: AgentGenerationSettings;
   skill?: PromptSkill | null;
+  /** Server-resolved page constraints; never accept this object from clients. */
+  policy?: EffectiveGenerationPolicy;
 }
 
 function isFailedGenerationResult(
@@ -821,7 +827,14 @@ function modelSelection(
   requested: string,
   ctx: AgentToolContext
 ): { modelKey: AgentModelOptionValue } | { error: string } {
+  const locked = ctx.policy?.lockedVideoModel;
+  if (locked && requested && requested !== locked) {
+    return {
+      error: `This generation entry is locked to ${locked}; tool arguments cannot select ${requested}.`,
+    };
+  }
   const value =
+    locked ||
     requested ||
     ctx.settings?.modelName ||
     defaultComposerSettings().modelOption;
@@ -894,18 +907,40 @@ export function createAgentTools(ctx: AgentToolContext): ToolDefinition[] {
         return JSON.stringify({ status: 'error', message: selection.error });
       }
       const options: Record<string, unknown> = {};
+      const policyAttachments: {
+        mediaType: 'image' | 'audio' | 'video';
+        url: string;
+      }[] = [];
       for (const [inputKey, optionKey] of [
         ['reference_images', 'reference_image_urls'],
         ['reference_audios', 'reference_audio_urls'],
         ['reference_videos', 'reference_video_urls'],
       ] as const) {
-        const references = Array.isArray(input[inputKey])
+        const references: string[] = Array.isArray(input[inputKey])
           ? input[inputKey]
               .map((item: unknown) => String(item ?? '').trim())
               .filter(Boolean)
               .map((src: string) => resolveReferenceImage(src))
           : [];
+        const mediaType: 'image' | 'audio' | 'video' =
+          inputKey === 'reference_audios'
+            ? 'audio'
+            : inputKey === 'reference_videos'
+              ? 'video'
+              : 'image';
+        policyAttachments.push(
+          ...references.map((url: string) => ({ mediaType, url }))
+        );
         if (references.length > 0) options[optionKey] = references;
+      }
+      if (ctx.policy) {
+        const policyError = validateToolPolicyAttachments(
+          ctx.policy,
+          policyAttachments
+        );
+        if (policyError) {
+          return JSON.stringify({ status: 'error', message: policyError });
+        }
       }
       const aspectRatio = input.aspect_ratio || ctx.settings?.aspectRatio;
       if (aspectRatio) options.aspect_ratio = aspectRatio;
@@ -992,9 +1027,18 @@ export function createAgentTools(ctx: AgentToolContext): ToolDefinition[] {
           message: 'animate_image needs at least one source image',
         });
       }
-      const inputImages = sources.map((src: string) =>
+      const inputImages: string[] = sources.map((src: string) =>
         resolveReferenceImage(src)
       );
+      if (ctx.policy) {
+        const policyError = validateToolPolicyAttachments(
+          ctx.policy,
+          inputImages.map((url) => ({ mediaType: 'image' as const, url }))
+        );
+        if (policyError) {
+          return JSON.stringify({ status: 'error', message: policyError });
+        }
+      }
       // Normalized key — each provider's formatInput() maps this to the
       // field name the selected model actually expects. Don't hardcode a
       // provider-specific key in the tool schema.

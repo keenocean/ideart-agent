@@ -3,28 +3,15 @@ import { FileVideo2, Play, WandSparkles } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { useSession } from '@/core/auth/client';
-import { useRouter } from '@/core/i18n/navigation';
 import {
   isLocalChatMediaUrl,
-  mediaTypeForFile,
-  newAgentSessionId,
-  newAttachmentId,
   publishChatMediaSources,
-  uploadChatMedia,
   type PendingAttachment,
 } from '@/lib/agent';
-import {
-  initialTurnStorageKey,
-  serializeInitialTurnHandoff,
-} from '@/lib/agent-chat';
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
-import { useComposerSettings } from '@/hooks/use-composer-settings';
-import { useComposerSkill } from '@/hooks/use-composer-skill';
-import {
-  ChatComposer,
-  type LibraryMedia,
-} from '@/components/agent/chat-composer';
+import { useGenerationEntry } from '@/hooks/use-generation-entry';
+import { GenerationWorkbench } from '@/components/agent/generation-workbench';
 import {
   promptCategories,
   type PromptExample,
@@ -60,22 +47,34 @@ const EXAMPLE_ASPECT_RATIOS = [
  * through sessionStorage.
  */
 export function PromptLauncher({ className }: { className?: string }) {
-  const router = useRouter();
   const { data: session } = useSession();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-  const [value, setValue] = useState('');
-  const [attachments, setAttachments] = useState<PendingAttachment[]>([]);
-  const [composerSettings, setComposerSettings] = useComposerSettings();
-  const [skillName, setSkillName] = useComposerSkill();
-  const [submitting, setSubmitting] = useState(false);
+  const entry = useGenerationEntry({
+    entryContext: { kind: 'home' },
+    persistSettingsOnChange: true,
+  });
+  const {
+    value,
+    setValue,
+    attachments,
+    setAttachments,
+    settings: composerSettings,
+    setSettings: setComposerSettings,
+    skillName,
+    setSkillName,
+    submitting,
+    uploading,
+    hasUploaded,
+    addFiles,
+    addLibraryMedia,
+    removeAttachment,
+    submit,
+  } = entry;
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
 
   const examples = promptCategories()[0]?.examples ?? [];
   const preview =
     previewIndex === null ? null : (examples[previewIndex] ?? null);
-  const uploading = attachments.some((item) => item.status === 'uploading');
-  const hasUploaded = attachments.some((item) => item.status === 'uploaded');
 
   function fillPrompt(prompt: string) {
     setValue(prompt);
@@ -241,162 +240,18 @@ export function PromptLauncher({ className }: { className?: string }) {
     });
   }
 
-  // Uploads need a session — the API rejects anonymous requests, so say why
-  // instead of letting every thumbnail fail.
-  async function addFiles(files: File[]) {
-    const selected = files
-      .map((file) => ({ file, kind: mediaTypeForFile(file) }))
-      .filter(
-        (item): item is { file: File; kind: 'image' | 'audio' | 'video' } =>
-          item.kind !== null
-      )
-      .slice(0, 10);
-    if (selected.length === 0) return;
-    if (!session?.user) {
-      toast.error(m['landing.hero.sign_in_to_upload']());
-      return;
-    }
-
-    const created = selected.map(({ file, kind }) => ({
-      id: newAttachmentId(),
-      name: file.name || 'media',
-      kind,
-      preview: URL.createObjectURL(file),
-      status: 'uploading' as const,
-      file,
-    }));
-
-    setAttachments((prev) => [
-      ...prev,
-      ...created.map(({ file: _file, ...item }) => item),
-    ]);
-
-    try {
-      const urls = await uploadChatMedia(created.map((item) => item.file));
-      setAttachments((prev) =>
-        prev.map((item) => {
-          const index = created.findIndex(
-            (createdItem) => createdItem.id === item.id
-          );
-          return index >= 0 && urls[index]
-            ? { ...item, url: urls[index], status: 'uploaded' }
-            : item;
-        })
-      );
-    } catch (err) {
-      const error = (err as Error).message || 'Upload failed';
-      toast.error(error);
-      const createdIds = new Set(created.map((item) => item.id));
-      setAttachments((prev) =>
-        prev.map((item) =>
-          createdIds.has(item.id) ? { ...item, status: 'error', error } : item
-        )
-      );
-    }
-  }
-
-  async function addLibraryMedia(media: LibraryMedia[]) {
-    const selected = media.filter(
-      (item) =>
-        !attachments.some(
-          (attachment) =>
-            attachment.preview === item.src || attachment.url === item.src
-        )
-    );
-    if (selected.length === 0) return;
-    if (
-      selected.some((item) => isLocalChatMediaUrl(item.src)) &&
-      !session?.user
-    ) {
-      toast.error(m['landing.hero.sign_in_to_upload']());
-      return;
-    }
-
-    const created: PendingAttachment[] = selected.map((item) => ({
-      id: newAttachmentId(),
-      name: item.name || 'video',
-      kind: 'video',
-      preview: item.src,
-      ...(isLocalChatMediaUrl(item.src) ? {} : { url: item.src }),
-      status: isLocalChatMediaUrl(item.src) ? 'uploading' : 'uploaded',
-    }));
-    setAttachments((previous) => [...previous, ...created]);
-
-    try {
-      const urls = await publishChatMediaSources(
-        selected.map((item) => ({ src: item.src, name: item.name }))
-      );
-      setAttachments((current) =>
-        current.map((item) => {
-          const index = created.findIndex(
-            (createdItem) => createdItem.id === item.id
-          );
-          return index >= 0 && urls[index]
-            ? { ...item, url: urls[index], status: 'uploaded' }
-            : item;
-        })
-      );
-    } catch (error) {
-      const message = (error as Error).message || 'Upload failed';
-      toast.error(message);
-      const ids = new Set(
-        created
-          .filter((item) => item.status === 'uploading')
-          .map((item) => item.id)
-      );
-      setAttachments((current) =>
-        current.map((item) =>
-          ids.has(item.id) ? { ...item, status: 'error', error: message } : item
-        )
-      );
-    }
-  }
-
-  function removeAttachment(id: string) {
-    setAttachments((prev) => {
-      const target = prev.find((item) => item.id === id);
-      if (target?.preview.startsWith('blob:'))
-        URL.revokeObjectURL(target.preview);
-      return prev.filter((item) => item.id !== id);
-    });
-  }
-
-  function handleSubmit() {
-    const prompt = value.trim();
-    if ((!prompt && !hasUploaded) || uploading || submitting) return;
-    setSubmitting(true);
-    const sessionId = newAgentSessionId();
-    // Hand the first turn off to the chat page via sessionStorage so it can
-    // auto-send when it mounts. Avoids URL-encoding long prompts. Only
-    // uploaded attachments survive the hop — the blob previews don't.
-    try {
-      sessionStorage.setItem(
-        initialTurnStorageKey(sessionId),
-        serializeInitialTurnHandoff({
-          prompt,
-          settings: composerSettings,
-          skillName,
-          attachments,
-        })
-      );
-    } catch {
-      // sessionStorage unavailable — chat page will start blank.
-    }
-    router.push(`/chat/${sessionId}`);
-  }
-
   return (
     <div className={cn('w-full', className)}>
       <h1 className="text-foreground mx-auto max-w-3xl text-center font-serif text-3xl font-normal tracking-[-0.01em] sm:text-4xl">
         {m['landing.hero.headline_1']()}
       </h1>
 
-      <ChatComposer
+      <GenerationWorkbench
         className="mx-auto mt-10 max-w-3xl"
         textareaRef={textareaRef}
         value={value}
         onValueChange={setValue}
-        onSubmit={handleSubmit}
+        onSubmit={submit}
         placeholder={m['agent.home.placeholder']()}
         attachments={attachments}
         onAddFiles={(files) => void addFiles(files)}

@@ -1,9 +1,12 @@
-import { ChevronDown, ImageIcon } from 'lucide-react';
+import { Check, ChevronDown, ImageIcon } from 'lucide-react';
 
 import {
   AGENT_IMAGE_ASPECT_RATIOS,
+  AGENT_IMAGE_MODEL_OPTIONS,
   AGENT_IMAGE_QUALITIES,
   AGENT_IMAGE_RESOLUTIONS,
+  imageModelOptionFor,
+  settingsForImageModel,
   type AgentComposerSettings,
 } from '@/lib/agent-settings';
 import { cn } from '@/lib/utils';
@@ -12,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
@@ -34,12 +38,53 @@ function qualityLabel(quality: string) {
   return m['agent.composer.quality_medium']();
 }
 
-export function ComposerImageModel() {
+export function ComposerImageModel({
+  settings,
+  onChange,
+  disabled,
+}: {
+  settings: AgentComposerSettings;
+  onChange: (settings: AgentComposerSettings) => void;
+  disabled?: boolean;
+}) {
+  const selected = imageModelOptionFor(settings.imageModelOption)!;
   return (
-    <div className="bg-muted/70 text-foreground flex h-9 max-w-[160px] items-center gap-1.5 rounded-md px-3 text-xs">
-      <ImageIcon className="size-3.5 shrink-0" />
-      <span className="truncate">GPT Image 2</span>
-    </div>
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            disabled={disabled}
+            className="bg-muted/70 text-foreground hover:bg-muted h-9 max-w-[180px] gap-1.5 rounded-md px-3 text-xs"
+          />
+        }
+      >
+        <ImageIcon className="size-3.5 shrink-0" />
+        <span className="truncate">{selected.label}</span>
+        <ChevronDown className="text-muted-foreground size-3.5" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56">
+        {AGENT_IMAGE_MODEL_OPTIONS.map((model) => (
+          <DropdownMenuItem
+            key={model.value}
+            onClick={() =>
+              onChange(settingsForImageModel(settings, model.value))
+            }
+            className="items-center gap-2.5"
+          >
+            <ImageIcon className="size-4 shrink-0" />
+            <span className="min-w-0 flex-1 truncate text-sm">
+              {model.label}
+            </span>
+            {settings.imageModelOption === model.value && (
+              <Check className="size-4 shrink-0" />
+            )}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 

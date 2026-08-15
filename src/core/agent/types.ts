@@ -26,6 +26,8 @@ export interface AgentTurnMetadataV1 {
   skillReleaseId: string | null;
   toolNames: string[];
   longRunningToolNames: string[];
+  /** Stable marketing/chat entry identity for audit only. */
+  generationEntrySource?: string;
 }
 
 export interface AgentAssistantMessageMetadataV1 {

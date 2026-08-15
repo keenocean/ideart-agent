@@ -3,6 +3,10 @@ import { defineTool, type ToolDefinition } from '@keenocean/open-agent-sdk';
 import { AIMediaType, AITaskStatus, type AITaskResult } from '@/core/ai';
 import type { StorageManager } from '@/core/storage';
 import {
+  validateToolPolicyAttachments,
+  type EffectiveGenerationPolicy,
+} from '@/modules/agent/entry-policy';
+import {
   createTask,
   AITaskStatus as DbTaskStatus,
   findTask,
@@ -43,6 +47,7 @@ interface ImageToolContext {
   turnId?: string;
   requireTurnLease?: boolean;
   settings?: AgentGenerationSettings;
+  policy?: EffectiveGenerationPolicy;
 }
 
 function sleep(ms: number, signal?: AbortSignal): Promise<void> {
@@ -519,7 +524,20 @@ export function createImageTool(ctx: ImageToolContext): ToolDefinition {
     },
     isConcurrencySafe: true,
     async call(input, context) {
-      const requested = String(input.model ?? DEFAULT_IMAGE_MODEL);
+      const requestedInput = String(input.model ?? '');
+      const locked = ctx.policy?.lockedImageModel;
+      if (locked && requestedInput && requestedInput !== locked) {
+        return JSON.stringify({
+          status: 'error',
+          message: `This generation entry is locked to ${locked}; tool arguments cannot select ${requestedInput}.`,
+        });
+      }
+      const requested = String(
+        locked ||
+          requestedInput ||
+          ctx.settings?.imageModelName ||
+          DEFAULT_IMAGE_MODEL
+      );
       if (!isImageModelOptionValue(requested)) {
         return JSON.stringify({
           status: 'error',
@@ -539,12 +557,21 @@ export function createImageTool(ctx: ImageToolContext): ToolDefinition {
           message: 'The image prompt exceeds the 32,000-character limit.',
         });
       }
-      const references = Array.isArray(input.reference_images)
+      const references: string[] = Array.isArray(input.reference_images)
         ? input.reference_images
             .map((item: unknown) => String(item ?? '').trim())
             .filter(Boolean)
             .map(resolveReferenceImage)
         : [];
+      if (ctx.policy) {
+        const policyError = validateToolPolicyAttachments(
+          ctx.policy,
+          references.map((url) => ({ mediaType: 'image' as const, url }))
+        );
+        if (policyError) {
+          return JSON.stringify({ status: 'error', message: policyError });
+        }
+      }
       return runImageGeneration({
         ctx,
         modelKey: requested,

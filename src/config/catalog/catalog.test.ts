@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { generationPresetFor } from './generation';
 import { catalog } from './index';
 import { legacyCatalogRoutes } from './legacy-routes';
 import { modelCatalog } from './models';
@@ -131,6 +132,24 @@ describe('Catalog contract', () => {
       )
     ).toEqual(['ai-image-editor', 'gpt-image-2']);
     expect(selectIndexableUrls(catalog)).toEqual([]);
+  });
+
+  it('projects modality-safe UI presets without making them authoritative', () => {
+    const imageTool = catalog.find(
+      (entry) => entry.entityId === 'ai-image-editor'
+    )!;
+    const imageModel = catalog.find(
+      (entry) => entry.entityId === 'gpt-image-2'
+    )!;
+    expect(generationPresetFor(imageTool)).toMatchObject({
+      target: { mediaMode: 'image', modelKey: 'gpt-image-2' },
+      locks: { mediaMode: true, model: false },
+      inputPolicy: { minimum: 1, maximum: 16, accepts: ['image'] },
+    });
+    expect(generationPresetFor(imageModel)).toMatchObject({
+      target: { mediaMode: 'image', modelKey: 'gpt-image-2' },
+      locks: { mediaMode: true, model: true },
+    });
   });
 
   it('rejects duplicate locale slugs and broken related references', () => {

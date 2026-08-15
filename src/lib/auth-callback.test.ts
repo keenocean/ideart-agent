@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { sanitizeAuthCallback } from './auth-callback';
+import {
+  parseEmailVerificationSignal,
+  sanitizeAuthCallback,
+  verificationCompletionPath,
+} from './auth-callback';
 
 describe('sanitizeAuthCallback', () => {
   it('keeps safe locale-free or localized paths and queries', () => {
@@ -33,6 +37,38 @@ describe('sanitizeAuthCallback', () => {
     expect(sanitizeAuthCallback('https://evil.example', '/chat')).toBe('/chat');
     expect(
       sanitizeAuthCallback('https://evil.example', 'https://also-evil.example')
+    ).toBeNull();
+  });
+});
+
+describe('email verification callback contract', () => {
+  it('routes the verification tab through a completion page without payload data', () => {
+    const path = verificationCompletionPath('/chat/s-1234-abcd?source=home');
+    expect(path).toBe(
+      '/verify-email?verified=1&callbackUrl=%2Fchat%2Fs-1234-abcd%3Fsource%3Dhome'
+    );
+    expect(path).not.toContain('prompt');
+    expect(path).not.toContain('attachments');
+  });
+
+  it('accepts only a completion signal for the expected safe callback', () => {
+    expect(
+      parseEmailVerificationSignal(
+        { type: 'verified', callbackUrl: '/chat/s-1234-abcd' },
+        '/chat/s-1234-abcd'
+      )
+    ).toEqual({ type: 'verified', callbackUrl: '/chat/s-1234-abcd' });
+    expect(
+      parseEmailVerificationSignal(
+        { type: 'verified', callbackUrl: 'https://evil.example' },
+        '/chat/s-1234-abcd'
+      )
+    ).toBeNull();
+    expect(
+      parseEmailVerificationSignal(
+        { type: 'verified', callbackUrl: '/chat/other' },
+        '/chat/s-1234-abcd'
+      )
     ).toBeNull();
   });
 });

@@ -62,6 +62,33 @@ export interface LibraryMedia {
   alt: string;
 }
 
+export interface ChatComposerProps {
+  value: string;
+  onValueChange: (value: string) => void;
+  onSubmit: () => void;
+  onStop?: () => void;
+  placeholder: string;
+  attachments: PendingAttachment[];
+  onAddFiles: (files: File[]) => void;
+  onAddLibraryMedia: (media: LibraryMedia[]) => void;
+  onRemoveAttachment: (id: string) => void;
+  settings: AgentComposerSettings;
+  onSettingsChange: (settings: AgentComposerSettings) => void;
+  skillName?: string;
+  onSkillNameChange?: (skillName: string | undefined) => void;
+  disabled?: boolean;
+  running?: boolean;
+  submitDisabled?: boolean;
+  modeLocked?: boolean;
+  modelLocked?: boolean;
+  /** `lg` on the start screens, `sm` for the follow-up box in a session. */
+  size?: 'sm' | 'lg';
+  /** Rendered next to the "+" menu (e.g. the selected example category). */
+  toolbarExtra?: ReactNode;
+  textareaRef?: RefObject<HTMLTextAreaElement | null>;
+  className?: string;
+}
+
 interface LibraryData {
   images?: LibraryMedia[];
   nextCursor?: string;
@@ -90,34 +117,13 @@ export function ChatComposer({
   disabled = false,
   running = false,
   submitDisabled = false,
+  modeLocked = false,
+  modelLocked = false,
   size = 'lg',
   toolbarExtra,
   textareaRef,
   className,
-}: {
-  value: string;
-  onValueChange: (value: string) => void;
-  onSubmit: () => void;
-  onStop?: () => void;
-  placeholder: string;
-  attachments: PendingAttachment[];
-  onAddFiles: (files: File[]) => void;
-  onAddLibraryMedia: (media: LibraryMedia[]) => void;
-  onRemoveAttachment: (id: string) => void;
-  settings: AgentComposerSettings;
-  onSettingsChange: (settings: AgentComposerSettings) => void;
-  skillName?: string;
-  onSkillNameChange?: (skillName: string | undefined) => void;
-  disabled?: boolean;
-  running?: boolean;
-  submitDisabled?: boolean;
-  /** `lg` on the start screens, `sm` for the follow-up box in a session. */
-  size?: 'sm' | 'lg';
-  /** Rendered next to the "+" menu (e.g. the selected example category). */
-  toolbarExtra?: ReactNode;
-  textareaRef?: RefObject<HTMLTextAreaElement | null>;
-  className?: string;
-}) {
+}: ChatComposerProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [libraryOpen, setLibraryOpen] = useState(false);
   const uploading = attachments.some((item) => item.status === 'uploading');
@@ -285,7 +291,7 @@ export function ChatComposer({
           <ComposerModeSelector
             settings={settings}
             onChange={onSettingsChange}
-            disabled={disabled}
+            disabled={disabled || modeLocked}
           />
           {toolbarExtra}
         </div>
@@ -300,7 +306,11 @@ export function ChatComposer({
           )}
           {settings.mediaMode === 'image' ? (
             <>
-              <ComposerImageModel />
+              <ComposerImageModel
+                settings={settings}
+                onChange={onSettingsChange}
+                disabled={disabled || modelLocked}
+              />
               <ComposerImageSettings
                 settings={settings}
                 onChange={onSettingsChange}
@@ -312,7 +322,7 @@ export function ChatComposer({
               <ComposerControls
                 settings={settings}
                 onChange={onSettingsChange}
-                disabled={disabled}
+                disabled={disabled || modelLocked}
               />
               <ComposerSettings
                 settings={settings}

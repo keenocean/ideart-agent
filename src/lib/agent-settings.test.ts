@@ -149,6 +149,7 @@ describe('composer model capabilities', () => {
     expect(defaultComposerSettings()).toEqual({
       mediaMode: 'auto',
       modelOption: 'minimax-h3',
+      imageModelOption: 'gpt-image-2',
       duration: 5,
       resolution: '2K',
       aspectRatio: 'adaptive',
@@ -247,6 +248,30 @@ describe('resolveGenerationSettings', () => {
         'medium'
       ),
     });
+  });
+
+  it('carries the selected image picker key through composer and API normalization', () => {
+    const composer = {
+      ...defaultComposerSettings(),
+      mediaMode: 'image' as const,
+      imageModelOption: 'gpt-image-2' as const,
+    };
+
+    expect(resolveGenerationSettings(composer).imageModelName).toBe(
+      'gpt-image-2'
+    );
+    expect(
+      normalizeClientGenerationSettings({
+        ...resolveGenerationSettings(composer),
+        imageModelName: 'gpt-image-2',
+      })?.imageModelName
+    ).toBe('gpt-image-2');
+    expect(
+      normalizeClientGenerationSettings({
+        mediaMode: 'image',
+        imageModelName: 'retired-image-model' as 'gpt-image-2',
+      })
+    ).toBeNull();
   });
 
   it('does not trust client pricing or unsupported values', () => {

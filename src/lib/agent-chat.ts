@@ -3,6 +3,10 @@ import type {
   AgentComposerSettings,
   AgentMediaMode,
 } from '@/lib/agent-settings';
+import {
+  normalizeGenerationEntryContext,
+  type GenerationEntryContext,
+} from '@/lib/generation-entry';
 
 /**
  * The chat transcript's data model: message shapes, the reducers that fold
@@ -242,6 +246,8 @@ export interface InitialTurnPayload {
   skillName?: string;
   /** Media already uploaded or selected by the landing composer. */
   attachments?: PendingAttachment[];
+  /** Stable page identity; the server rebuilds policy from its own Catalog. */
+  entryContext?: GenerationEntryContext;
 }
 
 export function initialTurnStorageKey(sessionId: string): string {
@@ -257,6 +263,7 @@ export function serializeInitialTurnHandoff(
     ...(payload.skillName !== undefined
       ? { skillName: payload.skillName }
       : {}),
+    ...(payload.entryContext ? { entryContext: payload.entryContext } : {}),
     attachments: (payload.attachments ?? [])
       .filter((item) => item.status === 'uploaded' && !!item.url)
       .map((item) => ({ ...item, preview: item.url })),
@@ -288,6 +295,8 @@ export function parseInitialTurnHandoff(
           item.status === 'uploaded'
       )
     : [];
+  const entryContext = normalizeGenerationEntryContext(value.entryContext);
+  if (value.entryContext !== undefined && !entryContext) return null;
   return {
     prompt: typeof value.prompt === 'string' ? value.prompt : '',
     ...(isRecord(value.settings)
@@ -296,6 +305,7 @@ export function parseInitialTurnHandoff(
     ...(typeof value.skillName === 'string'
       ? { skillName: value.skillName }
       : {}),
+    ...(entryContext ? { entryContext } : {}),
     attachments,
   };
 }

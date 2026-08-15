@@ -230,6 +230,7 @@ export const AGENT_RESOLUTIONS = [
 export interface AgentComposerSettings {
   mediaMode: AgentMediaMode;
   modelOption: AgentModelOptionValue;
+  imageModelOption: AgentImageModelOptionValue;
   aspectRatio: string;
   resolution: string;
   duration: number;
@@ -405,12 +406,37 @@ export function settingsForModel(
   };
 }
 
+export function settingsForImageModel(
+  settings: AgentComposerSettings,
+  modelKey: AgentImageModelOptionValue
+): AgentComposerSettings {
+  const option = imageModelOptionFor(modelKey);
+  if (!option) return defaultComposerSettings();
+  if (settings.imageModelOption !== modelKey) {
+    return {
+      ...settings,
+      imageModelOption: modelKey,
+      imageAspectRatio: option.defaultAspectRatio,
+      imageResolution: option.defaultResolution,
+      imageQuality: option.defaultQuality,
+    };
+  }
+  return {
+    ...settings,
+    imageModelOption: modelKey,
+    imageAspectRatio: normalizeImageAspectRatio(settings.imageAspectRatio),
+    imageResolution: normalizeImageResolution(settings.imageResolution),
+    imageQuality: normalizeImageQuality(settings.imageQuality),
+  };
+}
+
 export function defaultComposerSettings(): AgentComposerSettings {
   const option = AGENT_MODEL_OPTIONS[0];
   const imageOption = imageModelOptionFor(DEFAULT_IMAGE_MODEL)!;
   return {
     mediaMode: 'auto',
     modelOption: option.value,
+    imageModelOption: imageOption.value,
     aspectRatio: option.defaultAspectRatio,
     resolution: option.defaultResolution,
     duration: option.defaultDuration,
@@ -428,12 +454,16 @@ export function normalizeComposerSettings(
   const modelOption = isModelOptionValue(settings?.modelOption)
     ? settings.modelOption
     : defaults.modelOption;
+  const imageModelOption = isImageModelOptionValue(settings?.imageModelOption)
+    ? settings.imageModelOption
+    : defaults.imageModelOption;
   return settingsForModel(
     {
       mediaMode: isAgentMediaMode(settings?.mediaMode)
         ? settings.mediaMode
         : defaults.mediaMode,
       modelOption,
+      imageModelOption,
       aspectRatio: isAspectRatioValue(settings?.aspectRatio)
         ? settings.aspectRatio
         : defaults.aspectRatio,
@@ -466,12 +496,12 @@ export function resolveGenerationSettings(
       normalized.duration,
       normalized.resolution
     ),
-    imageModelName: DEFAULT_IMAGE_MODEL,
+    imageModelName: normalized.imageModelOption,
     imageAspectRatio: normalizeImageAspectRatio(normalized.imageAspectRatio),
     imageResolution: normalizeImageResolution(normalized.imageResolution),
     imageQuality: normalizeImageQuality(normalized.imageQuality),
     imageCreditCost: creditsForImageGeneration(
-      DEFAULT_IMAGE_MODEL,
+      normalized.imageModelOption,
       normalized.imageResolution,
       normalized.imageQuality
     ),
@@ -487,12 +517,16 @@ export function normalizeClientGenerationSettings(
   if (!isAgentMediaMode(mediaMode)) return null;
   const modelOption = settings?.modelName ?? defaults.modelOption;
   if (!isModelOptionValue(modelOption)) return null;
+  const imageModelOption =
+    settings?.imageModelName ?? defaults.imageModelOption;
+  if (!isImageModelOptionValue(imageModelOption)) return null;
 
   return resolveGenerationSettings(
     settingsForModel(
       {
         mediaMode,
         modelOption,
+        imageModelOption,
         aspectRatio: settings?.aspectRatio ?? defaults.aspectRatio,
         resolution: settings?.resolution ?? defaults.resolution,
         duration:

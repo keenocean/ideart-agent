@@ -2,6 +2,13 @@ import { createFileRoute } from '@tanstack/react-router';
 
 import { agentErrorResponse, AgentRequestError } from '@/core/agent/errors';
 import { getAuth } from '@/core/auth';
+import {
+  applyEffectiveGenerationPolicy,
+  parseGenerationRequestAttachments,
+  resolveEffectiveGenerationPolicy,
+  validateRequestAttachments,
+  type EffectiveGenerationPolicy,
+} from '@/modules/agent/entry-policy';
 import { checkCredits, insufficientCreditsBody } from '@/modules/agent/paywall';
 import { prepareAgentTurn, runAgentTurn } from '@/modules/agent/service';
 import {
@@ -31,6 +38,7 @@ import {
   normalizeClientGenerationSettings,
   type AgentGenerationSettings,
 } from '@/lib/agent-settings';
+import { normalizeGenerationEntryContext } from '@/lib/generation-entry';
 import { enforceMinIntervalRateLimit } from '@/lib/rate-limit';
 
 const MAX_AGENT_MESSAGE_CHARS = 50_000;
@@ -40,6 +48,8 @@ interface ChatRequest {
   message: string;
   skillName?: string;
   settings?: AgentGenerationSettings;
+  entryContext?: unknown;
+  attachments?: unknown;
 }
 
 export async function POST({ request }: { request: Request }) {
@@ -72,6 +82,43 @@ export async function POST({ request }: { request: Request }) {
   if (!isAgentSessionId(body.sessionId)) {
     return new Response('invalid sessionId', { status: 400 });
   }
+
+  const entryContext =
+    body.entryContext === undefined
+      ? ({ kind: 'home' } as const)
+      : normalizeGenerationEntryContext(body.entryContext);
+  if (!entryContext) {
+    return new Response('invalid generation entry', { status: 400 });
+  }
+  const clientSettings = normalizeClientGenerationSettings(body.settings);
+  if (!clientSettings) {
+    return new Response('unsupported generation settings', { status: 400 });
+  }
+  let policy: EffectiveGenerationPolicy;
+  let generationSettings: AgentGenerationSettings;
+  try {
+    policy = resolveEffectiveGenerationPolicy(entryContext);
+    generationSettings = applyEffectiveGenerationPolicy(clientSettings, policy);
+  } catch {
+    return new Response('generation entry is not available', { status: 400 });
+  }
+  const attachments = parseGenerationRequestAttachments(body.attachments);
+  if (!attachments) {
+    return new Response('invalid attachments', { status: 400 });
+  }
+  const attachmentError = validateRequestAttachments({
+    message: body.message,
+    attachments,
+    policy,
+    settings: generationSettings,
+  });
+  if (attachmentError) {
+    return new Response(attachmentError, { status: 400 });
+  }
+  const executionPolicy: EffectiveGenerationPolicy = {
+    ...policy,
+    requestAttachments: attachments,
+  };
 
   const existingOwner = await findChatOwnerId(body.sessionId);
   if (existingOwner && existingOwner !== userId) {
@@ -141,11 +188,6 @@ export async function POST({ request }: { request: Request }) {
       }
     }
 
-    const generationSettings = normalizeClientGenerationSettings(body.settings);
-    if (!generationSettings) {
-      return new Response('unsupported video model', { status: 400 });
-    }
-
     // Gate on credits before spending anything.
     const verdict = checkCredits({
       mediaMode: generationSettings.mediaMode,
@@ -171,6 +213,7 @@ export async function POST({ request }: { request: Request }) {
       message: body.message,
       skill: selectedSkill,
       settings: generationSettings,
+      policy: executionPolicy,
       leaseOwner,
     });
     await assertTurnLeaseOwnership(leaseOwner);
@@ -318,6 +361,7 @@ export async function POST({ request }: { request: Request }) {
             persistedUserMessageId: userMessage.id,
             skill: selectedSkill,
             settings: generationSettings,
+            policy: executionPolicy,
             signal: runController.signal,
             prepared,
           })) {
