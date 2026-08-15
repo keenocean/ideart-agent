@@ -786,7 +786,7 @@ Google 当前指导同样要求优先修复站点自己链接或提交的 404，
 - 阶段 3 的首个工具纵向切片已经完成：`/tools`、`/tools/$slug`、纯 props Catalog 组件、工具 Blocks、精确语言 release resolver 和服务端 DeploymentReadiness 已存在；仅 `ai-image-generator` 有 en/zh 正文并可访问。详情展示层已重构为 `ToolDetailShell` 共享底盘、Block-owned 六类语义模板注册表和逐页面 typed content 三层；图片生成器只渲染 15 张图片、图片 Prompt 与图片 Use cases，不再显示视频灵感。动态瀑布流、媒体预览、图文交错和工具/模型 show-card 网格继续复用；视频轮播与 12 个已验证 R2 视频对象保留给未来真正的视频模板。阶段 4 模型详情切片尚未开始，`src/routes/models/*` 与模型 release resolver 仍不存在；`messages/marketing/assets.json` 登记 15 张图片与 12 个带共享 poster 的视频，共 27 个此前经在线验证的 R2 对象。
 - 阶段 5 尚未开始：首页仍是旧的 `Header → Hero(PromptLauncher) → Blog → Footer → SupportWidget`，登录用户仍自动跳转 `/chat`。仓库中未接线的 `Features`、`ModelsStrip`、`Gallery`、`FAQ`、`CTA` 等旧/demo Blocks 不计为本计划首页实施，其中渐变 placeholder 不符合真实 R2 案例门禁。
 - Header/Footer 和首页尚未接入 Tools/Models；`/tools` 已成为首个 Catalog directory 消费者，related selector 只输出具备同语言正文的目标。sitemap/llms 虽已接线，但因为 Catalog locale pages 均为 noindex，不输出这些 URL。
-- 2026-08-15 content release 迁移后全量 53 个测试文件/316 项测试、TypeScript、`pnpm build`、route bundle、100 页面 fixture、正文 bundle 扫描和 Cloudflare 构建/dry-run/预算门禁均通过；本地生产 SSR 已验证中英文图片工具页为 `200 + noindex,follow + self canonical`、未知工具为真实 404，故意移除已发布对象则为 `503 + Retry-After: 60`。本轮媒体检查只运行离线 inventory；此前 27 个 R2 对象的在线证据仍保留。2026-08-16 已创建真实内容 Bucket 并写入本地 binding；release 上传/固定、binding 随 Worker 部署生效及旧 release 回滚部署尚未执行。响应式浏览器复查、真实 OAuth/provider、浏览器生成 smoke、Lighthouse、更新后生产抓取与 Search Console 也仍待相应环境，不能据此宣告阶段 4–9 已完成或开放索引。
+- 2026-08-15 content release 迁移后全量 53 个测试文件/316 项测试、TypeScript、`pnpm build`、route bundle、100 页面 fixture、正文 bundle 扫描和 Cloudflare 构建/dry-run/预算门禁均通过；本地生产 SSR 已验证中英文图片工具页为 `200 + noindex,follow + self canonical`、未知工具为真实 404，故意移除已发布对象则为 `503 + Retry-After: 60`。2026-08-16 已把 release `7c68fb9fe0289c311a9ea46ff0af165d714e69f93223242c17937a54f7ff0c31` 上传并逐对象回读验证到私有 Bucket `ugcmind-marketing-content`，固定到 Worker 版本 `6a69e6cd-83d3-4ed2-b443-8ef00b24d262`；生产抓取确认 `/tools`、en/zh 图片工具页为 200，unknown en/zh slug 为 404，27 个公开媒体对象在线检查通过。旧 release 回滚部署演练、响应式浏览器复查、真实 OAuth/provider、浏览器生成 smoke、Lighthouse 与 Search Console 仍待执行，不能据此宣告阶段 4–9 已完成或开放索引。
 
 ### 已完成：阶段 2 共享生成入口安全链路（2026-08-15）
 
@@ -831,16 +831,16 @@ Google 当前指导同样要求优先修复站点自己链接或提交的 404，
 - 详情视觉层以双参考证据和组件规格为输入：`CatalogMedia` 同时接受带尺寸的图片与带 poster 的视频；图片案例使用按自然高度平衡的 3/2/1 显式 lane；`CatalogMediaFeatureList` 通过显式 `media` 与 `mediaPosition` 控制图片/视频和桌面左右交错，移动端统一媒体优先；`CatalogMediaComparisonGrid` 为编辑与图生视频模板提供 source/result 媒体对比。横向 snap 轮播继续作为纯 props 视频模板组件存在，但不在图片生成模板渲染。所有组件不读取 i18n/服务端模块，也没有引入任意 `sections[]` renderer。
 - 四个开放 URL 均经生产 HTTP 快照验证为 `200 + noindex,follow + self canonical`，无 hreflang；目录输出可见 `BreadcrumbList`，详情输出与可见内容同源的 `BreadcrumbList + FAQPage`。`/tools/missing`、`/zh/tools/missing` 和尚未开放的 `ai-image-editor` en/zh URL 均为 404。
 - 内容正文已经移出 Vite import graph；生产 bundle marker 扫描确认 source copy、页面正文和全局 asset inventory 未进入 Worker/客户端输出。代表路由报告为 `/tools/` 368,418 bytes gzip、`/tools/$slug` 394,983 bytes gzip，根路由相对记录基线增加 5,394 bytes；100 页面隔离 fixture 的运行时索引仍为 296 bytes。
-- content release 迁移后全量 53 个测试文件/316 项测试、TypeScript、生产构建、route bundle 与 Cloudflare build/dry-run/budget 均通过；Worker gzip 为 2,215,457 bytes，低于 free 预算 2,516,582 bytes，静态资产 232 / 250。中英文详情页继续为 `noindex,follow` 并只引用已验证 R2 图片；本地生产 SSR 验证无视频区块/元素、未知工具为真实 404、已发布对象故障为 503。响应式浏览器复查与生产页面抓取仍待后续部署；上线前还需真实 Provider/Storage 浏览器生成 smoke。
+- content release 迁移后全量 53 个测试文件/316 项测试、TypeScript、生产构建、route bundle 与 Cloudflare build/dry-run/budget 均通过；Worker gzip 为 2,215,457 bytes，低于 free 预算 2,516,582 bytes，静态资产 232 / 250。中英文详情页继续为 `noindex,follow` 并只引用已验证 R2 图片；本地生产 SSR 验证无视频区块/元素、未知工具为真实 404、已发布对象故障为 503。2026-08-16 的生产 HTTP/SEO 抓取和媒体在线检查已经通过；响应式浏览器复查以及真实 Provider/Storage 浏览器生成 smoke 仍待执行。
 - 页面继续保持 noindex，Header/Home、sitemap、hreflang 和 llms 发现面留到阶段 7。上线前还需在真实 Provider/Storage 配置下完成浏览器生成 smoke；加入案例/分享媒体时必须先走不可变 R2 typed asset 与 online check。
 
-### 阶段 3.5：100+ 页面内容 release 基础设施（代码已完成，外部发布待执行）
+### 阶段 3.5：100+ 页面内容 release 基础设施（代码与首个生产发布已完成，回滚演练待执行）
 
 1. **已完成**：建立 `messages/marketing/**` schema、源文件 inventory 和 `assets.json`，把当前 `ai-image-generator` en/zh 正文、工具目录文案与 27 个媒体引用迁移为 JSON 编辑源；原页面可见内容和 noindex 行为保留。
 2. **已完成**：实现 build/publish dry-run，全量验证 Catalog、locale、template/variant、内链、assetId、schemaVersion 与 `contentModifiedAt`，生成不可变页面/目录对象和 manifest；release `7c68fb9fe0289c311a9ea46ff0af165d714e69f93223242c17937a54f7ff0c31` 包含 2 个页面、2 个目录对象，共 62,804 bytes。
 3. **已完成（工具 surface）**：实现 server-only R2/local store、manifest/page hash/schema 验证、releaseId 固定和带 releaseId 的 Cache API key；工具详情、目录、Related、sitemap 和 llms 使用同一 release。首页与模型页 resolver 在各自阶段接入，当前 fail closed。
 4. **已完成**：unknown/hidden/unregistered locale 为 404；Catalog + pinned manifest 已发布但对象读取、hash 或 schema 失败为 `503 + Retry-After: 60`，发现端点不吞掉内容故障。
-5. **部分完成（2026-08-16）**：目标 Cloudflare 账号已创建私有 Bucket `ugcmind-marketing-content`，真实 `wrangler.jsonc` 已配置 `MARKETING_CONTENT` binding。仍需上传并验证 release，随后固定 `MARKETING_CONTENT_RELEASE`，完成 SSR/SEO/cache smoke 与前一 release 回滚部署演练；release 变量在远端对象验证前不得提前设置。
+5. **生产发布已完成（2026-08-16）**：目标 Cloudflare 账号已创建私有 Bucket `ugcmind-marketing-content`，release `7c68fb9fe0289c311a9ea46ff0af165d714e69f93223242c17937a54f7ff0c31` 已在远端逐对象验证后固定为 `MARKETING_CONTENT_RELEASE`，`MARKETING_CONTENT` binding 已随 Worker 版本 `6a69e6cd-83d3-4ed2-b443-8ef00b24d262` 生效。生产 SSR/SEO/404 smoke 与媒体在线检查通过；前一 release 回滚部署演练仍待执行。后续发布仍必须坚持先远端验证、再固定 release 变量、最后部署。
 6. **已完成**：删除运行时代码对 `src/content/tools/pages/**` 和全局 TS asset registry 的依赖；production bundle marker、100 页面 fixture、route bundle 与 CF budget 证明正文不生成 client chunks，Static Assets 不随页面 JSON 增长。
 
 ### 阶段 4：第一个模型纵向切片与克制抽取

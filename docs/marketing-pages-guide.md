@@ -383,7 +383,7 @@ active lease/task 检查发生在历史读取和 receipt 验证之前；402 拒�
 - `/tools` 和首个详情页当前均为 `200 + noindex`，无 hreflang、sitemap 或 llms 条目。阶段 7 完成发现面和生产发布门槛后，才能逐语言改为 index。
 - 当前页面使用 15 张已在线验证的 R2 图片；12 个已验证视频对象及共享 poster 只保留给未来能力匹配的视频模板，图片生成页不渲染它们。当前仍没有专属分享图，因此输出 summary card。禁止用本地占位图、渐变图或未上传 URL 冒充结果 gallery。
 
-content release 迁移后的最新证据为：53 个测试文件/316 项测试、TypeScript、生产构建、en/zh HTTP route inventory、release/hash/schema 测试、100 页面 fixture、无正文 bundle 扫描，以及 Cloudflare build/dry-run/budget 全部通过。本地生产 SSR 验证现有页面为 200、未知 slug 为 404，故意移除已发布对象时为 `503 + Retry-After: 60`。本轮资源检查是离线 inventory；此前 27 个媒体对象的在线验证记录仍有效，但不能替代发布环境复查。2026-08-16 已创建私有内容 Bucket 并配置本地 Worker binding；真实 release 发布/固定、binding 部署生效和旧 release 回滚部署演练仍待执行。
+content release 迁移后的最新证据为：53 个测试文件/316 项测试、TypeScript、生产构建、en/zh HTTP route inventory、release/hash/schema 测试、100 页面 fixture、无正文 bundle 扫描，以及 Cloudflare build/dry-run/budget 全部通过。本地生产 SSR 验证现有页面为 200、未知 slug 为 404，故意移除已发布对象时为 `503 + Retry-After: 60`。2026-08-16 已把 release `7c68fb9fe0289c311a9ea46ff0af165d714e69f93223242c17937a54f7ff0c31` 上传并逐对象验证到私有 Bucket `ugcmind-marketing-content`，固定后随 Worker 版本 `6a69e6cd-83d3-4ed2-b443-8ef00b24d262` 部署；生产抓取确认工具目录、en/zh 详情页、canonical、FAQ schema 与 404 contract 正常，27 个媒体对象在线检查通过。旧 release 回滚部署演练仍待执行。
 
 ## 5. 页面公共骨架与差异化
 
