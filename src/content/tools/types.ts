@@ -21,12 +21,14 @@ export type ToolMediaReference = {
 
 export type ToolWorkflowShowcaseItem = ToolCopyItem & {
   id: string;
+  entityId: string;
   prompt: string;
   media: readonly [ToolMediaReference, ToolMediaReference];
 };
 
 export type ToolModelShowcaseItem = ToolCopyItem & {
   id: string;
+  entityId: string;
   runtimeModelKey: string;
   media: ToolMediaReference;
 };

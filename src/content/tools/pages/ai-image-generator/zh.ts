@@ -337,6 +337,7 @@ export const content = {
       items: [
         {
           id: 'text-to-image',
+          entityId: 'ai-image-generator',
           title: '文生图生成器',
           description: '把文字视觉需求转成构图完整的静态图片。',
           prompt:
@@ -354,6 +355,7 @@ export const content = {
         },
         {
           id: 'campaign-visuals',
+          entityId: 'campaign-image-generator',
           title: '广告图片生成器',
           description: '用明确构图控制产品、发布和社媒视觉。',
           prompt:
@@ -371,6 +373,7 @@ export const content = {
         },
         {
           id: 'reference-guided-edit',
+          entityId: 'ai-image-editor',
           title: '参考图引导编辑',
           description: '添加图片来约束主体、构图或视觉方向。',
           prompt:
@@ -388,6 +391,7 @@ export const content = {
         },
         {
           id: 'style-transform',
+          entityId: 'style-transformation',
           title: '风格转换',
           description: '在保留核心主体辨识度的同时重塑参考图风格。',
           prompt:
@@ -412,6 +416,7 @@ export const content = {
       items: [
         {
           id: 'gpt-image-2',
+          entityId: 'gpt-image-2',
           runtimeModelKey: 'gpt-image-2',
           title: 'GPT Image 2',
           description:

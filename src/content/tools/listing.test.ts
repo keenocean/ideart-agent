@@ -176,6 +176,7 @@ describe('tool route content gate', () => {
       ).toHaveLength(examples.length);
       expect(detail?.content.showcase.workflows.items).toHaveLength(4);
       for (const workflow of detail?.content.showcase.workflows.items ?? []) {
+        expect(workflow.entityId.trim().length).toBeGreaterThan(0);
         expect(workflow.prompt.trim().length).toBeGreaterThan(0);
         expect(workflow.media).toHaveLength(2);
         for (const media of workflow.media) {
@@ -185,9 +186,19 @@ describe('tool route content gate', () => {
       }
       expect(detail?.content.showcase.models.items).toHaveLength(1);
       for (const model of detail?.content.showcase.models.items ?? []) {
+        expect(model.entityId.trim().length).toBeGreaterThan(0);
         expect(imageModelOptionFor(model.runtimeModelKey)).toBeDefined();
         expect(getMarketingAsset(model.media.assetId).kind).toBe('image');
       }
+      expect(detail?.showcaseRoutes).toEqual({
+        workflows: [
+          {
+            entityId: 'ai-image-generator',
+            href: '/tools/ai-image-generator',
+          },
+        ],
+        models: [],
+      });
       expect(
         detail?.content.videoInspiration.title.trim().length
       ).toBeGreaterThan(0);

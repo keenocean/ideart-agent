@@ -66,7 +66,6 @@ export function ToolDetailPage({
   relatedItems,
   workbench,
   onUsePrompt,
-  onSelectModel,
 }: {
   content: ToolDetailPageContent;
   availabilityLabel: string;
@@ -76,7 +75,6 @@ export function ToolDetailPage({
   relatedItems: readonly ToolDetailRelatedItem[];
   workbench: ReactNode;
   onUsePrompt: (prompt: string) => void;
-  onSelectModel: (modelKey: string) => void;
 }) {
   const galleryItems: CatalogGalleryItem[] = content.examples.items.map(
     (item, index) => ({
@@ -185,8 +183,6 @@ export function ToolDetailPage({
       <CatalogShowcaseCardGrid
         workflows={content.showcase.workflows}
         models={content.showcase.models}
-        onSelectWorkflow={(item) => onUsePrompt(item.prompt)}
-        onSelectModel={(item) => onSelectModel(item.runtimeModelKey)}
       />
 
       <section id="showcase" className="scroll-mt-20 px-4 py-16 sm:px-6">

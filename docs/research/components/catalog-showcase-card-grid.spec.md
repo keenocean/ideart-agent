@@ -4,7 +4,7 @@ Reuse entry point: [Catalog marketing component reuse guide](./README.md).
 
 ## Purpose
 
-Reusable, pure-props card groups for the compact “tools” and “models” sections on catalog detail pages. The component copies the geometry and interaction hierarchy of the image-generator reference while inheriting this product's theme tokens and only exposing real runtime capabilities.
+Reusable, pure-props card groups for the compact “tools” and “models” sections on catalog detail pages. The component copies the geometry and interaction hierarchy of the image-generator reference while inheriting this product's theme tokens and exposing only content-backed public pages.
 
 ## Geometry
 
@@ -18,17 +18,17 @@ Reusable, pure-props card groups for the compact “tools” and “models” se
 
 ## Interaction
 
-- Workflow cards are real buttons that apply a truthful prompt preset and return focus to the generator.
-- Model cards are buttons only when a real selectable runtime model exists. Non-interactive inventory is rendered as an article, never as a fake link.
+- Every rendered card is a locale-aware link to a content-backed Catalog page.
+- Candidate cards without a published, loadable target page are filtered before they reach the component. An empty group is omitted, and the entire section returns `null` when both groups are empty.
 - Hover/focus changes the border and title to the system primary color. Model cards translate upward by 2px and their cover scales to 1.025.
 - Visible focus rings and descriptive accessible names are required.
 
 ## Data contract
 
-- Workflow cards receive `title`, `description`, a two-item typed R2 media tuple, and a prompt.
-- Model cards receive `title`, `description`, one typed R2 image, and an optional model key/action.
-- Item counts are dynamic. The current image tool may show one model because the runtime exposes only GPT Image 2; the grid must expand without a component rewrite when more models are published.
-- Components do not read i18n and do not invent routes.
+- Workflow cards receive `title`, `description`, a two-item typed R2 media tuple, and a verified `href`.
+- Model cards receive `title`, `description`, one typed R2 image, and a verified `href`.
+- Item counts are dynamic. Cards appear only after their exact-locale detail content is available; grids expand without a component rewrite as pages are published.
+- Components do not read i18n, invent routes, or treat runtime availability as proof that a marketing page exists.
 
 ## Theme and media rules
 

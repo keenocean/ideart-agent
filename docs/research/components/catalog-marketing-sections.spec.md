@@ -24,7 +24,7 @@ Horizontal snap rail with 20px gap, hidden scrollbar, 24px horizontal padding, c
 
 ## CatalogShowcaseCardGrid
 
-Two reusable catalog groups reproduce the reference tool/model card geometry with dynamic inventory. Workflow cards accept paired R2 media and a prompt action; model cards accept a single R2 cover and only become interactive for a real runtime model. Exact behavior lives in `catalog-showcase-card-grid.spec.md`.
+Two reusable catalog groups reproduce the reference tool/model card geometry with dynamic inventory. Workflow cards accept paired R2 media; model cards accept a single R2 cover. Both render only when their exact-locale Catalog target has a loadable content page. Exact behavior lives in `catalog-showcase-card-grid.spec.md`.
 
 ## CatalogFaq
 

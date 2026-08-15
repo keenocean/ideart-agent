@@ -55,13 +55,14 @@ The current composition derives sections as follows:
 ```text
 examples.items (image) -> quick starts + masonry gallery
 examples.items (video) -> CatalogMediaCarousel
-showcase.workflows      -> reusable workflow cards
-showcase.models         -> runtime-backed model cards
+showcase.workflows      -> content-backed tool links
+showcase.models         -> content-backed model links
 useCases.items          -> alternating CatalogMediaFeatureList rows
 ```
 
-Only publish a model card when its `runtimeModelKey` is supported by the real
-generator. Inventory counts remain dynamic; do not pad a grid with fake items.
+Only publish a card when its target Catalog page has loadable content in the
+active locale. Runtime support alone does not make a marketing page real.
+Inventory counts remain dynamic; do not pad a grid with fake items.
 
 ## Standalone alternating image/video rows
 
@@ -131,13 +132,12 @@ import { CatalogShowcaseCardGrid } from '@/components/catalog/catalog-showcase-c
 <CatalogShowcaseCardGrid
   workflows={localizedWorkflowGroup}
   models={localizedModelGroup}
-  onSelectWorkflow={(item) => applyPrompt(item.prompt)}
-  onSelectModel={(item) => selectRuntimeModel(item.runtimeModelKey)}
 />;
 ```
 
-Omit `onSelectModel` when model cards are informational. The component then
-renders semantic `article` elements instead of buttons.
+Resolve every item to a content-backed locale-aware `href` before rendering.
+The component omits empty groups and never renders fake links or buttons for
+unpublished pages.
 
 ## Media and theme rules
 

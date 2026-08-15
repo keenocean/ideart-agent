@@ -372,6 +372,7 @@ export const content = {
       items: [
         {
           id: 'text-to-image',
+          entityId: 'ai-image-generator',
           title: 'Text-to-image generator',
           description:
             'Turn a written visual brief into a composed still image.',
@@ -390,6 +391,7 @@ export const content = {
         },
         {
           id: 'campaign-visuals',
+          entityId: 'campaign-image-generator',
           title: 'Campaign image generator',
           description:
             'Direct product, launch, and social visuals with precise composition.',
@@ -408,6 +410,7 @@ export const content = {
         },
         {
           id: 'reference-guided-edit',
+          entityId: 'ai-image-editor',
           title: 'Reference-guided image edit',
           description:
             'Add an image to guide subject, composition, or visual direction.',
@@ -426,6 +429,7 @@ export const content = {
         },
         {
           id: 'style-transform',
+          entityId: 'style-transformation',
           title: 'Style transformation',
           description:
             'Restyle a reference while keeping its core subject recognizable.',
@@ -451,6 +455,7 @@ export const content = {
       items: [
         {
           id: 'gpt-image-2',
+          entityId: 'gpt-image-2',
           runtimeModelKey: 'gpt-image-2',
           title: 'GPT Image 2',
           description:

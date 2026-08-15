@@ -30,6 +30,11 @@ export type ToolDirectoryItem = {
   availability: Availability;
 };
 
+export type ToolShowcaseRoute = {
+  entityId: string;
+  href: string;
+};
+
 export type ToolDetailPageData = {
   entityId: string;
   locale: AppLocale;
@@ -42,6 +47,10 @@ export type ToolDetailPageData = {
   alternates: SeoRouteRef[];
   content: ToolPageContent;
   related: ToolDirectoryItem[];
+  showcaseRoutes: {
+    workflows: ToolShowcaseRoute[];
+    models: ToolShowcaseRoute[];
+  };
 };
 
 type ListedToolDefinition = ToolDefinition & {
@@ -53,6 +62,35 @@ function asListedTool(entry: CatalogDefinition): ListedToolDefinition | null {
   return entry.kind === 'tool' && entry.publication === 'listed'
     ? (entry as ListedToolDefinition)
     : null;
+}
+
+async function showcaseRouteFor(
+  kind: CatalogDefinition['kind'],
+  entityId: string,
+  locale: AppLocale
+): Promise<ToolShowcaseRoute | null> {
+  const definition = catalog.find(
+    (entry) => entry.kind === kind && entry.entityId === entityId
+  );
+  if (
+    !definition ||
+    definition.publication !== 'listed' ||
+    !definition.localePages[locale] ||
+    !isCatalogPageContentAvailable(definition, locale)
+  ) {
+    return null;
+  }
+  if (
+    definition.kind === 'tool' &&
+    (await loadToolContentOrNull(entityId, locale)) === null
+  ) {
+    return null;
+  }
+  return {
+    entityId,
+    href: resolveCatalogRoute(kind, locale, definition.localePages[locale].slug)
+      .path,
+  };
 }
 
 async function cardFor(
@@ -130,6 +168,26 @@ export async function loadToolDetailPage(
   ).filter((item): item is ToolDirectoryItem => Boolean(item));
 
   const localeRoutes = selectContentBackedCatalogLocaleRoutes(definition);
+  const [workflowRouteCandidates, modelRouteCandidates] = await Promise.all([
+    Promise.all(
+      content.showcase.workflows.items.map((item) =>
+        showcaseRouteFor('tool', item.entityId, locale)
+      )
+    ),
+    Promise.all(
+      content.showcase.models.items.map((item) =>
+        showcaseRouteFor('model', item.entityId, locale)
+      )
+    ),
+  ]);
+  const showcaseRoutes = {
+    workflows: workflowRouteCandidates.filter(
+      (item): item is ToolShowcaseRoute => Boolean(item)
+    ),
+    models: modelRouteCandidates.filter((item): item is ToolShowcaseRoute =>
+      Boolean(item)
+    ),
+  };
   return {
     entityId: definition.entityId,
     locale,
@@ -142,5 +200,6 @@ export async function loadToolDetailPage(
     alternates: indexableAlternates(definition, page.indexing, localeRoutes),
     content,
     related,
+    showcaseRoutes,
   };
 }
