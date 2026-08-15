@@ -1,3 +1,4 @@
+import type { MarketingAssetId } from '@/config/catalog/assets';
 import type { AppLocale } from '@/config/locale';
 
 export type ToolCopyItem = {
@@ -7,6 +8,10 @@ export type ToolCopyItem = {
 
 export type ToolPromptExample = ToolCopyItem & {
   prompt: string;
+  image: {
+    assetId: MarketingAssetId;
+    alt: string;
+  };
 };
 
 export type ToolFaqItem = {

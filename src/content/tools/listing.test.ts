@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
+import {
+  getMarketingImageAsset,
+  marketingAssets,
+} from '@/config/catalog/assets';
 import { catalogRouteSegment } from '@/config/catalog/paths';
 import { hasLocalePage } from '@/config/catalog/selectors';
 import { toolCatalog } from '@/config/catalog/tools';
@@ -152,7 +156,22 @@ describe('tool route content gate', () => {
         ],
         alternates: [],
       });
-      expect(detail?.content.examples.items).toHaveLength(3);
+      const examples = detail?.content.examples.items ?? [];
+      expect(examples).toHaveLength(3);
+      const exampleAssetIds = new Set(
+        examples.map((example) => example.image.assetId)
+      );
+      expect(exampleAssetIds.size).toBe(examples.length);
+      for (const example of examples) {
+        expect(example.image.alt.trim().length).toBeGreaterThan(0);
+        expect(getMarketingImageAsset(example.image.assetId)).toMatchObject({
+          id: example.image.assetId,
+          kind: 'image',
+        });
+      }
+      expect(
+        marketingAssets.filter((asset) => exampleAssetIds.has(asset.id))
+      ).toHaveLength(examples.length);
       expect(detail?.content.faq.items.length).toBeGreaterThanOrEqual(3);
       expect(detail?.related).toEqual([]);
     }

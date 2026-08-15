@@ -6,7 +6,11 @@ import {
   assertMarketingAssetUrl,
   verifyMarketingPublishedAsset,
 } from '@/core/storage/marketing';
-import { marketingAssets } from '@/config/catalog/assets';
+import {
+  marketingAssetPublicDomain,
+  marketingAssets,
+} from '@/config/catalog/assets';
+import type { MarketingAsset } from '@/config/catalog/types';
 
 type QualityConfig = {
   publicAssets: {
@@ -111,23 +115,19 @@ const requestedDomain = process.argv
   .find((arg) => arg.startsWith('--r2-domain='))
   ?.slice('--r2-domain='.length)
   .trim();
-if (marketingAssets.length > 0 && !requestedDomain) {
-  failures.push(
-    'R2 asset refs exist but --r2-domain=https://cdn.example.com was not provided'
-  );
-}
+const publicDomain = requestedDomain || marketingAssetPublicDomain;
 
-const assets = new Map<string, (typeof marketingAssets)[number]>();
-function registerAsset(asset: (typeof marketingAssets)[number]): void {
+const assets = new Map<string, MarketingAsset>();
+function registerAsset(asset: MarketingAsset): void {
   if (assets.has(asset.id))
     failures.push(`duplicate marketing asset id: ${asset.id}`);
   assets.set(asset.id, asset);
   if (asset.bytes <= 0 || asset.width <= 0 || asset.height <= 0) {
     failures.push(`invalid marketing asset metadata: ${asset.id}`);
   }
-  if (requestedDomain) {
+  if (publicDomain) {
     try {
-      assertMarketingAssetUrl(asset.url, requestedDomain);
+      assertMarketingAssetUrl(asset.url, publicDomain);
     } catch (error) {
       failures.push(`${asset.id}: ${(error as Error).message}`);
     }
@@ -138,8 +138,8 @@ for (const asset of marketingAssets) registerAsset(asset);
 
 if (process.argv.includes('--online')) {
   for (const asset of assets.values()) {
-    await verifyMarketingPublishedAsset(asset, requestedDomain ?? '').catch(
-      (error) => failures.push(`${asset.id}: ${(error as Error).message}`)
+    await verifyMarketingPublishedAsset(asset, publicDomain).catch((error) =>
+      failures.push(`${asset.id}: ${(error as Error).message}`)
     );
   }
 }

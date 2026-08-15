@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { CircleAlert, CircleCheck, Save } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { getMarketingImageAsset } from '@/config/catalog/assets';
 import { generationPresetFor } from '@/config/catalog/generation';
 import { toolCatalog } from '@/config/catalog/tools';
 import type { DeploymentReadiness } from '@/config/catalog/types';
@@ -67,11 +68,24 @@ export function ToolDetail({
     ...item,
     actionLabel: m['tools.directory.view_tool'](),
   }));
+  const content = {
+    ...page.content,
+    examples: {
+      ...page.content.examples,
+      items: page.content.examples.items.map((item) => ({
+        ...item,
+        image: {
+          ...getMarketingImageAsset(item.image.assetId),
+          alt: item.image.alt,
+        },
+      })),
+    },
+  };
   const ReadyIcon = readiness.executable ? CircleCheck : CircleAlert;
 
   return (
     <ToolDetailPage
-      content={page.content}
+      content={content}
       availabilityLabel={availabilityLabel(page.availability)}
       breadcrumbHomeLabel={m['tools.breadcrumb.home']()}
       breadcrumbToolsLabel={m['tools.breadcrumb.tools']()}

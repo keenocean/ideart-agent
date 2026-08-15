@@ -753,10 +753,10 @@ Google 当前指导同样要求优先修复站点自己链接或提交的 404，
 
 - 阶段 0/1 的 Catalog、resolver/selectors、SEO helper、固定公开路由、sitemap/llms 和 R2 检查底座已经落地；阶段 3 已为 `ai-image-generator` 增加真实同语言正文和路由，但工具/模型 locale route 当前仍全部保持 `noindex`。
 - 阶段 2 的共享生成入口安全链路及 2.5 收口已经完成：`PromptLauncher` 已成为复用 `useGenerationEntry` + `GenerationWorkbench` 的兼容 wrapper，图片模型状态已贯通；服务端会从 `entryContext` 与精确语言正文共同重建 policy，并在 API/tool 两层执行锁定、附件来源与媒体复用约束。Agent guard/认证页/邮箱验证保留原 session callback，402 拒绝不会提前消费首轮 stash。
-- 阶段 3 的首个工具纵向切片已经完成：`/tools`、`/tools/$slug`、纯 props Catalog 组件、工具 Blocks、精确语言 content manifest/resolver 和服务端 DeploymentReadiness 已存在；仅 `ai-image-generator` 有 en/zh 正文并可访问。阶段 4 模型切片尚未开始，`src/routes/models/*` 与 model content modules 仍不存在，Block registry 和 marketing asset registry 仍为空。
+- 阶段 3 的首个工具纵向切片已经完成：`/tools`、`/tools/$slug`、纯 props Catalog 组件、工具 Blocks、精确语言 content manifest/resolver 和服务端 DeploymentReadiness 已存在；仅 `ai-image-generator` 有 en/zh 正文并可访问。阶段 4 模型切片尚未开始，`src/routes/models/*` 与 model content modules 仍不存在，Block registry 仍为空；marketing asset registry 已登记三张经在线验证的 `ai-image-generator` R2 案例图。
 - 阶段 5 尚未开始：首页仍是旧的 `Header → Hero(PromptLauncher) → Blog → Footer → SupportWidget`，登录用户仍自动跳转 `/chat`。仓库中未接线的 `Features`、`ModelsStrip`、`Gallery`、`FAQ`、`CTA` 等旧/demo Blocks 不计为本计划首页实施，其中渐变 placeholder 不符合真实 R2 案例门禁。
 - Header/Footer 和首页尚未接入 Tools/Models；`/tools` 已成为首个 Catalog directory 消费者，related selector 只输出具备同语言正文的目标。sitemap/llms 虽已接线，但因为 Catalog locale pages 均为 noindex，不输出这些 URL。
-- 阶段 3 完成后全量 47 个测试文件/281 项测试、`pnpm exec tsc --noEmit`、`pnpm format:check`、`pnpm build`、HTTP route inventory、营销资源检查和 Cloudflare 构建/预算门禁均通过；构建仍有既有大 chunk warning。真实 OAuth/provider、浏览器生成 smoke、完整视觉、Lighthouse、生产抓取、Search Console 与 R2 online check 仍只在具备相应环境时执行，不能据此宣告阶段 4–9 已完成或开放索引。
+- 2026-08-15 gallery 更新后全量 51 个测试文件/309 项测试、`pnpm exec tsc --noEmit`、`pnpm format:check`、`pnpm build`、营销资源在线检查、route bundle 和 Cloudflare 构建/预算门禁均通过；中英文页面已完成本地 SSR 与桌面/移动 Chrome 视觉检查。真实 OAuth/provider、浏览器生成 smoke、Lighthouse、更新后生产页面抓取与 Search Console 仍只在具备相应环境时执行，不能据此宣告阶段 4–9 已完成或开放索引。
 
 ### 已完成：阶段 2 共享生成入口安全链路（2026-08-15）
 
@@ -797,10 +797,10 @@ Google 当前指导同样要求优先修复站点自己链接或提交的 404，
 - `/tools` 和 `/tools/ai-image-generator` 已提供独立 en/zh SSR 页面。详情 loader 先解析 Catalog route，再从 `src/content/tools/pages/<entityId>/<locale>.ts` 约定目录自动发现并加载精确语言 content module；任一门禁缺失都返回真实 404，不回退到另一语言。新增工具/语言内容文件无需再手写 manifest loader，自动化测试遍历所有发现模块而不复制页面清单。
 - Catalog selectors 强制注入同语言内容 availability；目录与 Related 无法仅凭 Catalog `listed` 输出内容缺失的 URL，Sitemap 与 llms 还会验证 lazy 模块确实可加载且导出身份匹配。详情语言切换使用内容-backed Catalog locale target，可支持各语言不同 slug；模型正文 resolver 尚未实现时保持 fail closed。
 - 工具目录和详情组件只接收 props；Blocks 负责 i18n、Catalog preset、`useGenerationEntry` 与 `GenerationWorkbench` 接线。公开 readiness 只返回 Agent LLM、图片 Provider、模型 route 和存储是否配置，不向客户端序列化凭据。
-- `ai-image-generator` 正文覆盖输入/输出、三组提示词案例、步骤、功能、提示词指导、使用场景、限制、FAQ 和 CTA。当前没有已在线验证的 R2 结果图或分享图，因此不伪造 gallery：只展示提示词案例并输出 summary card，marketing asset registry 继续为空。
+- `ai-image-generator` 正文覆盖输入/输出、三组提示词案例、步骤、功能、提示词指导、使用场景、限制、FAQ 和 CTA。2026-08-15 后续使用 Codex 生成三张与可见提示词对应的案例图，上传到 Admin Storage 配置指向的 R2 content-hash key，并验证公网状态、MIME、字节数、inline disposition 与 immutable cache；中英文页面共享 typed asset ref、分别提供本地化 alt。当前仍没有专属分享图，因此社交 metadata 继续使用 summary card。
 - 四个开放 URL 均经生产 HTTP 快照验证为 `200 + noindex,follow + self canonical`，无 hreflang；目录输出可见 `BreadcrumbList`，详情输出与可见内容同源的 `BreadcrumbList + FAQPage`。`/tools/missing`、`/zh/tools/missing` 和尚未开放的 `ai-image-editor` en/zh URL 均为 404。
 - 内容按语言拆成独立 client chunks（en 约 2.89 KiB gzip，zh 约 3.20 KiB gzip）；代表路由报告为 `/tools/` 约 362.7 KiB gzip、`/tools/$slug` 约 381.9 KiB gzip，根路由不 preload 工具内容。
-- 全量 47 个测试文件/281 项测试、TypeScript、Prettier、生产构建、营销资源检查、Cloudflare build/dry-run/budget 均通过；Worker gzip 2,203,272 bytes，低于 free 预算 2,516,582 bytes。HTTP 快照中的 Blog/Sitemap 503 来自本地 SQLite 未初始化的既有数据库依赖，不是工具页回归。
+- gallery 更新后全量 51 个测试文件/309 项测试、TypeScript、Prettier、生产构建、营销资源在线检查、route bundle 与 Cloudflare build/dry-run/budget 均通过；`/tools/$slug` gzip 增加 901 bytes，Worker gzip 为 2,208,297 bytes，低于 free 预算 2,516,582 bytes。中英文详情页本地 SSR 均为 `200 + noindex,follow` 并包含三张 R2 图片，桌面/移动端 Chrome 视觉检查通过；更新后生产页面仍等待部署抓取。
 - 页面继续保持 noindex，Header/Home、sitemap、hreflang 和 llms 发现面留到阶段 7。上线前还需在真实 Provider/Storage 配置下完成浏览器生成 smoke；加入案例/分享媒体时必须先走不可变 R2 typed asset 与 online check。
 
 ### 阶段 4：第一个模型纵向切片与克制抽取

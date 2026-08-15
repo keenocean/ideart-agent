@@ -59,6 +59,10 @@ export const content = {
           'Useful when you need a clear subject, controlled materials, and a commercial lighting direction.',
         prompt:
           'A premium skincare serum bottle on a shallow mirror of water, cool silver palette, soft diffused studio light, close product crop, clean luxury campaign photography, no extra objects.',
+        image: {
+          assetId: 'tools-ai-image-generator-0241fe76c3058fcd',
+          alt: 'Unbranded glass serum bottle standing in shallow water under cool silver studio light',
+        },
       },
       {
         title: 'Editorial illustration',
@@ -66,6 +70,10 @@ export const content = {
           'Combines a recognizable scene with a restrained visual language and a defined page composition.',
         prompt:
           'An editorial illustration about remote collaboration across time zones, three connected desks floating above a night city, limited navy and coral palette, geometric shapes, generous negative space for a headline.',
+        image: {
+          assetId: 'tools-ai-image-generator-5d01838c8320ab5f',
+          alt: 'Three illuminated desks connected above a night city in a navy and coral editorial illustration',
+        },
       },
       {
         title: 'Social launch visual',
@@ -73,6 +81,10 @@ export const content = {
           'Specifies the platform shape, focal object, motion cue, and space reserved for later layout work.',
         prompt:
           'Vertical 9:16 launch visual for a running shoe, shoe suspended above a red track with a sharp burst of chalk dust, energetic side light, bold modern sports photography, clear space at the top for copy.',
+        image: {
+          assetId: 'tools-ai-image-generator-eee9f320ac365d1e',
+          alt: 'Unbranded black running shoe suspended above a red track with a burst of white chalk dust',
+        },
       },
     ],
   },

@@ -7,9 +7,20 @@ import {
 } from 'lucide-react';
 
 import { Link } from '@/core/i18n/navigation';
+import type { MarketingImageAsset } from '@/config/catalog/types';
 import { cn } from '@/lib/utils';
 import { buttonVariants } from '@/components/ui/button';
-import type { ToolPageContent } from '@/content/tools/types';
+import type { ToolPageContent, ToolPromptExample } from '@/content/tools/types';
+
+type ToolDetailPromptExample = Omit<ToolPromptExample, 'image'> & {
+  image: MarketingImageAsset & { alt: string };
+};
+
+type ToolDetailPageContent = Omit<ToolPageContent, 'examples'> & {
+  examples: Omit<ToolPageContent['examples'], 'items'> & {
+    items: readonly ToolDetailPromptExample[];
+  };
+};
 
 export type ToolDetailRelatedItem = {
   entityId: string;
@@ -28,7 +39,7 @@ export function ToolDetailPage({
   relatedItems,
   workbench,
 }: {
-  content: ToolPageContent;
+  content: ToolDetailPageContent;
   availabilityLabel: string;
   breadcrumbHomeLabel: string;
   breadcrumbToolsLabel: string;
@@ -100,7 +111,18 @@ export function ToolDetailPage({
                 key={item.title}
                 className="border-border bg-card flex flex-col rounded-3xl border p-6"
               >
-                <h3 className="font-semibold">{item.title}</h3>
+                <div className="bg-muted/60 border-border flex aspect-[3/2] items-center justify-center overflow-hidden rounded-2xl border">
+                  <img
+                    src={item.image.url}
+                    alt={item.image.alt}
+                    width={item.image.width}
+                    height={item.image.height}
+                    loading="lazy"
+                    decoding="async"
+                    className="size-full object-contain"
+                  />
+                </div>
+                <h3 className="mt-5 font-semibold">{item.title}</h3>
                 <p className="text-muted-foreground mt-2 text-sm leading-6">
                   {item.description}
                 </p>
