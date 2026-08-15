@@ -6,6 +6,7 @@ import {
   assertMarketingAssetUrl,
   MARKETING_ASSET_CACHE_CONTROL,
   marketingAssetKey,
+  verifyMarketingPublishedAsset,
 } from '@/core/storage/marketing';
 import { loadEnvFiles } from '@/lib/env';
 
@@ -102,33 +103,10 @@ if (await storage.exists({ key })) {
 if (!url) throw new Error('R2 provider did not return a public URL');
 assertMarketingAssetUrl(url, publicDomain);
 
-async function verifyPublishedAsset(
-  assetUrl: string,
-  expectedMime: string,
-  kind: 'image' | 'video'
-): Promise<void> {
-  const response = await fetch(assetUrl, {
-    method: kind === 'video' ? 'GET' : 'HEAD',
-    headers: kind === 'video' ? { Range: 'bytes=0-0' } : undefined,
-  });
-  const expectedStatus = kind === 'video' ? 206 : 200;
-  if (response.status !== expectedStatus) {
-    throw new Error(
-      `Published ${kind} returned HTTP ${response.status}, expected ${expectedStatus}`
-    );
-  }
-  if (!(response.headers.get('content-type') ?? '').startsWith(expectedMime)) {
-    throw new Error(`Published ${kind} MIME does not match ${expectedMime}`);
-  }
-  if (response.headers.get('cache-control') !== MARKETING_ASSET_CACHE_CONTROL) {
-    throw new Error(`Published ${kind} is missing immutable cache metadata`);
-  }
-  if (kind === 'video' && !response.headers.get('content-range')) {
-    throw new Error('Published video is missing byte-range support');
-  }
-}
-
-await verifyPublishedAsset(url, mimeType, kind);
+await verifyMarketingPublishedAsset(
+  { url, mimeType, kind, bytes: body.byteLength },
+  publicDomain
+);
 
 let poster:
   | {
@@ -144,7 +122,10 @@ let poster:
 if (kind === 'video') {
   if (!posterInput) throw new Error('Video poster validation did not run');
   assertMarketingAssetUrl(posterInput.url, publicDomain);
-  await verifyPublishedAsset(posterInput.url, posterInput.mimeType, 'image');
+  await verifyMarketingPublishedAsset(
+    { ...posterInput, kind: 'image' },
+    publicDomain
+  );
   poster = {
     id: posterInput.id,
     kind: 'image',

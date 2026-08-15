@@ -34,7 +34,10 @@ describe('composer reference media', () => {
   });
 
   it('preserves only uploaded media in the initial-turn handoff', () => {
-    const uploaded = attachment('ready.png', 'image');
+    const uploaded = {
+      ...attachment('ready.png', 'image'),
+      receipt: 'signed-media-receipt',
+    };
     const raw = serializeInitialTurnHandoff({
       prompt: 'Create this',
       skillName: 'storyboard',

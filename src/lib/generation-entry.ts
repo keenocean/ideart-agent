@@ -66,6 +66,7 @@ export type GenerationSettingSources = Record<
 export type GenerationRequestAttachment = {
   mediaType: AttachmentMediaType;
   url: string;
+  receipt?: string;
 };
 
 function own(value: object | undefined, key: PropertyKey): boolean {
@@ -238,6 +239,7 @@ export function requestAttachments(
           {
             mediaType: mediaTypeForAttachment(attachment),
             url: attachment.url,
+            ...(attachment.receipt ? { receipt: attachment.receipt } : {}),
           },
         ]
       : []

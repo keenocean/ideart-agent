@@ -57,7 +57,7 @@ export const Route = createFileRoute('/llms-full.txt')({
           ),
           ...catalogPages.map(
             (page) =>
-              `- [${page.definition.entityId}](${localizedUrl(page.path)}): Published ${page.kind} page`
+              `- [${page.title}](${localizedUrl(page.path)}): ${page.summary}`
           ),
         ];
 

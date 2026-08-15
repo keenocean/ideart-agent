@@ -13,8 +13,56 @@ env:
   SVR_NAME: ${{ github.event.repository.name }}
 
 jobs:
+  quality-gates:
+    runs-on: ubuntu-latest
+    env:
+      AUTH_SECRET: ci-auth-secret-change-in-production
+      DATABASE_PROVIDER: sqlite
+      DATABASE_URL: file:data/ci.db
+      VITE_APP_URL: http://localhost:3000
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check formatting
+        run: pnpm format:check
+
+      - name: Run tests
+        run: pnpm test
+
+      - name: Typecheck
+        run: pnpm exec tsc --noEmit
+
+      - name: Build application
+        run: pnpm build
+
+      - name: Check marketing assets
+        run: pnpm marketing:check-assets
+
+      - name: Check route bundles
+        run: pnpm bundle:report-routes
+
+      - name: Check Cloudflare dry-run budget
+        run: pnpm cf:check-budget
+
   build-and-push:
     runs-on: ubuntu-latest
+    needs: quality-gates
     permissions:
       contents: read
       packages: write

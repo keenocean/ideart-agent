@@ -1,6 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router';
 
 import { agentErrorResponse, AgentRequestError } from '@/core/agent/errors';
+import { verifyAgentMediaReceipt } from '@/core/agent/media-receipt';
+import type { AgentVerifiedMedia } from '@/core/agent/types';
 import { getAuth } from '@/core/auth';
 import {
   applyEffectiveGenerationPolicy,
@@ -9,6 +11,7 @@ import {
   validateRequestAttachments,
   type EffectiveGenerationPolicy,
 } from '@/modules/agent/entry-policy';
+import { collectAllowedMediaAttachments } from '@/modules/agent/history';
 import { checkCredits, insufficientCreditsBody } from '@/modules/agent/paywall';
 import { prepareAgentTurn, runAgentTurn } from '@/modules/agent/service';
 import {
@@ -29,6 +32,7 @@ import {
   appendMessage,
   ensureChat,
   findChatOwnerId,
+  getChatWithMessages,
   type StoredPart,
 } from '@/modules/chats/service';
 import { getBalance } from '@/modules/credits/service';
@@ -38,8 +42,12 @@ import {
   normalizeClientGenerationSettings,
   type AgentGenerationSettings,
 } from '@/lib/agent-settings';
-import { normalizeGenerationEntryContext } from '@/lib/generation-entry';
+import {
+  normalizeGenerationEntryContext,
+  type GenerationRequestAttachment,
+} from '@/lib/generation-entry';
 import { enforceMinIntervalRateLimit } from '@/lib/rate-limit';
+import { isCatalogPageContentAvailable } from '@/content/catalog-pages';
 
 const MAX_AGENT_MESSAGE_CHARS = 50_000;
 
@@ -50,6 +58,67 @@ interface ChatRequest {
   settings?: AgentGenerationSettings;
   entryContext?: unknown;
   attachments?: unknown;
+}
+
+function mediaKey(
+  media: Pick<GenerationRequestAttachment, 'mediaType' | 'url'>
+) {
+  return `${media.mediaType}\u0000${media.url}`;
+}
+
+function stripReceipts(
+  attachments: readonly GenerationRequestAttachment[]
+): GenerationRequestAttachment[] {
+  return attachments.map((attachment) => ({
+    mediaType: attachment.mediaType,
+    url: attachment.url,
+  }));
+}
+
+async function verifyCurrentAttachments(params: {
+  attachments: readonly GenerationRequestAttachment[];
+  historicalAllowed: readonly AgentVerifiedMedia[];
+  userId: string;
+  chatId: string;
+}): Promise<GenerationRequestAttachment[] | null> {
+  const historical = new Set(params.historicalAllowed.map(mediaKey));
+  const verified: GenerationRequestAttachment[] = [];
+  for (const attachment of params.attachments) {
+    if (attachment.receipt) {
+      let media: AgentVerifiedMedia | null;
+      try {
+        media = await verifyAgentMediaReceipt({
+          receipt: attachment.receipt,
+          userId: params.userId,
+          chatId: params.chatId,
+          mediaType: attachment.mediaType,
+          url: attachment.url,
+        });
+      } catch {
+        return null;
+      }
+      if (!media) return null;
+      verified.push(media);
+      continue;
+    }
+    if (!historical.has(mediaKey(attachment))) return null;
+    verified.push({ mediaType: attachment.mediaType, url: attachment.url });
+  }
+  return verified;
+}
+
+function mergeAllowedAttachments(
+  current: readonly GenerationRequestAttachment[],
+  historical: readonly AgentVerifiedMedia[]
+): GenerationRequestAttachment[] {
+  const merged = new Map<string, GenerationRequestAttachment>();
+  for (const media of [...historical, ...current]) {
+    merged.set(mediaKey(media), {
+      mediaType: media.mediaType,
+      url: media.url,
+    });
+  }
+  return [...merged.values()];
 }
 
 export async function POST({ request }: { request: Request }) {
@@ -97,7 +166,10 @@ export async function POST({ request }: { request: Request }) {
   let policy: EffectiveGenerationPolicy;
   let generationSettings: AgentGenerationSettings;
   try {
-    policy = resolveEffectiveGenerationPolicy(entryContext);
+    policy = resolveEffectiveGenerationPolicy(
+      entryContext,
+      isCatalogPageContentAvailable
+    );
     generationSettings = applyEffectiveGenerationPolicy(clientSettings, policy);
   } catch {
     return new Response('generation entry is not available', { status: 400 });
@@ -106,19 +178,6 @@ export async function POST({ request }: { request: Request }) {
   if (!attachments) {
     return new Response('invalid attachments', { status: 400 });
   }
-  const attachmentError = validateRequestAttachments({
-    message: body.message,
-    attachments,
-    policy,
-    settings: generationSettings,
-  });
-  if (attachmentError) {
-    return new Response(attachmentError, { status: 400 });
-  }
-  const executionPolicy: EffectiveGenerationPolicy = {
-    ...policy,
-    requestAttachments: attachments,
-  };
 
   const existingOwner = await findChatOwnerId(body.sessionId);
   if (existingOwner && existingOwner !== userId) {
@@ -151,6 +210,46 @@ export async function POST({ request }: { request: Request }) {
       )
     );
   }
+
+  const preloadedChat = existingOwner
+    ? await getChatWithMessages(body.sessionId, userId)
+    : undefined;
+  const historicalAllowed = preloadedChat
+    ? collectAllowedMediaAttachments(preloadedChat.messages)
+    : [];
+  const verifiedAttachments = await verifyCurrentAttachments({
+    attachments,
+    historicalAllowed,
+    userId,
+    chatId: body.sessionId,
+  });
+  if (!verifiedAttachments) {
+    return new Response('invalid attachment receipt', { status: 400 });
+  }
+  const allowedAttachments = mergeAllowedAttachments(
+    verifiedAttachments,
+    historicalAllowed
+  );
+  const minimumSatisfiedByAllowedMedia =
+    allowedAttachments.filter((attachment) =>
+      policy.inputPolicy.accepts.includes(attachment.mediaType)
+    ).length >= policy.inputPolicy.minimum;
+
+  const attachmentError = validateRequestAttachments({
+    message: body.message,
+    attachments: verifiedAttachments,
+    policy,
+    settings: generationSettings,
+    minimumSatisfiedByAllowedMedia,
+  });
+  if (attachmentError) {
+    return new Response(attachmentError, { status: 400 });
+  }
+  const executionPolicy: EffectiveGenerationPolicy = {
+    ...policy,
+    requestAttachments: stripReceipts(verifiedAttachments),
+    allowedAttachments,
+  };
 
   const turnId = `turn-${crypto.randomUUID()}`;
   const leaseOwner = { chatId: body.sessionId, userId, turnId };
@@ -215,6 +314,7 @@ export async function POST({ request }: { request: Request }) {
       settings: generationSettings,
       policy: executionPolicy,
       leaseOwner,
+      preloadedChat,
     });
     await assertTurnLeaseOwnership(leaseOwner);
 

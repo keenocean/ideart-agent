@@ -65,6 +65,7 @@ export function PromptLauncher({ className }: { className?: string }) {
     submitting,
     uploading,
     hasUploaded,
+    ensureSessionId,
     addFiles,
     addLibraryMedia,
     removeAttachment,
@@ -140,16 +141,22 @@ export function PromptLauncher({ className }: { className?: string }) {
     });
 
     try {
-      const urls = await publishChatMediaSources(
-        sources.map((src) => ({ src, name: example.title }))
+      const uploaded = await publishChatMediaSources(
+        sources.map((src) => ({ src, name: example.title })),
+        ensureSessionId()
       );
       setAttachments((current) =>
         current.map((item) => {
           const index = created.findIndex(
             (createdItem) => createdItem.id === item.id
           );
-          return index >= 0 && urls[index]
-            ? { ...item, url: urls[index], status: 'uploaded' }
+          return index >= 0 && uploaded[index]
+            ? {
+                ...item,
+                url: uploaded[index].url,
+                receipt: uploaded[index].receipt,
+                status: 'uploaded',
+              }
             : item;
         })
       );
@@ -215,11 +222,21 @@ export function PromptLauncher({ className }: { className?: string }) {
     });
 
     try {
-      const [url] = await publishChatMediaSources([{ src: video, name }]);
-      if (!url) throw new Error('Upload failed');
+      const [uploaded] = await publishChatMediaSources(
+        [{ src: video, name }],
+        ensureSessionId()
+      );
+      if (!uploaded) throw new Error('Upload failed');
       setAttachments((current) =>
         current.map((item) =>
-          item.id === id ? { ...item, url, status: 'uploaded' } : item
+          item.id === id
+            ? {
+                ...item,
+                url: uploaded.url,
+                receipt: uploaded.receipt,
+                status: 'uploaded',
+              }
+            : item
         )
       );
     } catch (error) {

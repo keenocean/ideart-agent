@@ -14,6 +14,12 @@ import type { SeoRouteRef } from '@/lib/seo';
 import { locales } from '@/paraglide/runtime.js';
 
 import { hasToolContent, loadToolContentOrNull } from './tools/manifest';
+import type { ToolPageContent } from './tools/types';
+
+export type LoadableCatalogLlmsEntry = ResolvedCatalogRoute & {
+  title: string;
+  summary: string;
+};
 
 /**
  * Content-backed publication gate shared by every Catalog discovery surface.
@@ -44,6 +50,25 @@ async function isCatalogPageContentLoadable(
     case 'model':
       return false;
   }
+}
+
+async function loadCatalogLlmsCopy(
+  definition: CatalogDefinition,
+  locale: AppLocale
+): Promise<{ title: string; summary: string } | null> {
+  let content: ToolPageContent | null = null;
+  switch (definition.kind) {
+    case 'tool':
+      content = await loadToolContentOrNull(definition.entityId, locale);
+      break;
+    case 'model':
+      return null;
+  }
+  if (!content) return null;
+  return {
+    title: content.directory.title || content.seo.title,
+    summary: content.directory.description || content.seo.description,
+  };
 }
 
 /**
@@ -79,18 +104,21 @@ export async function selectLoadableIndexableCatalogUrls(
 export async function selectLoadableLlmsEntries(
   definitions: readonly CatalogDefinition[],
   locale: AppLocale
-): Promise<ResolvedCatalogRoute[]> {
+): Promise<LoadableCatalogLlmsEntry[]> {
   const candidates = selectLlmsEntries(
     definitions,
     locale,
     isCatalogPageContentAvailable
   );
-  const loadable = await Promise.all(
-    candidates.map((candidate) =>
-      isCatalogPageContentLoadable(candidate.definition, locale)
-    )
+  const entries = await Promise.all(
+    candidates.map(async (candidate) => {
+      const copy = await loadCatalogLlmsCopy(candidate.definition, locale);
+      return copy ? { ...candidate, ...copy } : null;
+    })
   );
-  return candidates.filter((_, index) => loadable[index]);
+  return entries.filter(
+    (entry): entry is LoadableCatalogLlmsEntry => entry !== null
+  );
 }
 
 /** Exact locale-free targets for content-backed Catalog routes. */

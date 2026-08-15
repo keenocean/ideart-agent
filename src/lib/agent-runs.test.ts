@@ -1,8 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   buildAgentChatRequestPayload,
   parseAgentTurnConflict,
+  startRun,
 } from './agent-runs';
 
 describe('parseAgentTurnConflict', () => {
@@ -64,6 +65,49 @@ describe('buildAgentChatRequestPayload', () => {
         entityId: 'image-to-video',
         locale: 'en',
       },
+    });
+  });
+});
+
+describe('agent run acceptance boundary', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('does not mark a turn accepted when the server refuses it for credits', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        return new Response(
+          JSON.stringify({
+            code: 'insufficient_credits',
+            required: 4,
+            balance: 0,
+            subscribed: true,
+          }),
+          {
+            status: 402,
+            headers: { 'Content-Type': 'application/json' },
+          }
+        );
+      })
+    );
+
+    const onAccepted = vi.fn();
+    const onInsufficientCredits = vi.fn();
+
+    await startRun({
+      sessionId: 's-1777280106721-credits',
+      text: 'create this',
+      onAccepted,
+      onInsufficientCredits,
+    });
+
+    expect(onAccepted).not.toHaveBeenCalled();
+    expect(onInsufficientCredits).toHaveBeenCalledWith({
+      required: 4,
+      balance: 0,
+      subscribed: true,
     });
   });
 });

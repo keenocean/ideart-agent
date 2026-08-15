@@ -331,7 +331,13 @@ type ToolExecution =
 - 工具/模型页进入 `/chat/$sessionId` 时不会把页面锁定设置写入全局 `localStorage`；home handoff 仍保持历史行为。
 - 验证邮件 callback 指向无草稿数据的 completion page。completion page 只广播安全 callback identity，原标签页必须重新确认 session 后才能跳转并一次性消费自己的 stash。
 
-阶段 2 的自动验证覆盖 46 个测试文件/267 项测试，并通过 TypeScript、Prettier 和生产构建。真实 OAuth/provider 与浏览器跨标签 smoke 只在有合法回调域和凭据的发布环境执行；不得用无凭据环境中的 mock 冒充真实 provider 成功。
+阶段 2.5 收口后的自动验证覆盖 51 个测试文件/309 项测试，并通过 TypeScript、Prettier 和生产构建。真实 OAuth/provider 与浏览器跨标签 smoke 只在有合法回调域和凭据的发布环境执行；不得用无凭据环境中的 mock 冒充真实 provider 成功。
+
+附件 URL 本身不是授权证明。reference upload 先经过登录、类型 allowlist 与 magic-byte 校验，再由服务端签发绑定 `userId + chatId + mediaType + exact URL + expiry` 的短期 HMAC receipt；空密钥、开发占位密钥、篡改、过期和跨会话复用均失败关闭。客户端必须在初始 handoff 中保留 receipt，服务端只把已验证的 `{ mediaType, url }` 写入 user audit metadata，不持久化 receipt。
+
+后续 turn 可以重用 owner-scoped 同一 chat 的历史媒体，但 allowlist 只来自 server-authored user audit metadata，以及与合法 user turn 关联且 `status: success` 的内置媒体 tool result。跨 chat Library 媒体必须以 source chat/message/type/exact URL 重新做 owner 校验，再为目标 chat 签发 receipt；legacy 文本中的裸 URL 不自动获得权限。工具层继续独立检查 minimum、maximum、类型和 allowlist，历史中不兼容的媒体不能满足页面 minimum。
+
+active lease/task 检查发生在历史读取和 receipt 验证之前；402 拒绝不调用 `onAccepted`，因此首轮 sessionStorage stash 会保留到用户完成订阅/充值后重试。Catalog policy 的正文 availability predicate 也没有默认值，生产调用必须注入精确语言 content resolver。
 
 ### 4.2 阶段 3 已实现的工具页消费方式
 
@@ -754,7 +760,7 @@ SEO 发布门槛：
 R2 URL 与对象规则：
 
 - `r2_domain` 必须配置为可匿名访问的 HTTPS custom domain/CDN。`R2Provider` 未配置 public domain 时回退的 `*.r2.cloudflarestorage.com` S3 API endpoint 不是页面交付地址；临时 signed URL 也不能进入页面、sitemap、JSON-LD 或社交 metadata。
-- 现有通用上传接口在未配置存储时会写入 `public/uploads`，并且尚未暴露 cache metadata；这是运行时/本地开发兼容路径，不是营销素材发布路径。营销上传流程必须补齐缓存 metadata，并在 R2 或 `r2_domain` 缺失时 fail closed。
+- 通用非 reference 图片上传在未配置存储时仍可写入 `public/uploads`，这是运行时/本地开发兼容路径，不是营销素材发布路径。Agent reference upload 必须配置公开 Storage，并返回目标 chat 的签名 receipt；营销上传则继续使用独立的 fail-closed R2 流程和 cache metadata，二者不能互相替代。
 - Blog 图片已经使用独立的 fail-closed R2 上传接口；不得为了复用通用上传 UI 将它改回本地 fallback。其他营销 surface 仍按上条契约逐步接入专用发布流程。
 - 组件只消费 props，不读取 Admin Storage 配置或拼接域名。asset ref 保存绝对 URL、kind、MIME、宽高、字节数与可选 poster；逐语言 alt/caption 保存在对应 locale 内容源。
 - 对象使用 `marketing/<surface>/<slug>/<content-hash>.<ext>` 一类不可变 key；内容变化上传新 key 并更新引用。为内容 hash 对象返回正确 `Content-Type`、`Content-Disposition: inline` 与 `Cache-Control: public, max-age=31536000, immutable`；视频验证 range request。
@@ -785,6 +791,8 @@ pnpm cf:check-budget
 ```
 
 `cf:dry-run`/`cf:check-budget` 封装锁定版本的 Wrangler dry-run，并按选定套餐内部预算失败；阈值和 baseline 必须作为可审阅配置提交。另提供 `pnpm marketing:check-assets`：离线检查 `public/` allowlist/体积增量、本地营销媒体引用、Base64 大字符串、R2 origin 与 asset metadata；release/online 模式全量请求 R2 URL，验证 200、MIME、缓存、体积和视频 range。网络不可用时必须明确标记 online 检查未执行，不能把离线通过等同于资源已上线。以上脚本使用现有 Node 能力，不为检查器新增依赖。
+
+`cf:dry-run` 在构建前删除自己的旧输出目录，避免旧 hash chunk 被重复计入；当前收口证据为 Worker gzip 2,207,282 / 2,516,582 bytes、235 / 250 个静态资产、最大单文件 4,731,048 / 26,214,400 bytes。route bundle 以 gzip baseline 逐路由比较，任何超过 100 KiB 的增长必须提供非空、已审阅说明，否则 CI 失败。
 
 每次批量新增工具或模型后记录：
 

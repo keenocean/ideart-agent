@@ -10,6 +10,17 @@
       "/blog/",
       "/blog/$slug"
     ],
+    "baselineGzipBytes": {
+      "__root__": 291006,
+      "/": 393454,
+      "/pricing": 370563,
+      "/(pages)": 300755,
+      "/tools/": 363008,
+      "/tools/$slug": 382230,
+      "/blog/": 363868,
+      "/blog/$slug": 364024
+    },
+    "explainedGzipIncreases": {},
     "explainIncreaseAboveGzipBytes": 102400
   },
   "publicAssets": {
@@ -36,6 +47,7 @@
     "plan": "free",
     "workerGzipBudgetBytes": 2516582,
     "paidWorkerGzipBudgetBytes": 8388608,
-    "singleStaticAssetMaxBytes": 26214400
+    "singleStaticAssetMaxBytes": 26214400,
+    "staticAssetCountBudget": 250
   }
 }

@@ -8,10 +8,9 @@ import { baseLocale, locales } from '@/paraglide/runtime.js';
 import { selectLoadableIndexableCatalogUrls } from '@/content/catalog-pages';
 import { getPublishedBlogLocales } from '@/content/posts';
 
-type LocalizedEntry = {
+export type SitemapEntry = {
   groupId: string;
-  routes: SeoRouteRef[];
-  lastModified?: string;
+  routes: Array<SeoRouteRef & { lastModified?: string }>;
 };
 
 function xml(value: string): string {
@@ -23,7 +22,10 @@ function xml(value: string): string {
     .replace(/'/g, '&apos;');
 }
 
-function entryXml(entry: LocalizedEntry, route: SeoRouteRef): string {
+function entryXml(
+  entry: SitemapEntry,
+  route: SeoRouteRef & { lastModified?: string }
+): string {
   const defaultRoute = entry.routes.find(
     (candidate) => candidate.locale === baseLocale
   );
@@ -42,8 +44,8 @@ function entryXml(entry: LocalizedEntry, route: SeoRouteRef): string {
     '  <url>',
     `    <loc>${xml(buildAbsoluteSeoUrl(route))}</loc>`,
     alternates,
-    entry.lastModified
-      ? `    <lastmod>${xml(entry.lastModified)}</lastmod>`
+    route.lastModified
+      ? `    <lastmod>${xml(route.lastModified)}</lastmod>`
       : null,
     '  </url>',
   ]
@@ -51,68 +53,78 @@ function entryXml(entry: LocalizedEntry, route: SeoRouteRef): string {
     .join('\n');
 }
 
-function fixedEntries(): LocalizedEntry[] {
-  const groups = new Map<string, LocalizedEntry>();
+function fixedEntries(): SitemapEntry[] {
+  const groups = new Map<string, SitemapEntry>();
   for (const record of selectIndexableFixedUrls()) {
     const group = groups.get(record.id) ?? {
       groupId: `fixed:${record.id}`,
       routes: [],
     };
-    group.routes.push({ locale: record.locale, path: record.path });
-    if (
-      record.modifiedAt &&
-      (!group.lastModified || record.modifiedAt > group.lastModified)
-    ) {
-      group.lastModified = record.modifiedAt;
-    }
+    group.routes.push({
+      locale: record.locale,
+      path: record.path,
+      lastModified: record.modifiedAt,
+    });
     groups.set(record.id, group);
   }
   return [...groups.values()];
 }
 
-async function catalogEntries(): Promise<LocalizedEntry[]> {
-  const groups = new Map<string, LocalizedEntry>();
+async function catalogEntries(): Promise<SitemapEntry[]> {
+  const groups = new Map<string, SitemapEntry>();
   for (const record of await selectLoadableIndexableCatalogUrls(catalog)) {
     const groupId = `${record.kind}:${record.entityId}`;
     const group = groups.get(groupId) ?? { groupId, routes: [] };
-    group.routes.push({ locale: record.locale, path: record.path });
-    if (
-      record.modifiedAt &&
-      (!group.lastModified || record.modifiedAt > group.lastModified)
-    ) {
-      group.lastModified = record.modifiedAt;
-    }
+    group.routes.push({
+      locale: record.locale,
+      path: record.path,
+      lastModified: record.modifiedAt,
+    });
     groups.set(groupId, group);
   }
   return [...groups.values()];
 }
 
-async function blogEntries(): Promise<LocalizedEntry[]> {
+async function blogEntries(): Promise<SitemapEntry[]> {
   const posts = new Map<
     string,
-    { locales: Set<AppLocale>; lastModified: string }
+    {
+      routes: Partial<
+        Record<AppLocale, SeoRouteRef & { lastModified?: string }>
+      >;
+    }
   >();
-  const publishedLocales = new Set<AppLocale>();
-  let latestUpdate: string | undefined;
+  const blogIndexRoutes: Partial<
+    Record<AppLocale, SeoRouteRef & { lastModified?: string }>
+  > = {};
   const { listPublishedArticles } = await import('@/modules/posts/service');
   const rows = await listPublishedArticles();
   for (const row of rows) {
     if (!locales.includes(row.locale as AppLocale)) continue;
     const locale = row.locale as AppLocale;
     const updatedAt = new Date(row.updatedAt).toISOString();
-    const current = posts.get(row.slug) ?? {
-      locales: new Set<AppLocale>(),
+    const current = posts.get(row.slug) ?? { routes: {} };
+    current.routes[locale] = {
+      locale,
+      path: `/blog/${row.slug}`,
       lastModified: updatedAt,
     };
-    current.locales.add(locale);
-    publishedLocales.add(locale);
-    if (updatedAt > current.lastModified) current.lastModified = updatedAt;
-    if (!latestUpdate || updatedAt > latestUpdate) latestUpdate = updatedAt;
+    const blogIndexRoute = blogIndexRoutes[locale];
+    if (
+      !blogIndexRoute?.lastModified ||
+      updatedAt > blogIndexRoute.lastModified
+    ) {
+      blogIndexRoutes[locale] = {
+        locale,
+        path: '/blog',
+        lastModified: updatedAt,
+      };
+    }
     posts.set(row.slug, current);
   }
 
   const availableBlogLocales = getPublishedBlogLocales(
-    [...publishedLocales],
+    Object.keys(blogIndexRoutes) as AppLocale[],
     locales
   ) as AppLocale[];
   return [
@@ -120,36 +132,53 @@ async function blogEntries(): Promise<LocalizedEntry[]> {
       ? [
           {
             groupId: 'blog:index',
-            routes: availableBlogLocales.map((locale) => ({
-              locale,
-              path: '/blog',
-            })),
-            lastModified: latestUpdate,
+            routes: availableBlogLocales.flatMap((locale) => {
+              const route = blogIndexRoutes[locale];
+              return route ? [route] : [];
+            }),
           },
         ]
       : []),
     ...[...posts.entries()].map(
-      ([slug, value]): LocalizedEntry => ({
+      ([slug, value]): SitemapEntry => ({
         groupId: `blog:${slug}`,
-        routes: getPublishedBlogLocales([...value.locales], locales).map(
-          (locale) => ({ locale: locale as AppLocale, path: `/blog/${slug}` })
-        ),
-        lastModified: value.lastModified,
+        routes: getPublishedBlogLocales(
+          Object.keys(value.routes) as AppLocale[],
+          locales
+        ).flatMap((locale) => {
+          const route = value.routes[locale as AppLocale];
+          return route ? [route] : [];
+        }),
       })
     ),
   ].filter((entry) => entry.routes.length > 0);
 }
 
-function deduplicate(entries: readonly LocalizedEntry[]): LocalizedEntry[] {
+export function deduplicateSitemapEntries(
+  entries: readonly SitemapEntry[]
+): SitemapEntry[] {
   const urls = new Set<string>();
-  for (const entry of entries) {
-    for (const route of entry.routes) {
+  return entries.flatMap((entry) => {
+    const routes = entry.routes.filter((route) => {
       const url = buildAbsoluteSeoUrl(route);
-      if (urls.has(url)) throw new Error(`Duplicate sitemap URL: ${url}`);
+      if (urls.has(url)) return false;
       urls.add(url);
-    }
-  }
-  return [...entries];
+      return true;
+    });
+    return routes.length ? [{ ...entry, routes }] : [];
+  });
+}
+
+export function renderSitemapXml(entries: readonly SitemapEntry[]): string {
+  return [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">',
+    ...entries.flatMap((entry) =>
+      entry.routes.map((route) => entryXml(entry, route))
+    ),
+    '</urlset>',
+    '',
+  ].join('\n');
 }
 
 export const Route = createFileRoute('/sitemap.xml')({
@@ -157,20 +186,12 @@ export const Route = createFileRoute('/sitemap.xml')({
     handlers: {
       GET: async () => {
         try {
-          const entries = deduplicate([
+          const entries = deduplicateSitemapEntries([
             ...fixedEntries(),
             ...(await catalogEntries()),
             ...(await blogEntries()),
           ]);
-          const body = [
-            '<?xml version="1.0" encoding="UTF-8"?>',
-            '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">',
-            ...entries.flatMap((entry) =>
-              entry.routes.map((route) => entryXml(entry, route))
-            ),
-            '</urlset>',
-            '',
-          ].join('\n');
+          const body = renderSitemapXml(entries);
           return new Response(body, {
             headers: {
               'Content-Type': 'application/xml; charset=utf-8',

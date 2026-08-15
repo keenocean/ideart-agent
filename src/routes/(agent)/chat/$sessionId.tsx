@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 
 import { useRouter } from '@/core/i18n/navigation';
 import {
+  authorizeLibraryMediaForChat,
   isLocalChatMediaUrl,
   mediaTypeForFile,
   newAttachmentId,
@@ -42,7 +43,7 @@ import {
 import { apiGet, apiPatch, apiPost } from '@/lib/api-client';
 import { ChatAutoScroll } from '@/lib/chat-scroll';
 import type { GenerationEntryContext } from '@/lib/generation-entry';
-import { mediaNameFromUrl } from '@/lib/media';
+import { isVideoUrl, mediaNameFromUrl } from '@/lib/media';
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
 import { useComposerSettings } from '@/hooks/use-composer-settings';
@@ -345,7 +346,6 @@ function ChatSessionPage() {
         // Refused before anything ran. No plan yet means "subscribe";
         // already on one just means the balance ran out, so offer a top-up.
         onInsufficientCredits: ({ subscribed }) => {
-          onAccepted?.();
           if (subscribed) setTopUpOpen(true);
           else setUpgradeOpen(true);
         },
@@ -487,14 +487,22 @@ function ChatSessionPage() {
     ]);
 
     try {
-      const urls = await uploadChatMedia(created.map((item) => item.file));
+      const uploaded = await uploadChatMedia(
+        created.map((item) => item.file),
+        sessionId
+      );
       setAttachments((prev) =>
         prev.map((item) => {
           const index = created.findIndex(
             (createdItem) => createdItem.id === item.id
           );
-          return index >= 0 && urls[index]
-            ? { ...item, url: urls[index], status: 'uploaded' }
+          return index >= 0 && uploaded[index]
+            ? {
+                ...item,
+                url: uploaded[index].url,
+                receipt: uploaded[index].receipt,
+                status: 'uploaded',
+              }
             : item;
         })
       );
@@ -522,39 +530,47 @@ function ChatSessionPage() {
 
     const created: PendingAttachment[] = selected.map((item) => ({
       id: newAttachmentId(),
-      name: item.name || 'video',
-      kind: 'video',
+      name: item.name || 'media',
+      kind: item.mediaType ?? (isVideoUrl(item.src) ? 'video' : 'image'),
       preview: item.src,
       ...(isLocalChatMediaUrl(item.src) ? {} : { url: item.src }),
-      status: isLocalChatMediaUrl(item.src) ? 'uploading' : 'uploaded',
+      status: 'uploading',
     }));
     setAttachments((previous) => [...previous, ...created]);
 
     try {
-      const urls = await publishChatMediaSources(
-        selected.map((item) => ({ src: item.src, name: item.name }))
+      const uploaded = await Promise.all(
+        selected.map((item) =>
+          isLocalChatMediaUrl(item.src)
+            ? publishChatMediaSources(
+                [{ src: item.src, name: item.name }],
+                sessionId
+              ).then(([uploadedItem]) => uploadedItem)
+            : authorizeLibraryMediaForChat(item, sessionId)
+        )
       );
       setAttachments((current) =>
         current.map((item) => {
           const index = created.findIndex(
             (createdItem) => createdItem.id === item.id
           );
-          return index >= 0 && urls[index]
-            ? { ...item, url: urls[index], status: 'uploaded' }
+          return index >= 0 && uploaded[index]
+            ? {
+                ...item,
+                url: uploaded[index].url,
+                receipt: uploaded[index].receipt,
+                status: 'uploaded',
+              }
             : item;
         })
       );
     } catch (error) {
       const message = (error as Error).message || 'Upload failed';
       toast.error(message);
-      const localIds = new Set(
-        created
-          .filter((item) => item.status === 'uploading')
-          .map((item) => item.id)
-      );
+      const createdIds = new Set(created.map((item) => item.id));
       setAttachments((current) =>
         current.map((item) =>
-          localIds.has(item.id)
+          createdIds.has(item.id)
             ? { ...item, status: 'error', error: message }
             : item
         )

@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useSession } from '@/core/auth/client';
 import { usePathname, useRouter } from '@/core/i18n/navigation';
 import { apiGet } from '@/lib/api-client';
+import { sanitizeAuthCallback } from '@/lib/auth-callback';
 import { useUserPermissions } from '@/hooks/use-user-permissions';
 import { AppSidebar, type NavItem } from '@/components/app-sidebar';
 import { Separator } from '@/components/ui/separator';
@@ -85,7 +86,8 @@ export function AppLayout({
       // pathname is already locale-free; append the live query string.
       const search =
         typeof window !== 'undefined' ? window.location.search : '';
-      const callbackUrl = `${pathname}${search}`;
+      const callbackUrl =
+        sanitizeAuthCallback(`${pathname}${search}`, '/') ?? '/';
       router.push(`/sign-in?callbackUrl=${encodeURIComponent(callbackUrl)}`);
       return;
     }

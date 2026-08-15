@@ -12,6 +12,12 @@ other Catalog tool still returns 404 despite having an infrastructure route
 registration. A later phase may change one locale to `index` only after its own
 release gate passes; the other locale does not follow automatically.
 
+Phase 2.5 hardened the shared execution and discovery projections without
+changing publication state: exact-locale content is now mandatory when the
+server rebuilds a Catalog policy, attachment reuse is owner/chat scoped, and
+sitemap/llms projections preserve source-backed locale content and dates. This
+does not constitute a production SEO release, so no tool URL moves to `index`.
+
 External follow-up remains conditional on a production deployment: repeat the
 representative URL fetch and review Search Console on 2026-08-22 (day 7) and
 2026-09-14 (day 30). If the pages are not deployed by either checkpoint, record
@@ -45,7 +51,7 @@ Shared fields for the entries below:
 - Structured data: visible `BreadcrumbList`; `FAQPage` only if the same FAQ is
   rendered on the page. No Product/ratings/reviews schema.
 - Actual content updated at: unknown unless an entry below records a date.
-- Repository checks: phase 3 test, type, format, asset, bundle, build, route inventory, and Cloudflare budget gate passed on 2026-08-15.
+- Repository checks: phase 2.5 closure passed 51 test files/309 tests, type, format, offline asset, route-bundle, production build, and Cloudflare budget gates on 2026-08-15. Worker gzip was 2,207,282 / 2,516,582 bytes; static assets were 235 / 250. R2 inventory remains 0.
 - External verification: not available before production deployment.
 
 ## tools-directory · en

@@ -3,7 +3,11 @@ import { describe, expect, it } from 'vitest';
 import type { AgentMessageMetadata } from '@/core/agent/types';
 import type { StoredPart } from '@/modules/chats/service';
 
-import { completeInterruptedMediaCalls, mapRowsToHistory } from './history';
+import {
+  collectAllowedMediaAttachments,
+  completeInterruptedMediaCalls,
+  mapRowsToHistory,
+} from './history';
 
 // The runtime is stateless: every turn replays the conversation from these
 // rows. If the mapping drops a tool call or detaches it from its result, the
@@ -234,6 +238,103 @@ describe('mapRowsToHistory', () => {
     expect(serialized).not.toContain('business-hash');
     expect(serialized).not.toContain('effective-hash');
     expect(serialized).not.toContain('turn-1');
+  });
+});
+
+describe('collectAllowedMediaAttachments', () => {
+  it('collects audit media and associated successful generated files only', () => {
+    const rows = linkedToolRows([
+      call(
+        'c1',
+        'generate_image',
+        '{"prompt":"a"}',
+        JSON.stringify({
+          status: 'success',
+          files: ['https://cdn.example.com/generated.png'],
+        })
+      ),
+    ]);
+    rows[0].metadata = {
+      ...userAudit,
+      media: [{ mediaType: 'image', url: 'https://cdn.example.com/input.png' }],
+    };
+
+    expect(collectAllowedMediaAttachments(rows)).toEqual([
+      { mediaType: 'image', url: 'https://cdn.example.com/input.png' },
+      { mediaType: 'image', url: 'https://cdn.example.com/generated.png' },
+    ]);
+  });
+
+  it('fails closed for broken association, unknown tool, malformed result and non-success status', () => {
+    const associated = linkedToolRows([
+      call(
+        'c1',
+        'generate_image',
+        '{}',
+        JSON.stringify({
+          status: 'error',
+          files: ['https://cdn.example.com/error.png'],
+        })
+      ),
+      call(
+        'c2',
+        'generate_image',
+        '{}',
+        JSON.stringify({
+          files: ['https://cdn.example.com/missing-status.png'],
+        })
+      ),
+      call('c3', 'generate_image', '{}', '{broken'),
+      call(
+        'c4',
+        'generate_image',
+        '{}',
+        JSON.stringify({
+          status: 'success',
+          files: ['https://cdn.example.com/not-an-image.mp4'],
+        })
+      ),
+      call(
+        'c5',
+        'generate_image',
+        '{}',
+        JSON.stringify({
+          status: 'success',
+          files: ['http://127.0.0.1/private.png'],
+        })
+      ),
+      call(
+        'c6',
+        'future_tool',
+        '{}',
+        JSON.stringify({
+          status: 'success',
+          files: ['https://cdn.example.com/future.png'],
+        })
+      ),
+    ]);
+    const brokenAssociation: Row[] = [
+      {
+        id: 'assistant-orphan',
+        role: 'assistant',
+        parts: [
+          call(
+            'c7',
+            'generate_image',
+            '{}',
+            JSON.stringify({
+              status: 'success',
+              files: ['https://cdn.example.com/orphan.png'],
+            })
+          ),
+        ],
+        metadata: assistantAudit,
+      },
+    ];
+
+    expect(
+      collectAllowedMediaAttachments([...associated, ...brokenAssociation])
+    ).toEqual([]);
   });
 });
 

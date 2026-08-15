@@ -23,6 +23,17 @@ describe('Agent message metadata decoder', () => {
     expect(parseAgentMessageMetadata(userMetadata)).toEqual(userMetadata);
     expect(
       parseAgentMessageMetadata({
+        ...userMetadata,
+        media: [
+          { mediaType: 'image', url: 'https://cdn.example.com/input.png' },
+        ],
+      })
+    ).toMatchObject({
+      kind: 'user',
+      media: [{ mediaType: 'image', url: 'https://cdn.example.com/input.png' }],
+    });
+    expect(
+      parseAgentMessageMetadata({
         schemaVersion: 1,
         kind: 'assistant',
         turnId: 'turn-1',
@@ -38,6 +49,17 @@ describe('Agent message metadata decoder', () => {
     { ...userMetadata, schemaVersion: 2 },
     { ...userMetadata, toolNames: ['generate_image', 'generate_image'] },
     { ...userMetadata, longRunningToolNames: ['not_authorized'] },
+    {
+      ...userMetadata,
+      media: [
+        { mediaType: 'image', url: 'https://cdn.example.com/input.png' },
+        { mediaType: 'image', url: 'https://cdn.example.com/input.png' },
+      ],
+    },
+    {
+      ...userMetadata,
+      media: [{ mediaType: 'video', url: '' }],
+    },
     {
       schemaVersion: 1,
       kind: 'assistant',

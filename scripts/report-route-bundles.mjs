@@ -84,6 +84,27 @@ const reports = config.routeBundle.representativeRouteIds.map((routeId) => {
   return { routeId, chain, assets, ...sizes(assets) };
 });
 
+const routeFailures = [];
+const baselineGzipBytes = config.routeBundle.baselineGzipBytes ?? {};
+const explainedGzipIncreases = config.routeBundle.explainedGzipIncreases ?? {};
+const explainThreshold = config.routeBundle.explainIncreaseAboveGzipBytes;
+for (const report of reports) {
+  const baseline = baselineGzipBytes[report.routeId];
+  if (!Number.isFinite(baseline)) {
+    routeFailures.push(`missing route bundle baseline: ${report.routeId}`);
+    continue;
+  }
+  const delta = report.gzipBytes - baseline;
+  const explanation = explainedGzipIncreases[report.routeId];
+  const hasReviewedExplanation =
+    typeof explanation === 'string' && explanation.trim().length > 0;
+  if (delta > explainThreshold && !hasReviewedExplanation) {
+    routeFailures.push(
+      `${report.routeId}: gzip grew ${delta} bytes over baseline ${baseline}; add a reviewed explanation to config/marketing-quality.json or reduce the bundle`
+    );
+  }
+}
+
 const allAssets = readdirSync(path.join(publicDir, 'assets'));
 const messages = allAssets
   .filter((file) => /^messages-.*\.js$/.test(file))
@@ -106,12 +127,18 @@ const result = {
 };
 
 if (process.argv.includes('--json')) {
-  console.log(JSON.stringify(result, null, 2));
+  console.log(JSON.stringify({ ...result, failures: routeFailures }, null, 2));
 } else {
   console.log('Route bundle report (raw / gzip / assets)');
   for (const report of reports) {
+    const baseline = baselineGzipBytes[report.routeId];
+    const delta = Number.isFinite(baseline)
+      ? report.gzipBytes - baseline
+      : undefined;
     console.log(
-      `${report.routeId}: ${report.rawBytes} / ${report.gzipBytes} / ${report.assets.length}`
+      `${report.routeId}: ${report.rawBytes} / ${report.gzipBytes} / ${report.assets.length}${
+        delta === undefined ? '' : ` / delta=${delta}`
+      }`
     );
   }
   for (const message of messages) {
@@ -119,4 +146,9 @@ if (process.argv.includes('--json')) {
       `messages: ${message.rawBytes} / ${message.gzipBytes} / root-preloaded=${message.rootPreloaded}`
     );
   }
+}
+
+if (routeFailures.length) {
+  console.error(routeFailures.map((failure) => `- ${failure}`).join('\n'));
+  process.exitCode = 1;
 }

@@ -37,6 +37,7 @@ export interface PendingAttachment {
   /** Object URL while uploading, remote URL once uploaded. */
   preview: string;
   url?: string;
+  receipt?: string;
   status: 'uploading' | 'uploaded' | 'error';
   error?: string;
 }
@@ -45,30 +46,21 @@ export function newAttachmentId(): string {
   return `att-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-/** Upload one image and return its public URL. Requires a signed-in session. */
-export async function uploadChatImage(file: File): Promise<string> {
-  const formData = new FormData();
-  formData.append('files', file);
-
-  const res = await fetch('/api/storage/upload-image', {
-    method: 'POST',
-    body: formData,
-  });
-  if (!res.ok) throw new Error(`Upload failed (${res.status})`);
-
-  const json = await res.json();
-  if (json.code !== 0 || !json.data?.urls?.[0]) {
-    throw new Error(json.message || 'Upload failed');
-  }
-  return json.data.urls[0] as string;
+export interface UploadedChatMedia {
+  url: string;
+  receipt: string;
 }
 
 /** Upload public image, audio, or video material in one rate-limited request. */
-export async function uploadChatMedia(files: File[]): Promise<string[]> {
+export async function uploadChatMedia(
+  files: File[],
+  chatId: string
+): Promise<UploadedChatMedia[]> {
   const formData = new FormData();
   for (const file of files) formData.append('files', file);
   formData.append('requirePublic', 'true');
   formData.append('referenceMedia', 'true');
+  formData.append('chatId', chatId);
 
   const res = await fetch('/api/storage/upload-image', {
     method: 'POST',
@@ -77,10 +69,25 @@ export async function uploadChatMedia(files: File[]): Promise<string[]> {
   if (!res.ok) throw new Error(`Upload failed (${res.status})`);
 
   const json = await res.json();
-  if (json.code !== 0 || !Array.isArray(json.data?.urls)) {
+  if (json.code !== 0 || !Array.isArray(json.data?.results)) {
     throw new Error(json.message || 'Upload failed');
   }
-  return json.data.urls as string[];
+  const results = json.data.results as Array<{
+    url?: unknown;
+    receipt?: unknown;
+  }>;
+  if (
+    results.length !== files.length ||
+    results.some(
+      (item) => typeof item.url !== 'string' || typeof item.receipt !== 'string'
+    )
+  ) {
+    throw new Error('Upload did not return verified media receipts');
+  }
+  return results.map((item) => ({
+    url: item.url as string,
+    receipt: item.receipt as string,
+  }));
 }
 
 /** Whether a bundled/same-origin asset still needs a public storage URL. */
@@ -138,19 +145,61 @@ export interface ChatMediaSource {
   name?: string;
 }
 
+export interface LibraryMediaReceiptSource {
+  src: string;
+  mediaType?: AttachmentMediaType;
+  chatId?: string;
+  sourceMessageId?: string;
+}
+
+export async function authorizeLibraryMediaForChat(
+  source: LibraryMediaReceiptSource,
+  targetChatId: string
+): Promise<UploadedChatMedia> {
+  if (!source.chatId || !source.sourceMessageId || !source.mediaType) {
+    throw new Error('Library media is missing source metadata');
+  }
+  const res = await fetch('/api/agent/library', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      targetChatId,
+      sourceChatId: source.chatId,
+      sourceMessageId: source.sourceMessageId,
+      mediaType: source.mediaType,
+      url: source.src,
+    }),
+  });
+  const json = await res.json().catch(() => null);
+  if (
+    !res.ok ||
+    json?.code !== 0 ||
+    json.data?.url !== source.src ||
+    typeof json.data?.receipt !== 'string'
+  ) {
+    throw new Error(json?.message || `Library media failed (${res.status})`);
+  }
+  return {
+    url: String(json.data.url),
+    receipt: String(json.data.receipt),
+  };
+}
+
 /**
- * Copy bundled/same-origin media into configured public storage before it is
- * handed to an external generation provider. CDN URLs already reachable by
- * the provider pass through unchanged.
+ * Copy trusted bundled/same-origin media into configured public storage before
+ * it is handed to an external generation provider. Remote library media must
+ * use authorizeLibraryMediaForChat() so the server can prove ownership.
  */
 export async function publishChatMediaSources(
-  sources: ChatMediaSource[]
-): Promise<string[]> {
-  const urls = sources.map((source) => source.src);
+  sources: ChatMediaSource[],
+  chatId: string
+): Promise<UploadedChatMedia[]> {
   const localSources = sources
     .map((source, index) => ({ source, index }))
     .filter(({ source }) => isLocalChatMediaUrl(source.src));
-  if (localSources.length === 0) return urls;
+  if (localSources.length !== sources.length) {
+    throw new Error('Remote media must be authorized from the media library');
+  }
 
   const files = await Promise.all(
     localSources.map(async ({ source }) => {
@@ -180,22 +229,15 @@ export async function publishChatMediaSources(
       });
     })
   );
-  const uploaded = await uploadChatMedia(files);
-  if (uploaded.length !== localSources.length || uploaded.some((url) => !url)) {
+  const uploaded = await uploadChatMedia(files, chatId);
+  if (
+    uploaded.length !== localSources.length ||
+    uploaded.some((item) => !item.url)
+  ) {
     throw new Error('Upload failed');
   }
 
-  localSources.forEach(({ index }, uploadIndex) => {
-    urls[index] = uploaded[uploadIndex];
-  });
-  return urls;
-}
-
-/** Backwards-compatible single-file helper. */
-export async function uploadChatReference(file: File): Promise<string> {
-  const urls = await uploadChatMedia([file]);
-  if (!urls[0]) throw new Error('Upload failed');
-  return urls[0];
+  return uploaded;
 }
 
 const SUPPORTED_IMAGE_TYPES = new Set([

@@ -5,6 +5,13 @@ import type {
 
 import type { AgentGenerationSettings } from '@/lib/agent-settings';
 
+export type AgentMediaType = 'image' | 'audio' | 'video';
+
+export interface AgentVerifiedMedia {
+  mediaType: AgentMediaType;
+  url: string;
+}
+
 export interface AgentDefinition {
   id: string;
   name: string;
@@ -28,6 +35,8 @@ export interface AgentTurnMetadataV1 {
   longRunningToolNames: string[];
   /** Stable marketing/chat entry identity for audit only. */
   generationEntrySource?: string;
+  /** Server-verified reference media accepted for this user turn. */
+  media?: AgentVerifiedMedia[];
 }
 
 export interface AgentAssistantMessageMetadataV1 {
