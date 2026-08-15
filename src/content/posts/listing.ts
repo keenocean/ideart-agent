@@ -1,3 +1,5 @@
+import type { BlogImageRef } from '@/lib/blog-images';
+
 export type BlogCategory = {
   slug: string;
   title: string;
@@ -7,11 +9,11 @@ export type BlogPost = {
   slug: string;
   title: string;
   description: string;
-  image?: string;
+  image?: BlogImageRef;
   /** ISO date strings — serializable across loader/server-fn boundaries. */
   createdAt: string;
   updatedAt: string;
-  /** Empty means a legacy, language-neutral database post. */
+  /** Explicit supported locale stored with the article. */
   locale: string;
   categories: BlogCategory[];
   authorName?: string;
@@ -21,7 +23,7 @@ export type BlogPost = {
 export type BlogPostDetail = BlogPost & {
   /** Raw markdown — set for database posts. */
   content?: string;
-  /** Locales with a real translation, not merely a fallback. */
+  /** Supported locales with a published translation for this slug. */
   availableLocales: string[];
 };
 
@@ -34,25 +36,20 @@ export type BlogPage = {
   totalPages: number;
 };
 
-/**
- * Dedupe localized and language-neutral database rows by slug. Callers put
- * the preferred locale first, so the first row wins.
- */
-export function dedupePosts(
-  posts: BlogPost[],
-  options: { limit?: number } = {}
-): BlogPost[] {
-  const bySlug = new Map<string, BlogPost>();
-  for (const item of posts) {
-    if (!bySlug.has(item.slug)) bySlug.set(item.slug, item);
-  }
+export function isIndexableBlogListing(options: {
+  total: number;
+  category?: string;
+  page: number;
+}): boolean {
+  return options.total > 0 && !options.category && options.page === 1;
+}
 
-  const merged = [...bySlug.values()].sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  );
-  return options.limit && options.limit > 0
-    ? merged.slice(0, options.limit)
-    : merged;
+export function getPublishedBlogLocales(
+  storedLocales: readonly string[],
+  supportedLocales: readonly string[]
+): string[] {
+  const stored = new Set(storedLocales.filter(Boolean));
+  return supportedLocales.filter((locale) => stored.has(locale));
 }
 
 export function getBlogCategories(posts: BlogPost[]): BlogCategory[] {

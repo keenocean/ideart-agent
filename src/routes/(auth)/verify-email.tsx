@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { authClient, useSession } from '@/core/auth/client';
 import { Link, useRouter } from '@/core/i18n/navigation';
 import { envConfigs } from '@/config';
+import { sanitizeAuthCallback } from '@/lib/auth-callback';
 import { m } from '@/paraglide/messages.js';
 import { deLocalizeHref, localizeHref } from '@/paraglide/runtime.js';
 import { Button } from '@/components/ui/button';
@@ -19,17 +20,6 @@ import {
 } from '@/components/ui/card';
 
 const RESEND_COOLDOWN_SECONDS = 60;
-
-function safeDecodeCallbackUrl(raw?: string | null) {
-  if (!raw) return '/';
-  try {
-    const decoded = decodeURIComponent(raw);
-    if (decoded.startsWith('/')) return decoded;
-    return '/';
-  } catch {
-    return '/';
-  }
-}
 
 function stripLocalePrefix(path: string) {
   if (!path?.startsWith('/')) return '/';
@@ -101,7 +91,7 @@ function VerifyEmailPage() {
   }, [paramsReady, email, callbackUrl, router]);
 
   const nextUrl = useMemo(() => {
-    const decoded = safeDecodeCallbackUrl(callbackUrl);
+    const decoded = sanitizeAuthCallback(callbackUrl, '/') ?? '/';
     return stripLocalePrefix(decoded);
   }, [callbackUrl]);
 

@@ -1,0 +1,12 @@
+import { legacyCatalogRoutes } from './legacy-routes';
+import { modelCatalog } from './models';
+import { toolCatalog } from './tools';
+import type { CatalogDefinition } from './types';
+import { validateCatalog } from './validate';
+
+export const catalog = [
+  ...toolCatalog,
+  ...modelCatalog,
+] as const satisfies readonly CatalogDefinition[];
+
+validateCatalog(catalog, legacyCatalogRoutes);

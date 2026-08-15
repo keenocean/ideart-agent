@@ -82,7 +82,7 @@ src/
 ├── config/
 │   ├── index.ts                 # All env vars (app, db, auth, stripe, resend, storage, ai, locale)
 │   ├── db/schema.ts             # All table definitions (21 built-in + custom tables)
-│   └── locale/index.ts          # localeNames map for the language-switcher UI (locales live in project.inlang)
+│   └── locale/index.ts          # AppLocale/isSupportedLocale + localeNames (locales live in project.inlang)
 │
 ├── messages/{en,zh}.json        # Translation source — flat dot-keyed (e.g. "landing.hero.headline")
 ├── project.inlang/settings.json # Inlang project config (locales, baseLocale, plugins)
@@ -117,7 +117,7 @@ src/
 
 Key entry files:
 
-- `vite.config.ts` — plugins: mdx → tailwindcss → **paraglideVitePlugin** (outdir `./src/paraglide`, `strategy: ['url','cookie','baseLocale']`, `urlPatterns` for the `/zh` prefix) → tanstackStart → viteReact → nitro. Calls `loadEnvFiles()` so server-side `process.env` is populated from `.env.{NODE_ENV}`.
+- `vite.config.ts` — plugins: mdx → tailwindcss → **paraglideVitePlugin** (outdir `./src/paraglide`, `strategy: ['url','cookie','baseLocale']`; `urlPatterns` are derived from `project.inlang/settings.json`, with the base locale unprefixed and every other locale under `/<locale>`) → tanstackStart → viteReact → nitro. Calls `loadEnvFiles()` so server-side `process.env` is populated from `.env.{NODE_ENV}`.
 - `src/server.ts` — Nitro fetch entry; wraps the request in `paraglideMiddleware` so `getLocale()` resolves server-side.
 - `src/router.tsx` — exports `getRouter`; its `rewrite` runs Paraglide `deLocalizeUrl`/`localizeUrl` so routes stay locale-free while URLs gain the `/zh` prefix.
 - `src/routes/__root.tsx` — HTML shell (`QueryClientProvider` + `ReactQueryDevtools` in dev, fonts via `@fontsource` + a Google Fonts `<link>` for Noto Serif SC, `ThemeProvider`/`Toaster`/`GoogleOneTap`/`Analytics`, hreflang `<link>`s, `notFoundComponent`).
@@ -169,11 +169,13 @@ export function MyButton() {
 - Explicit locale (e.g. in a loader): `m['landing.pricing.title']({}, { locale })`
 - Runtime-built keys (tab labels, keyed lists): `tDynamic(key)` from `@/core/i18n/dynamic`. Prefer static `m['ns.key']()` whenever the key is known — dynamic access opts the bundle out of tree-shaking.
 
-**Adding a translation:** add the key to **both** `messages/en.json` and `messages/zh.json`, then call `m['the.key']()`. No per-namespace folders, no `localeMessagesPaths` registration — `src/config/locale/index.ts` now only exports `localeNames` for the switcher UI.
+**Adding a translation:** add the key to every `messages/<locale>.json` registered in `project.inlang/settings.json`, then call `m['the.key']()`. No per-namespace folders or `localeMessagesPaths` registration. `pnpm i18n:check` reads the registered locale set and rejects key drift.
+
+**Adding a locale:** add it to `project.inlang/settings.json`, create its complete `messages/<locale>.json`, and add its display name to `src/config/locale/index.ts` (the `Record<AppLocale, string>` check keeps these in sync). URL patterns are generated automatically; do not hand-add a `$locale` route or prefix. Static MDX and Blog content remain explicit per locale: missing content returns 404 and must not be added to sitemap/hreflang.
 
 **Locale runtime:** `import { getLocale, setLocale, localizeHref, localizeUrl, locales, baseLocale } from '@/paraglide/runtime.js'`. `getLocale()` works in components and in loaders (server-side via the `paraglideMiddleware` AsyncLocalStorage, client-side after hydration).
 
-**Switching locale:** call `setLocale('zh')` — it writes the `PARAGLIDE_LOCALE` cookie and triggers a full reload. See `src/components/locale-selector.tsx` / `user-menu.tsx`.
+**Switching locale:** call `setLocale('zh')` — it writes the `PARAGLIDE_LOCALE` cookie and triggers a full reload. See `src/components/locale-selector.tsx` / `user-menu.tsx`. Content details with partial translations (currently Blog articles) wrap their shell in `LocaleSwitchProvider`: a published translation keeps the detail path; a missing translation navigates to the target locale directory instead of a known 404.
 
 **Locale-aware links:** Use `Link` from `@/core/i18n/navigation` instead of a raw anchor for pages. Internal hrefs stay **locale-free** (`href="/pricing"`); the router rewrite localizes the output URL (en = no prefix, zh = `/zh`). `useRouter`/`usePathname` come from the same module.
 

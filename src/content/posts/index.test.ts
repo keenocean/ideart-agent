@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  dedupePosts,
+  formatOpenGraphLocale,
   getBlogCategories,
+  getPublishedBlogLocales,
+  isIndexableBlogListing,
   paginatePosts,
   type BlogPost,
-} from './listing';
+} from './index';
 
 function post(slug: string, overrides: Partial<BlogPost> = {}): BlogPost {
   return {
@@ -19,18 +21,6 @@ function post(slug: string, overrides: Partial<BlogPost> = {}): BlogPost {
     ...overrides,
   };
 }
-
-describe('dedupePosts', () => {
-  it('deduplicates repeated database slugs while preserving the preferred row', () => {
-    const preferred = post('shared', { title: 'Localized' });
-    const fallback = post('shared', {
-      title: 'Language neutral',
-      locale: '',
-    });
-
-    expect(dedupePosts([preferred, fallback])).toEqual([preferred]);
-  });
-});
 
 describe('blog listing helpers', () => {
   const posts = [
@@ -64,5 +54,36 @@ describe('blog listing helpers', () => {
       { slug: 'guides', title: 'Guides' },
       { slug: 'updates', title: 'Updates' },
     ]);
+  });
+
+  it('publishes only explicitly stored locales', () => {
+    const supported = ['en', 'zh', 'fr'];
+    expect(getPublishedBlogLocales(['', 'en'], supported)).toEqual(['en']);
+    expect(getPublishedBlogLocales(['fr', 'en'], supported)).toEqual([
+      'en',
+      'fr',
+    ]);
+    expect(getPublishedBlogLocales(['', 'de'], supported)).toEqual([]);
+  });
+
+  it('indexes only a populated, unfiltered first Blog page', () => {
+    expect(
+      isIndexableBlogListing({ total: 1, category: undefined, page: 1 })
+    ).toBe(true);
+    expect(
+      isIndexableBlogListing({ total: 0, category: undefined, page: 1 })
+    ).toBe(false);
+    expect(
+      isIndexableBlogListing({ total: 1, category: 'guides', page: 1 })
+    ).toBe(false);
+    expect(
+      isIndexableBlogListing({ total: 10, category: undefined, page: 2 })
+    ).toBe(false);
+  });
+
+  it('formats Open Graph locales for current and future languages', () => {
+    expect(formatOpenGraphLocale('en')).toBe('en_US');
+    expect(formatOpenGraphLocale('zh')).toBe('zh_CN');
+    expect(formatOpenGraphLocale('pt-BR')).toBe('pt_BR');
   });
 });

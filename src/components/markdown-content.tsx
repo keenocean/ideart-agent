@@ -1,6 +1,5 @@
 // Server-side markdown renderer for database-backed posts.
-import MarkdownIt from 'markdown-it';
-
+import { createBlogMarkdownIt } from '@/lib/blog-images';
 import { cn } from '@/lib/utils';
 
 function generateHeadingId(text: string): string {
@@ -12,10 +11,7 @@ function generateHeadingId(text: string): string {
     .replace(/(^-|-$)/g, '');
 }
 
-const md = new MarkdownIt({
-  html: false,
-  linkify: true,
-});
+const md = createBlogMarkdownIt('public');
 
 // Headings get stable IDs so in-content anchors work
 md.renderer.rules.heading_open = function (tokens, idx) {
@@ -61,7 +57,8 @@ export const markdownStyles = cn(
   '[&_code]:rounded [&_code]:bg-muted [&_code]:px-[0.4rem] [&_code]:py-[0.2rem] [&_code]:font-mono [&_code]:text-sm [&_code]:text-foreground',
   '[&_pre]:my-4 [&_pre]:overflow-x-auto [&_pre]:rounded-md [&_pre]:border [&_pre]:border-border [&_pre]:bg-muted [&_pre]:p-4 [&_pre_code]:bg-transparent [&_pre_code]:p-0',
   '[&_hr]:my-8 [&_hr]:border-border',
-  '[&_img]:my-4 [&_img]:rounded-md',
+  '[&_figure.blog-image]:my-6 [&_figure.blog-image_img]:h-auto [&_figure.blog-image_img]:w-full [&_figure.blog-image_img]:rounded-md',
+  '[&_figure.blog-image_figcaption]:mt-2 [&_figure.blog-image_figcaption]:text-center [&_figure.blog-image_figcaption]:text-sm [&_figure.blog-image_figcaption]:text-muted-foreground',
   '[&_table]:my-4 [&_table]:w-full [&_table]:border-collapse [&_th]:border [&_th]:border-border [&_th]:px-3 [&_th]:py-2 [&_th]:text-left [&_th]:font-semibold [&_td]:border [&_td]:border-border [&_td]:px-3 [&_td]:py-2'
 );
 

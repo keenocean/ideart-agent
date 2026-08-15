@@ -3,8 +3,13 @@ import { createFileRoute, redirect } from '@tanstack/react-router';
 
 import { useRouter } from '@/core/i18n/navigation';
 import { envConfigs } from '@/config';
+import {
+  getFixedLocalePage,
+  getFixedRouteAlternates,
+} from '@/config/seo/public-routes';
+import { buildSeoHead } from '@/lib/seo';
 import { m } from '@/paraglide/messages.js';
-import { getLocale, locales, localizeUrl } from '@/paraglide/runtime.js';
+import { getLocale } from '@/paraglide/runtime.js';
 import { Blog } from '@/blocks/blog';
 import { Footer } from '@/blocks/footer';
 import { Header } from '@/blocks/header';
@@ -64,29 +69,22 @@ export const Route = createFileRoute('/')({
   loader: async () => {
     const locale = getLocale();
     const posts = await getBlogPostsFn({ data: { locale, limit: 3 } });
-    return { locale, posts };
-  },
-  head: ({ loaderData }) => {
-    const locale = loaderData?.locale ?? 'en';
-    const urlFor = (loc: string) =>
-      localizeUrl(`${envConfigs.app_url}/`, { locale: loc as any }).href;
+    const page = getFixedLocalePage('home', locale);
+    if (!page) throw new Error(`Home is not registered for locale ${locale}`);
+    const description = m['landing.hero.subheadline']({}, { locale });
     return {
-      meta: [
-        {
-          name: 'description',
-          content: m['landing.hero.subheadline']({}, { locale: locale as any }),
-        },
-      ],
-      links: [
-        { rel: 'canonical', href: urlFor(locale) },
-        ...locales.map((loc) => ({
-          rel: 'alternate',
-          hrefLang: loc,
-          href: urlFor(loc),
-        })),
-        { rel: 'alternate', hrefLang: 'x-default', href: urlFor('en') },
-      ],
+      locale,
+      posts,
+      seo: {
+        kind: 'website' as const,
+        title: envConfigs.app_name,
+        description,
+        canonical: { locale, path: page.path },
+        alternates: getFixedRouteAlternates('home', locale),
+        indexing: page.indexing,
+      },
     };
   },
+  head: ({ loaderData }) => (loaderData ? buildSeoHead(loaderData.seo) : {}),
   component: HomePage,
 });

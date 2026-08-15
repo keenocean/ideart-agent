@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
 import { mediaTypeForAttachment, type PendingAttachment } from '@/lib/agent';
-import { buildAgentMessage, splitAttachedImages } from '@/lib/agent-chat';
+import {
+  buildAgentMessage,
+  initialTurnStorageKey,
+  parseInitialTurnHandoff,
+  serializeInitialTurnHandoff,
+  splitAttachedImages,
+} from '@/lib/agent-chat';
 
 function attachment(
   id: string,
@@ -25,6 +31,29 @@ describe('composer reference media', () => {
       'create or edit one still image'
     );
     expect(buildAgentMessage('', [image], 'video')).toContain('create a video');
+  });
+
+  it('preserves only uploaded media in the initial-turn handoff', () => {
+    const uploaded = attachment('ready.png', 'image');
+    const raw = serializeInitialTurnHandoff({
+      prompt: 'Create this',
+      skillName: 'storyboard',
+      attachments: [
+        uploaded,
+        {
+          ...attachment('pending.png', 'image'),
+          status: 'uploading',
+          url: undefined,
+        },
+      ],
+    });
+    expect(initialTurnStorageKey('s-123')).toBe('agent:initial-turn:s-123');
+    expect(parseInitialTurnHandoff(raw)).toMatchObject({
+      prompt: 'Create this',
+      skillName: 'storyboard',
+      attachments: [{ ...uploaded, preview: uploaded.url }],
+    });
+    expect(parseInitialTurnHandoff('{broken')).toBeNull();
   });
 
   it('keeps generic image material in order and hides its plumbing', () => {

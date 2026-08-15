@@ -1,8 +1,12 @@
 import { createFileRoute } from '@tanstack/react-router';
 
-import { envConfigs } from '@/config';
+import {
+  getFixedLocalePage,
+  getFixedRouteAlternates,
+} from '@/config/seo/public-routes';
+import { buildSeoHead } from '@/lib/seo';
 import { m } from '@/paraglide/messages.js';
-import { getLocale, locales, localizeUrl } from '@/paraglide/runtime.js';
+import { getLocale } from '@/paraglide/runtime.js';
 import { Footer } from '@/blocks/footer';
 import { Header } from '@/blocks/header';
 import { Pricing } from '@/blocks/pricing';
@@ -10,36 +14,30 @@ import { Pricing } from '@/blocks/pricing';
 export const Route = createFileRoute('/pricing')({
   loader: () => {
     const locale = getLocale();
+    const page = getFixedLocalePage('pricing', locale);
+    if (!page)
+      throw new Error(`Pricing is not registered for locale ${locale}`);
     return {
       locale,
       title: m['landing.pricing.title']({}, { locale }),
       description: m['landing.pricing.description']({}, { locale }),
+      path: page.path,
+      indexing: page.indexing,
+      alternates: getFixedRouteAlternates('pricing', locale),
     };
   },
   head: ({ loaderData }) => {
     if (!loaderData) return {};
-    const { title, description, locale } = loaderData;
-    const urlFor = (loc: string) =>
-      localizeUrl(`${envConfigs.app_url}/pricing`, { locale: loc as any }).href;
-    return {
-      meta: [
-        { title },
-        { name: 'description', content: description },
-        { property: 'og:title', content: title },
-        { property: 'og:description', content: description },
-        { property: 'og:url', content: urlFor(locale) },
-        { name: 'twitter:title', content: title },
-        { name: 'twitter:description', content: description },
-      ],
-      links: [
-        { rel: 'canonical', href: urlFor(locale) },
-        ...locales.map((loc) => ({
-          rel: 'alternate',
-          hrefLang: loc,
-          href: urlFor(loc),
-        })),
-      ],
-    };
+    const { title, description, locale, path, indexing, alternates } =
+      loaderData;
+    return buildSeoHead({
+      kind: 'website',
+      title,
+      description,
+      canonical: { locale, path },
+      alternates,
+      indexing,
+    });
   },
   component: PricingPage,
 });

@@ -1,9 +1,9 @@
 // Tiptap-based rich text editor for database posts.
 // Storage format stays markdown: value in → markdown-it → HTML for editing;
-// edits out → turndown → markdown. The public rendering chain
-// (MarkdownContent) is untouched.
+// edits out → turndown → markdown. Blog images use the same typed metadata
+// contract as the public Markdown renderer.
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Image as TiptapImage } from '@tiptap/extension-image';
 import { Placeholder } from '@tiptap/extension-placeholder';
 import { EditorContent, useEditor, type Editor } from '@tiptap/react';
@@ -18,7 +18,6 @@ import {
   Link as LinkIcon,
   List,
   ListOrdered,
-  Loader2,
   Minus,
   Quote,
   Redo,
@@ -27,15 +26,65 @@ import {
   Undo,
   Unlink,
 } from 'lucide-react';
-import MarkdownIt from 'markdown-it';
-import { toast } from 'sonner';
 import TurndownService from 'turndown';
 
+import {
+  createBlogMarkdownIt,
+  parseBlogImageRef,
+  serializeBlogImageMarkdown,
+  type BlogImageRef,
+} from '@/lib/blog-images';
 import { cn } from '@/lib/utils';
+import {
+  BlogImageDialog,
+  type BlogImageLabels,
+} from '@/components/blog-image-dialog';
 import { markdownStyles } from '@/components/markdown-content';
 import { Button } from '@/components/ui/button';
 
-const md = new MarkdownIt({ html: false, linkify: true });
+const md = createBlogMarkdownIt('editor');
+
+const BlogImage = TiptapImage.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      width: {
+        default: null,
+        parseHTML: (element) => Number(element.getAttribute('width')) || null,
+      },
+      height: {
+        default: null,
+        parseHTML: (element) => Number(element.getAttribute('height')) || null,
+      },
+      caption: {
+        default: null,
+        parseHTML: (element) => element.getAttribute('data-caption'),
+        renderHTML: (attributes) =>
+          attributes.caption ? { 'data-caption': attributes.caption } : {},
+      },
+      mimeType: {
+        default: null,
+        parseHTML: (element) => element.getAttribute('data-mime-type'),
+        renderHTML: (attributes) =>
+          attributes.mimeType ? { 'data-mime-type': attributes.mimeType } : {},
+      },
+      bytes: {
+        default: null,
+        parseHTML: (element) =>
+          Number(element.getAttribute('data-bytes')) || null,
+        renderHTML: (attributes) =>
+          attributes.bytes ? { 'data-bytes': attributes.bytes } : {},
+      },
+      blogImage: {
+        default: false,
+        parseHTML: (element) =>
+          element.getAttribute('data-blog-image') === 'true',
+        renderHTML: (attributes) =>
+          attributes.blogImage ? { 'data-blog-image': 'true' } : {},
+      },
+    };
+  },
+});
 
 const turndown = new TurndownService({
   headingStyle: 'atx',
@@ -47,8 +96,24 @@ turndown.addRule('strikethrough', {
   filter: ['del', 's'],
   replacement: (content) => `~~${content}~~`,
 });
-// keep empty paragraphs from collapsing list/paragraph spacing
-turndown.keep(['figure']);
+turndown.addRule('blogImage', {
+  filter: (node) =>
+    node.nodeName === 'IMG' &&
+    (node as HTMLElement).getAttribute('data-blog-image') === 'true',
+  replacement: (_content, node) => {
+    const element = node as HTMLElement;
+    const image = parseBlogImageRef({
+      url: element.getAttribute('src'),
+      alt: element.getAttribute('alt'),
+      caption: element.getAttribute('data-caption') || undefined,
+      width: Number(element.getAttribute('width')),
+      height: Number(element.getAttribute('height')),
+      mimeType: element.getAttribute('data-mime-type'),
+      bytes: Number(element.getAttribute('data-bytes')),
+    });
+    return image ? `\n\n${serializeBlogImageMarkdown(image)}\n\n` : '';
+  },
+});
 
 function mdToHtml(markdown: string): string {
   return markdown ? md.render(markdown) : '';
@@ -89,12 +154,12 @@ function ToolbarButton({
 
 function Toolbar({
   editor,
-  uploading,
   onPickImage,
+  imageLabel,
 }: {
   editor: Editor;
-  uploading: boolean;
   onPickImage: () => void;
+  imageLabel: string;
 }) {
   const chain = () => editor.chain().focus();
 
@@ -198,16 +263,8 @@ function Toolbar({
       >
         <Unlink className="size-4" />
       </ToolbarButton>
-      <ToolbarButton
-        label="Insert image"
-        disabled={uploading}
-        onClick={onPickImage}
-      >
-        {uploading ? (
-          <Loader2 className="size-4 animate-spin" />
-        ) : (
-          <ImageIcon className="size-4" />
-        )}
+      <ToolbarButton label={imageLabel} onClick={onPickImage}>
+        <ImageIcon className="size-4" />
       </ToolbarButton>
       <ToolbarButton
         label="Horizontal rule"
@@ -238,6 +295,8 @@ export function RichTextEditor({
   value,
   onChange,
   placeholder,
+  assetSlug,
+  imageLabels,
   className,
 }: {
   /** markdown in */
@@ -245,14 +304,16 @@ export function RichTextEditor({
   /** markdown out */
   onChange: (markdown: string) => void;
   placeholder?: string;
+  assetSlug: string;
+  imageLabels: BlogImageLabels;
   className?: string;
 }) {
   // Tracks the markdown this editor last emitted, so external value updates
   // (e.g. dialog reopened with another post) reset content without clobbering
   // in-progress edits on every keystroke round-trip.
   const lastEmitted = useRef(value);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const uploadingRef = useRef(false);
+  const [imageDialogOpen, setImageDialogOpen] = useState(false);
+  const [editingImage, setEditingImage] = useState<BlogImageRef>();
 
   const editor = useEditor({
     extensions: [
@@ -260,7 +321,7 @@ export function RichTextEditor({
         link: { openOnClick: false },
         heading: { levels: [1, 2, 3] },
       }),
-      TiptapImage,
+      BlogImage,
       Placeholder.configure({ placeholder: placeholder || '' }),
     ],
     content: mdToHtml(value),
@@ -286,29 +347,37 @@ export function RichTextEditor({
     editor.commands.setContent(mdToHtml(value));
   }, [editor, value]);
 
-  async function handleFiles(files: FileList | null) {
-    if (!editor || !files?.length || uploadingRef.current) return;
-    uploadingRef.current = true;
-    try {
-      const formData = new FormData();
-      formData.append('files', files[0]);
-      const res = await fetch('/api/storage/upload-image', {
-        method: 'POST',
-        body: formData,
-      });
-      const data = await res.json();
-      const url = data?.data?.urls?.[0];
-      if (data.code === 0 && url) {
-        editor.chain().focus().setImage({ src: url }).run();
-      } else {
-        toast.error(data.message || 'Upload failed');
-      }
-    } catch {
-      toast.error('Upload failed');
-    } finally {
-      uploadingRef.current = false;
-      if (fileInputRef.current) fileInputRef.current.value = '';
+  function openImageDialog() {
+    if (!editor) return;
+    const image = editor.isActive('image')
+      ? parseBlogImageRef(editor.getAttributes('image')) || undefined
+      : undefined;
+    setEditingImage(image);
+    setImageDialogOpen(true);
+  }
+
+  function saveImage(image: BlogImageRef) {
+    if (!editor) return;
+    const attributes = {
+      src: image.url,
+      alt: image.alt,
+      title: image.caption || null,
+      caption: image.caption || null,
+      width: image.width,
+      height: image.height,
+      mimeType: image.mimeType,
+      bytes: image.bytes,
+      blogImage: true,
+    };
+    if (editingImage) {
+      editor.chain().focus().updateAttributes('image', attributes).run();
+      return;
     }
+    editor
+      .chain()
+      .focus()
+      .insertContent({ type: 'image', attrs: attributes })
+      .run();
   }
 
   if (!editor) {
@@ -331,19 +400,22 @@ export function RichTextEditor({
     >
       <Toolbar
         editor={editor}
-        uploading={uploadingRef.current}
-        onPickImage={() => fileInputRef.current?.click()}
-      />
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={(e) => handleFiles(e.target.files)}
+        onPickImage={openImageDialog}
+        imageLabel={
+          editor.isActive('image') ? imageLabels.edit : imageLabels.add
+        }
       />
       <div className="max-h-[50vh] overflow-y-auto">
         <EditorContent editor={editor} />
       </div>
+      <BlogImageDialog
+        open={imageDialogOpen}
+        onOpenChange={setImageDialogOpen}
+        assetSlug={assetSlug}
+        value={editingImage}
+        onSave={saveImage}
+        labels={imageLabels}
+      />
     </div>
   );
 }
