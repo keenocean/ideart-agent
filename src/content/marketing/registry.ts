@@ -6,8 +6,11 @@ import {
   MAX_MARKETING_DIRECTORY_BYTES,
   MAX_MARKETING_MANIFEST_BYTES,
   MAX_MARKETING_PAGE_BYTES,
+  MAX_MARKETING_PROJECTION_BYTES,
+  parseHomeProjectionReleaseObject,
   parseToolDirectoryReleaseObject,
   parseToolPageReleaseObject,
+  type HomeProjectionReleaseObject,
   type MarketingContentManifest,
   type ToolDirectoryReleaseObject,
   type ToolPageReleaseObject,
@@ -65,6 +68,7 @@ function releaseBase(manifest: MarketingContentManifest) {
     sourceSha256: manifest.sourceSha256,
     pages: manifest.pages,
     directories: manifest.directories,
+    projections: manifest.projections,
   };
 }
 
@@ -108,6 +112,18 @@ export function marketingDirectoryObjectKey(
   return `${MARKETING_CONTENT_RELEASE_PREFIX}/${releaseId}/directories/${kind}/${locale}.json`;
 }
 
+export function marketingHomeProjectionObjectKey(
+  releaseId: string,
+  locale: AppLocale
+): string {
+  if (!RELEASE_ID_PATTERN.test(releaseId) || !LOCALE_PATTERN.test(locale)) {
+    throw new MarketingContentValidationError(
+      'Invalid marketing home projection identity'
+    );
+  }
+  return `${MARKETING_CONTENT_RELEASE_PREFIX}/${releaseId}/projections/home/${locale}.json`;
+}
+
 async function parseJson(text: string, label: string): Promise<unknown> {
   try {
     return JSON.parse(text) as unknown;
@@ -147,6 +163,10 @@ export function createMarketingContentRegistry(
   const directoryPromises = new Map<
     string,
     Promise<ToolDirectoryReleaseObject>
+  >();
+  const homeProjectionPromises = new Map<
+    string,
+    Promise<HomeProjectionReleaseObject>
   >();
 
   async function loadManifest(): Promise<MarketingContentManifest> {
@@ -309,7 +329,49 @@ export function createMarketingContentRegistry(
     return boundedRemember(directoryPromises, cacheKey, promise, 32);
   }
 
+  async function getHomeProjection(
+    locale: AppLocale
+  ): Promise<HomeProjectionReleaseObject | null> {
+    if (!LOCALE_PATTERN.test(locale)) return null;
+    const manifest = await loadManifest();
+    const entry = manifest.projections.find(
+      (projection) => projection.kind === 'home' && projection.locale === locale
+    );
+    if (!entry) return null;
+    const cacheKey = `home:${locale}`;
+    const cached = homeProjectionPromises.get(cacheKey);
+    if (cached) return cached;
+    const promise = (async () => {
+      const value = await verifiedObject(
+        marketingHomeProjectionObjectKey(releaseId, locale),
+        entry,
+        MAX_MARKETING_PROJECTION_BYTES,
+        `Marketing projection "${cacheKey}"`
+      );
+      let projection: HomeProjectionReleaseObject;
+      try {
+        projection = parseHomeProjectionReleaseObject(value);
+      } catch (error) {
+        throw new MarketingContentValidationError(
+          `Marketing projection "${cacheKey}" failed schema validation`,
+          { cause: error }
+        );
+      }
+      if (projection.kind !== 'home' || projection.locale !== locale) {
+        throw new MarketingContentValidationError(
+          `Marketing projection "${cacheKey}" identity mismatch`
+        );
+      }
+      return projection;
+    })().catch((error) => {
+      homeProjectionPromises.delete(cacheKey);
+      throw error;
+    });
+    return boundedRemember(homeProjectionPromises, cacheKey, promise, 16);
+  }
+
   return {
+    getHomeProjection,
     getToolPage,
     getToolDirectory,
     loadManifest,

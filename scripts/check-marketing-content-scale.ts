@@ -42,14 +42,21 @@ try {
   ) as { releaseId: string; manifestKey: string };
   const manifest = JSON.parse(
     await readFile(path.join(root, pointer.manifestKey), 'utf8')
-  ) as { pages: unknown[]; directories: unknown[] };
+  ) as {
+    pages: unknown[];
+    directories: unknown[];
+    projections: unknown[];
+  };
   if (manifest.pages.length !== fixtureCount) {
     throw new Error(
       `Expected ${fixtureCount} external page objects, found ${manifest.pages.length}`
     );
   }
   const jsonFiles = await countJsonFiles(root);
-  if (jsonFiles !== fixtureCount + manifest.directories.length + 2) {
+  if (
+    jsonFiles !==
+    fixtureCount + manifest.directories.length + manifest.projections.length + 2
+  ) {
     throw new Error(`Unexpected scale release file count: ${jsonFiles}`);
   }
   const indexBytes = (

@@ -9,3 +9,8 @@ export const marketingDirectoryKeys = [
   'tools:en',
   'tools:zh',
 ] as const;
+// prettier-ignore
+export const marketingHomeProjectionLocales = [
+  'en',
+  'zh',
+] as const;

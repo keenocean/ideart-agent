@@ -46,7 +46,15 @@ const EXAMPLE_ASPECT_RATIOS = [
  * first turn (prompt, model settings, uploaded images) to /chat/$sessionId
  * through sessionStorage.
  */
-export function PromptLauncher({ className }: { className?: string }) {
+export function PromptLauncher({
+  className,
+  showHeading = true,
+  showExamples = true,
+}: {
+  className?: string;
+  showHeading?: boolean;
+  showExamples?: boolean;
+}) {
   const { data: session } = useSession();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const entry = useGenerationEntry({
@@ -259,12 +267,14 @@ export function PromptLauncher({ className }: { className?: string }) {
 
   return (
     <div className={cn('w-full', className)}>
-      <h1 className="text-foreground mx-auto max-w-3xl text-center font-serif text-3xl font-normal tracking-[-0.01em] sm:text-4xl">
-        {m['landing.hero.headline_1']()}
-      </h1>
+      {showHeading && (
+        <h1 className="text-foreground mx-auto max-w-3xl text-center font-serif text-3xl font-normal tracking-[-0.01em] sm:text-4xl">
+          {m['landing.hero.headline_1']()}
+        </h1>
+      )}
 
       <GenerationWorkbench
-        className="mx-auto mt-10 max-w-3xl"
+        className={cn('mx-auto max-w-3xl', showHeading && 'mt-10')}
         textareaRef={textareaRef}
         value={value}
         onValueChange={setValue}
@@ -282,91 +292,97 @@ export function PromptLauncher({ className }: { className?: string }) {
         submitDisabled={(!value.trim() && !hasUploaded) || uploading}
       />
 
-      <section className="mx-auto mt-14 max-w-3xl">
-        <h2 className="text-foreground text-sm font-medium">
-          {m['landing.examples.recommended']()}
-        </h2>
-        <div className="mt-4 columns-2 gap-2 sm:columns-3 lg:columns-4">
-          {examples.map((example, index) => {
-            return (
-              <button
-                key={example.key}
-                type="button"
-                onClick={() => setPreviewIndex(index)}
-                title={example.prompt}
-                aria-label={example.title}
-                className="border-border bg-muted group focus-visible:ring-primary relative mb-2 block w-full break-inside-avoid overflow-hidden rounded-lg border text-left focus-visible:ring-2 focus-visible:outline-none focus-visible:ring-inset"
-                style={{
-                  aspectRatio:
-                    EXAMPLE_ASPECT_RATIOS[index % EXAMPLE_ASPECT_RATIOS.length],
-                }}
-              >
-                {example.video && (
-                  <ViewportVideo
-                    src={example.video}
-                    className="size-full object-cover transition-transform duration-500 group-hover:scale-[1.025]"
-                  />
-                )}
-                <span className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/5 opacity-20 transition-opacity group-hover:opacity-70" />
-                <span className="pointer-events-none absolute top-1/2 left-1/2 flex size-10 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/20 bg-black/40 text-white opacity-0 shadow-lg backdrop-blur-md transition group-hover:scale-105 group-hover:opacity-100 group-focus-visible:opacity-100">
-                  <Play className="ml-0.5 size-3.5 fill-current" />
-                </span>
-                <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 to-transparent px-3 pt-8 pb-3 text-xs font-medium text-white opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
-                  {example.title}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </section>
+      {showExamples && (
+        <section className="mx-auto mt-14 max-w-3xl">
+          <h2 className="text-foreground text-sm font-medium">
+            {m['landing.examples.recommended']()}
+          </h2>
+          <div className="mt-4 columns-2 gap-2 sm:columns-3 lg:columns-4">
+            {examples.map((example, index) => {
+              return (
+                <button
+                  key={example.key}
+                  type="button"
+                  onClick={() => setPreviewIndex(index)}
+                  title={example.prompt}
+                  aria-label={example.title}
+                  className="border-border bg-muted group focus-visible:ring-primary relative mb-2 block w-full break-inside-avoid overflow-hidden rounded-lg border text-left focus-visible:ring-2 focus-visible:outline-none focus-visible:ring-inset"
+                  style={{
+                    aspectRatio:
+                      EXAMPLE_ASPECT_RATIOS[
+                        index % EXAMPLE_ASPECT_RATIOS.length
+                      ],
+                  }}
+                >
+                  {example.video && (
+                    <ViewportVideo
+                      src={example.video}
+                      className="size-full object-cover transition-transform duration-500 group-hover:scale-[1.025]"
+                    />
+                  )}
+                  <span className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/5 opacity-20 transition-opacity group-hover:opacity-70" />
+                  <span className="pointer-events-none absolute top-1/2 left-1/2 flex size-10 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/20 bg-black/40 text-white opacity-0 shadow-lg backdrop-blur-md transition group-hover:scale-105 group-hover:opacity-100 group-focus-visible:opacity-100">
+                    <Play className="ml-0.5 size-3.5 fill-current" />
+                  </span>
+                  <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 to-transparent px-3 pt-8 pb-3 text-xs font-medium text-white opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
+                    {example.title}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
-      <VideoPreviewDialog
-        open={preview !== null}
-        item={
-          preview?.video
-            ? {
-                src: preview.video,
-                title: preview.title,
-                prompt: preview.prompt,
-              }
-            : null
-        }
-        index={previewIndex ?? -1}
-        total={examples.length}
-        labels={{
-          video: m['showcase.dialog.video'](),
-          prompt: m['showcase.dialog.prompt'](),
-          download: m['showcase.dialog.download'](),
-          previous: m['showcase.dialog.previous'](),
-          next: m['showcase.dialog.next'](),
-          close: m['showcase.dialog.close'](),
-        }}
-        downloadHref={preview?.video ?? '#'}
-        onClose={() => setPreviewIndex(null)}
-        onNavigate={navigatePreview}
-        actions={
-          preview ? (
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
-              <button
-                type="button"
-                onClick={usePreviewPrompt}
-                className="bg-primary text-primary-foreground focus-visible:ring-primary flex h-11 w-full items-center justify-center gap-2 rounded-xl px-4 text-sm font-medium transition-colors hover:opacity-90 focus-visible:ring-2 focus-visible:outline-none"
-              >
-                <WandSparkles className="size-4" />
-                {m['showcase.dialog.use_prompt']()}
-              </button>
-              <button
-                type="button"
-                onClick={usePreviewAsReference}
-                className="focus-visible:ring-primary flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-white/12 bg-white/5 px-4 text-sm font-medium text-white transition-colors hover:bg-white/10 focus-visible:ring-2 focus-visible:outline-none"
-              >
-                <FileVideo2 className="size-4" />
-                {m['showcase.dialog.use_reference']()}
-              </button>
-            </div>
-          ) : null
-        }
-      />
+      {showExamples && (
+        <VideoPreviewDialog
+          open={preview !== null}
+          item={
+            preview?.video
+              ? {
+                  src: preview.video,
+                  title: preview.title,
+                  prompt: preview.prompt,
+                }
+              : null
+          }
+          index={previewIndex ?? -1}
+          total={examples.length}
+          labels={{
+            video: m['showcase.dialog.video'](),
+            prompt: m['showcase.dialog.prompt'](),
+            download: m['showcase.dialog.download'](),
+            previous: m['showcase.dialog.previous'](),
+            next: m['showcase.dialog.next'](),
+            close: m['showcase.dialog.close'](),
+          }}
+          downloadHref={preview?.video ?? '#'}
+          onClose={() => setPreviewIndex(null)}
+          onNavigate={navigatePreview}
+          actions={
+            preview ? (
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
+                <button
+                  type="button"
+                  onClick={usePreviewPrompt}
+                  className="bg-primary text-primary-foreground focus-visible:ring-primary flex h-11 w-full items-center justify-center gap-2 rounded-xl px-4 text-sm font-medium transition-colors hover:opacity-90 focus-visible:ring-2 focus-visible:outline-none"
+                >
+                  <WandSparkles className="size-4" />
+                  {m['showcase.dialog.use_prompt']()}
+                </button>
+                <button
+                  type="button"
+                  onClick={usePreviewAsReference}
+                  className="focus-visible:ring-primary flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-white/12 bg-white/5 px-4 text-sm font-medium text-white transition-colors hover:bg-white/10 focus-visible:ring-2 focus-visible:outline-none"
+                >
+                  <FileVideo2 className="size-4" />
+                  {m['showcase.dialog.use_reference']()}
+                </button>
+              </div>
+            ) : null
+          }
+        />
+      )}
     </div>
   );
 }

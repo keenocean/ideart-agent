@@ -32,6 +32,7 @@ function normalizeExternalContentFailure(
   if (response.status !== 500) return response;
   const pathname = deLocalizeUrl(new URL(req.url)).pathname;
   const externalContentRoute =
+    pathname === '/' ||
     pathname === '/blog' ||
     pathname.startsWith('/blog/') ||
     pathname === '/tools' ||

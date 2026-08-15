@@ -1,8 +1,5 @@
-import { useLayoutEffect, useRef } from 'react';
-import { createFileRoute, redirect } from '@tanstack/react-router';
+import { createFileRoute } from '@tanstack/react-router';
 
-import { useRouter } from '@/core/i18n/navigation';
-import { envConfigs } from '@/config';
 import {
   getFixedLocalePage,
   getFixedRouteAlternates,
@@ -11,47 +8,39 @@ import { buildSeoHead } from '@/lib/seo';
 import { m } from '@/paraglide/messages.js';
 import { getLocale } from '@/paraglide/runtime.js';
 import { Blog } from '@/blocks/blog';
+import { FeaturedCatalog } from '@/blocks/featured-catalog';
 import { Footer } from '@/blocks/footer';
 import { Header } from '@/blocks/header';
-import { Hero } from '@/blocks/hero';
+import { HomeCTA } from '@/blocks/home-cta';
+import { HomeFAQ } from '@/blocks/home-faq';
+import { HomeFeatures } from '@/blocks/home-features';
+import { HomeGallery } from '@/blocks/home-gallery';
+import { HomeHero } from '@/blocks/home-hero';
+import { HowItWorks } from '@/blocks/how-it-works';
 import { SupportWidget } from '@/blocks/support-widget';
+import { UseCases } from '@/blocks/use-cases';
+import { getHomeProjectionFn } from '@/content/home/server';
 import { getBlogPostsFn } from '@/content/posts/server';
 
-/**
- * Signed-in? Decided from the session cookie alone — `useSession()` would
- * round-trip to /api/auth/get-session first, leaving the landing page on
- * screen for as long as that takes. A stale cookie just means /chat's own
- * guard sends them to sign-in instead.
- */
-function hasSessionCookie(): boolean {
-  if (typeof document === 'undefined') return false;
-  return document.cookie
-    .split(';')
-    .some((part) =>
-      part.trim().split('=')[0].endsWith('better-auth.session_token')
-    );
-}
-
 function HomePage() {
-  const router = useRouter();
-  const redirected = useRef(false);
-  const { posts } = Route.useLoaderData();
-
-  // Signed-in visitors get the app, not the pitch. Client-side (and at layout
-  // time, before paint) so the landing page still renders — and indexes — for
-  // everyone else.
-  useLayoutEffect(() => {
-    if (redirected.current || !hasSessionCookie()) return;
-    redirected.current = true;
-    router.push('/chat');
-  }, [router]);
+  const { home, posts } = Route.useLoaderData();
 
   return (
     <div className="bg-background text-foreground flex min-h-screen flex-col">
       <Header />
       <main className="flex flex-1 flex-col">
-        <Hero />
-        <Blog posts={posts} />
+        <HomeHero media={home.media.hero} />
+        <HomeFeatures />
+        <HomeGallery media={home.media.examples} />
+        <UseCases media={home.media.useCases} />
+        <HowItWorks />
+        <FeaturedCatalog
+          tools={home.featured.tools}
+          models={home.featured.models}
+        />
+        <HomeFAQ />
+        {posts.length > 0 && <Blog posts={posts} />}
+        <HomeCTA />
       </main>
       <Footer />
       <SupportWidget />
@@ -60,28 +49,58 @@ function HomePage() {
 }
 
 export const Route = createFileRoute('/')({
-  // Client-side navigations to "/" (the logo, a back button) never render the
-  // landing page at all. SSR has no document, so it falls through to the
-  // component's hydration-time check.
-  beforeLoad: () => {
-    if (hasSessionCookie()) throw redirect({ to: '/chat' });
-  },
   loader: async () => {
     const locale = getLocale();
-    const posts = await getBlogPostsFn({ data: { locale, limit: 3 } });
     const page = getFixedLocalePage('home', locale);
     if (!page) throw new Error(`Home is not registered for locale ${locale}`);
-    const description = m['landing.hero.subheadline']({}, { locale });
+    const [home, posts] = await Promise.all([
+      getHomeProjectionFn({ data: { locale } }),
+      getBlogPostsFn({ data: { locale, limit: 3 } }).catch(() => []),
+    ]);
+    const faq = [
+      {
+        question: m['landing.faq.q_1']({}, { locale }),
+        answer: m['landing.faq.a_1']({}, { locale }),
+      },
+      {
+        question: m['landing.faq.q_2']({}, { locale }),
+        answer: m['landing.faq.a_2']({}, { locale }),
+      },
+      {
+        question: m['landing.faq.q_3']({}, { locale }),
+        answer: m['landing.faq.a_3']({}, { locale }),
+      },
+      {
+        question: m['landing.faq.q_4']({}, { locale }),
+        answer: m['landing.faq.a_4']({}, { locale }),
+      },
+      {
+        question: m['landing.faq.q_5']({}, { locale }),
+        answer: m['landing.faq.a_5']({}, { locale }),
+      },
+      {
+        question: m['landing.faq.q_6']({}, { locale }),
+        answer: m['landing.faq.a_6']({}, { locale }),
+      },
+    ];
     return {
-      locale,
+      home,
       posts,
       seo: {
         kind: 'website' as const,
-        title: envConfigs.app_name,
-        description,
+        title: m['landing.seo.title']({}, { locale }),
+        description: m['landing.seo.description']({}, { locale }),
         canonical: { locale, path: page.path },
         alternates: getFixedRouteAlternates('home', locale),
         indexing: page.indexing,
+        image: {
+          src: home.media.og.url,
+          alt: home.media.og.alt,
+          width: home.media.og.width,
+          height: home.media.og.height,
+          type: home.media.og.mimeType,
+        },
+        faq,
       },
     };
   },

@@ -7,6 +7,7 @@ import {
   MarketingContentUnavailableError,
   MarketingContentValidationError,
   marketingDirectoryObjectKey,
+  marketingHomeProjectionObjectKey,
   marketingManifestKey,
   marketingPageObjectKey,
   type MarketingContentObjectStore,
@@ -31,6 +32,7 @@ async function releaseFixture(): Promise<Fixture> {
       'en'
     ),
     marketingDirectoryObjectKey(pointer.releaseId, 'tools', 'en'),
+    marketingHomeProjectionObjectKey(pointer.releaseId, 'en'),
   ];
   return {
     releaseId: pointer.releaseId,
@@ -77,6 +79,21 @@ describe('marketing content release registry', () => {
       locale: 'en',
       items: [{ entityId: 'ai-image-generator' }],
     });
+    const home = await registry.getHomeProjection('en');
+    expect(home).toMatchObject({
+      kind: 'home',
+      locale: 'en',
+      media: {
+        hero: { kind: 'video' },
+        og: { kind: 'image' },
+      },
+      featured: {
+        tools: [{ entityId: 'ai-image-generator' }],
+        models: [],
+      },
+    });
+    expect(home?.media.examples).toHaveLength(8);
+    expect(home?.media.useCases).toHaveLength(3);
     await expect(registry.getToolPage('unknown', 'en')).resolves.toBeNull();
   });
 
@@ -117,5 +134,20 @@ describe('marketing content release registry', () => {
     await expect(
       registry.getToolPage('ai-image-generator', 'en')
     ).rejects.toBeInstanceOf(MarketingContentValidationError);
+  });
+
+  it('treats a missing published homepage projection as temporary unavailability', async () => {
+    const fixture = await releaseFixture();
+    fixture.objects.delete(
+      marketingHomeProjectionObjectKey(fixture.releaseId, 'en')
+    );
+    const registry = createMarketingContentRegistry(
+      store(fixture.objects),
+      fixture.releaseId
+    );
+
+    await expect(registry.getHomeProjection('en')).rejects.toBeInstanceOf(
+      MarketingContentUnavailableError
+    );
   });
 });

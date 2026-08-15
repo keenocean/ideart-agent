@@ -57,7 +57,7 @@
 - React/TypeScript 类型检查。
 - 每个 section 的自由交互和响应式布局。
 - 清晰的 code splitting、SEO 和可访问性控制。
-- 对新项目可直接删除、重排或替换 blocks 的能力。
+- 对真正改变信息架构的项目可删除、重排或替换 blocks 的能力；标准换项目不要求修改页面代码。
 
 JSON 只负责内容与媒体元数据，不负责 React 布局或执行；重复卡片和页面实体由 Typed Catalog 驱动。
 
@@ -65,17 +65,18 @@ JSON 只负责内容与媒体元数据，不负责 React 布局或执行；重�
 
 “内容数据化”不等于“页面 JSON 化”。本次实施固定使用以下边界：
 
-| 内容/规则                                                                              | 权威位置                                             | 格式与加载方式                                                                                         |
-| -------------------------------------------------------------------------------------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| 页面 section 顺序、交互和特殊布局                                                      | `src/routes/*` + `src/blocks/*`                      | React/TypeScript 显式 composition                                                                      |
-| 导航、按钮、状态、短标题和短 metadata                                                  | `messages/<locale>.json`                             | flat JSON key，已知 key 静态调用                                                                       |
-| entityId、slug、publication、indexing、placement、related、工具 archetype/模型 variant | `src/config/catalog/*`                               | Typed TypeScript Catalog                                                                               |
-| 介绍、案例说明、Prompt 教程、限制、长 FAQ 等 SEO 正文                                  | `messages/marketing/<kind>/<entityId>/<locale>.json` | schema 校验的编辑源；构建为不可变内容 release，由服务端按实体与语言读取并参与 SSR                      |
-| 模型能力、参数、积分、Provider、权限和执行限制                                         | Runtime/服务端权威源                                 | 运行时派生并在服务端验证                                                                               |
-| 图片、视频、poster 和分享图                                                            | R2 + `messages/marketing/assets.json`                | 全局 assetId/稳定公网 URL 为构建期输入；逐语言 alt/caption 留在页面 JSON，发布时解析为页面局部 payload |
-| Blog 正文                                                                              | 数据库                                               | 按 `(slug, locale)` 精确读取                                                                           |
+| 内容/规则                                                                              | 权威位置                                             | 格式与加载方式                                                                                     |
+| -------------------------------------------------------------------------------------- | ---------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| 页面 section 顺序、交互和特殊布局                                                      | `src/routes/*` + `src/blocks/*`                      | React/TypeScript 显式 composition                                                                  |
+| 首页固定槽位的标题、正文、FAQ、Prompt、CTA、媒体 assetId 与逐语言 alt/caption          | `messages/<locale>.json`                             | ShipAny 风格的 flat `landing.*` key，已知 key 静态调用；标准换项目只改 JSON                        |
+| 导航、按钮、状态和其他短 UI/metadata                                                   | `messages/<locale>.json`                             | flat JSON key，已知 key 静态调用                                                                   |
+| entityId、slug、publication、indexing、placement、related、工具 archetype/模型 variant | `src/config/catalog/*`                               | Typed TypeScript Catalog                                                                           |
+| 介绍、案例说明、Prompt 教程、限制、长 FAQ 等 SEO 正文                                  | `messages/marketing/<kind>/<entityId>/<locale>.json` | schema 校验的编辑源；构建为不可变内容 release，由服务端按实体与语言读取并参与 SSR                  |
+| 模型能力、参数、积分、Provider、权限和执行限制                                         | Runtime/服务端权威源                                 | 运行时派生并在服务端验证                                                                           |
+| 图片、视频、poster 和分享图                                                            | 当前项目 R2 + `messages/marketing/assets.json`       | assetId/稳定公网 URL 为构建期输入；首页 alt/caption 在 `landing.*`，详情页 alt/caption 在页面 JSON |
+| Blog 正文                                                                              | 数据库                                               | 按 `(slug, locale)` 精确读取                                                                       |
 
-`messages/marketing/**` 是内容源，不是页面解释器。不得加入任意 `sections[]`、component name、React props、HTML、Base64 媒体或业务能力；JSON 只提供受 schema 约束的语义字段，最终 section 顺序仍由 React Route/Block 和工具 archetype/模型 variant 决定。`project.inlang` 只编译顶层 `messages/<locale>.json`，不得把 `messages/marketing/**` 纳入 Paraglide 输入或通过客户端 glob 导入。
+`messages/marketing/**` 是目录、工具、模型和媒体 inventory 的内容源，不是首页内容源，也不是页面解释器。不得加入任意 `sections[]`、component name、React props、HTML、Base64 媒体或业务能力；JSON 只提供受 schema 约束的语义字段，最终 section 顺序仍由 React Route/Block 和工具 archetype/模型 variant 决定。`project.inlang` 只编译顶层 `messages/<locale>.json`；首页 Block 静态读取 `landing.*`，不得把 `messages/marketing/**` 纳入 Paraglide 输入或通过客户端 glob 导入。
 
 ### 3.2 模板底盘与项目内容包分离
 
@@ -83,11 +84,10 @@ JSON 只负责内容与媒体元数据，不负责 React 布局或执行；重�
 
 ```text
 messages/
-├── en.json                         # Paraglide 短 UI/metadata
-├── zh.json
-└── marketing/                      # 仓库内可编辑内容源，不直接进入运行时 bundle
-    ├── assets.json                 # R2 assetId、绝对 URL、MIME、尺寸、字节数、poster
-    ├── home/{en,zh}.json
+├── en.json                         # Paraglide 短 UI/metadata + 完整英文 landing.* 首页内容/素材槽位
+├── zh.json                         # Paraglide 短 UI/metadata + 完整中文 landing.* 首页内容/素材槽位
+└── marketing/                      # 仓库内可编辑的规模化内容源，不直接进入运行时 bundle
+    ├── assets.json                 # 当前项目 R2 assetId、绝对 URL、MIME、尺寸、字节数、poster
     ├── directories/
     │   ├── tools/{en,zh}.json
     │   └── models/{en,zh}.json
@@ -140,7 +140,7 @@ scripts/
 └── check-marketing-content-scale.ts
 ```
 
-`src/blocks/` 中可执行的 React Blocks 保持扁平，不再增加重复的 `blocks/marketing/` 命名空间；序列化正文统一在 `messages/marketing/**` 编辑，但运行时只读取已发布 release，不直接 import 源 JSON。Catalog 同时驱动路由、目录、Related、Sitemap 与 llms 投影，因此使用 `config/catalog/`，避免把它误解为仅供营销文案使用。`components/catalog/` 只容纳工具/模型目录真正共享的纯展示组件；SectionHeading、Steps、FeatureGrid、FAQList、FinalCTA 等通用抽象必须在出现至少两个真实消费者后再提取，优先复用现有 blocks 和 UI primitives。
+`src/blocks/` 中可执行的 React Blocks 保持扁平，不再增加重复的 `blocks/marketing/` 命名空间。首页对齐 ShipAny TanStack：`src/routes/index.tsx` 显式组合稳定 Blocks，Blocks 静态读取顶层 `landing.*`；标准换项目只替换 `messages/<locale>.json`、本项目 `messages/marketing/assets.json` 和对应 R2 对象。只有新增交互或改变信息架构才修改 Route/Block/Component。工具、模型与目录的规模化正文在 `messages/marketing/**` 编辑，运行时只读取已发布 release，不直接 import 源 JSON。Catalog 同时驱动路由、目录、Related、Sitemap 与 llms 投影，因此使用 `config/catalog/`。`components/catalog/` 只容纳真正共享的纯展示组件；通用抽象必须在出现至少两个真实消费者后再提取。
 
 ### 3.3 Catalog 分离“发布”“逐语言收录”与“能力”
 
@@ -247,14 +247,14 @@ marketing-content/releases/<releaseId>/manifest.json
 marketing-content/releases/<releaseId>/pages/<kind>/<entityId>/<locale>.json
 marketing-content/releases/<releaseId>/directories/tools/<locale>.json
 marketing-content/releases/<releaseId>/directories/models/<locale>.json
-marketing-content/releases/<releaseId>/home/<locale>.json
+marketing-content/releases/<releaseId>/projections/home/<locale>.json
 ```
 
 `manifest.json` 只保存可用性、对象 key、content hash、schemaVersion、精确 locale 和 `contentModifiedAt` 等轻量投影，不包含凭据或全量正文。Worker 只携带轻量 Catalog 与固定的 release descriptor（releaseId、schemaVersion、store prefix），完整 manifest/projection 仍在外部内容层；Route loader 在服务端以 `kind + entityId + locale` 精确读取 release 对象，用 releaseId + object key 作为 Cache API/KV 缓存键，再把当前页面数据交给 SSR。客户端只收到当前 loader data，禁止 `import.meta.glob()`、静态 import 或客户端请求全站内容清单。
 
 默认以私有 R2 binding 中的 release objects 为内容事实源，Cache API 做边缘 read-through；KV 只可作为同 releaseId 的小型 manifest/projection 加速层，不能成为独立可变真相。公开页面媒体继续使用独立的 R2 CDN URL。内容对象不要求公开 URL，浏览器也不得绕过 SSR loader 直读它们。
 
-首页、目录、Related、Sitemap 与 llms 必须消费同一个 pinned release 投影，不能各自扫描源文件或读取“最新”指针。详情页先过 Catalog 门禁，再查 release manifest：unknown、hidden、未注册 locale 或 manifest 明确未发布返回真实 404；Catalog/manifest 证明应发布但对象存储读取失败、对象缺失或 hash/schema 校验失败，属于部署故障，返回 `503 Service Unavailable` 与 `Retry-After`，不得伪装成 404 或空的 200。Sitemap/llms 的内容后端失败也返回 503，避免发布不完整发现面。
+首页文案由 Paraglide `landing.*` 提供；首页的精选工具/模型卡片和经 `assetId` 解析的媒体只消费构建生成的 `projections/home/<locale>.json`。该投影不是仓库编辑的首页正文，不得引入 `messages/marketing/home`。首页、目录、Related、Sitemap 与 llms 的 Catalog 数据必须消费同一个 pinned release 投影，不能各自扫描源文件或读取“最新”指针。详情页先过 Catalog 门禁，再查 release manifest：unknown、hidden、未注册 locale 或 manifest 明确未发布返回真实 404；Catalog/manifest 证明应发布但对象存储读取失败、对象缺失或 hash/schema 校验失败，属于部署故障，返回 `503 Service Unavailable` 与 `Retry-After`，不得伪装成 404 或空的 200。
 
 发布顺序固定为：上传并在线验证 R2 媒体 → 校验全部内容源/Catalog/内链 → 构建 release 与发现投影 → 上传不可变内容对象 → 逐对象/hash 在线验证 → 部署固定该 `releaseId` 的 Worker → SSR/SEO/状态 smoke。旧 release 至少保留一个回滚窗口；回滚通过重新部署前一个 releaseId 完成，不移动对象、不在运行时追踪可变 latest。`releaseId` 是公开部署标识，不是秘密。
 
@@ -482,13 +482,17 @@ Catalog preset 不是安全边界。首轮 handoff 额外保存稳定的 `entryC
 index route loader
   → getLocale + fixed-route SEO state
   → selectHomeEntries(tool/model)
-  → 用 pinned release projection 过滤并加载当前语言首页/卡片摘要
+  → 用 pinned release home projection 过滤并加载当前语言卡片/媒体
   → 返回可序列化 loaderData
-  → Home* Blocks 组装 i18n/品牌内容
+  → Home* Blocks 静态读取 landing.* 并组装项目内容
   → durable Components 渲染
 ```
 
 `src/routes/index.tsx` 不实现卡片、FAQ 或 Gallery UI，也不手写工具/模型 slug；它只负责 loader/head 和显式 Block composition。首页精选卡片与目录/Related 共用 Catalog card primitive，但首页 Block 独立决定 section 节奏、精选数量和 `featured` 展示密度。`HomeHero` 与工具/模型详情 Hero 不合并；它只复用 `GenerationWorkbench`，并使用不会覆盖用户合法持久化设置的 home default policy。
+
+标准模板换项目的编辑面固定为两类 JSON 和对应对象：修改 `messages/<locale>.json` 的 `landing.*` 内容/首页 assetId 槽位，修改当前仓库 `messages/marketing/assets.json` 的媒体元数据，并上传新 R2 对象。Route、Blocks 和 Components 作为模板底盘保持不变；只有新增交互或改变首页信息架构时才改代码。首页 Block 不得直接 import 全量 `assets.json`；构建期只将 `landing.*` 引用的 assetId 解析为当前语言的小型 home projection。
+
+首页媒体槽位同样使用 flat key，例如 `landing.hero.media_asset_id`、`landing.examples.item_1.asset_id`、`landing.examples.item_1.alt` 与 `landing.seo.og_asset_id`。Block 对模板定义的有限槽位逐个静态调用 `m['...']()`，不得通过 `tDynamic()` 或运行时 key 拼接读取；空 assetId 可关闭可选槽位，非空引用必须在构建期解析到当前项目 `messages/marketing/assets.json`，并通过图片尺寸、视频 poster、OG 图和逐语言 alt 校验。
 
 首页不嵌入完整 PricingTable；继续保留 `/pricing` 独立页，并在 Header/CTA 中链接。原因是参考站首页主要围绕生成能力和 SEO 内容展开，完整价格表会打断主任务。
 
@@ -587,13 +591,13 @@ Background Remover 页面必须明确：
 
 ## 8. 文案与内容组织
 
-- 短 UI、导航、表单、状态、title/description 等新增为 `marketing.home.*`、`marketing.tools.*`、`marketing.models.*` flat keys 到中英文消息文件，保持全站 Paraglide 习惯与 key parity。
+- 首页使用 ShipAny 同源的 `landing.*`；工具/模型短 UI、导航、表单、状态和短 metadata 使用当前已有的 `tools.*`、`models.*` 等 flat keys，不新增一套 `marketing.home.*` 命名空间。
 - 已知固定文案使用静态 `m['key']()` 调用；公共营销 import graph 禁止调用 `tDynamic()` 或把 `m` cast 成动态 record。动态 slug 通过显式静态 resolver 映射，不能拼接 key。
-- 首页长正文、目录正文、工具/模型正文和媒体引用分别编辑在 `messages/marketing/home/`、`directories/`、`tools/`、`models/` 与 `assets.json`；所有 locale JSON 必须经过同一 schema、Catalog 和内链校验。
+- 首页完整文案、FAQ、Prompt、CTA、assetId 槽位和逐语言 alt/caption 编辑在顶层 `messages/<locale>.json` 的 `landing.*`；目录、工具/模型正文和全局媒体 inventory 分别编辑在 `messages/marketing/directories/`、`tools/`、`models/` 与当前项目 `assets.json`。
 - `messages/marketing/**` 不属于 Paraglide message input，也不被路由代码 import。发布脚本将其编译为 pinned immutable content release；缺少当前 locale release entry 时返回 404，绝不 fallback 到 baseLocale 伪装成译文。
 - 内容 JSON 只提供受约束、可序列化的语义字段；它不是任意 JSON renderer，不能声明 React component、section 顺序、执行策略、Provider 或计费。
 - Catalog 只保存 id/逐语言 slug/状态/关联/素材/能力引用，不保存双语长文案。
-- 每个新项目替换 blocks、Catalog、顶层 messages、`messages/marketing/**` 与 R2 assets；通用 components/routes、schema 与 release loader 保留。
+- 标准换项目保留首页 Route/Blocks/Components，只替换顶层 `landing.*` JSON、当前项目 `messages/marketing/assets.json` 和 R2 对象即可重建首页；工具/模型页另按实际能力替换 Catalog 与规模化内容 JSON。
 
 ## 9. 导航、SEO 与发现性
 
@@ -855,6 +859,7 @@ Google 当前指导同样要求优先修复站点自己链接或提交的 404，
 1. 重写或补充现有扁平首页 blocks，接入已经验证的 locale-aware Catalog selectors、真实案例和 i18n；`src/routes/index.tsx` 只保留 loader/head 与 block composition。
 2. 移除登录用户访问首页时的自动 redirect，保留安全的生成 handoff；校验首页 CTA、Header/Footer 预备链接都来自 route resolver。
 3. 首页使用的现有示例素材先上传到 R2 并验证公网 URL，再替换引用；首屏只加载必要的 R2 图片/poster，below-fold 媒体 lazy load，重交互 Workbench 保持独立动态边界，检查 SSR 核心正文和内链仍存在。
+4. 首次重组完成后冻结标准首页的 Route/Blocks/Components 契约；模板派生项目通过 `landing.*`、当前仓库 `messages/marketing/assets.json` 和 R2 对象换内容与素材，不复制或修改 `shipany-tanstack` 仓库中的资产，也不为常规换品牌重写首页代码。
 
 ### 阶段 6：逐页扩展工具与模型
 

@@ -11,6 +11,7 @@ export const MARKETING_CONTENT_RELEASE_PREFIX = 'marketing-content/releases';
 export const MAX_MARKETING_MANIFEST_BYTES = 2 * 1024 * 1024;
 export const MAX_MARKETING_PAGE_BYTES = 2 * 1024 * 1024;
 export const MAX_MARKETING_DIRECTORY_BYTES = 512 * 1024;
+export const MAX_MARKETING_PROJECTION_BYTES = 512 * 1024;
 
 const nonEmpty = z.string().trim().min(1);
 const localeSchema = z.string().regex(/^[a-z]{2}(?:-[A-Z]{2})?$/);
@@ -19,13 +20,19 @@ const routeSegmentSchema = z
   .regex(/^[a-z0-9](?:[a-z0-9-]{0,126}[a-z0-9])?$/);
 const sha256Schema = z.string().regex(/^[a-f0-9]{64}$/);
 const positiveInteger = z.number().int().positive();
+const imageMimeTypeSchema = z.custom<`image/${string}`>(
+  (value) => typeof value === 'string' && /^image\/[a-z0-9.+-]+$/i.test(value)
+);
+const videoMimeTypeSchema = z.custom<`video/${string}`>(
+  (value) => typeof value === 'string' && /^video\/[a-z0-9.+-]+$/i.test(value)
+);
 
 const imageAssetSchema = z
   .object({
     id: routeSegmentSchema,
     kind: z.literal('image'),
     url: z.string().url(),
-    mimeType: z.string().regex(/^image\/[a-z0-9.+-]+$/i),
+    mimeType: imageMimeTypeSchema,
     width: positiveInteger,
     height: positiveInteger,
     bytes: positiveInteger,
@@ -37,7 +44,7 @@ const videoAssetSourceSchema = z
     id: routeSegmentSchema,
     kind: z.literal('video'),
     url: z.string().url(),
-    mimeType: z.string().regex(/^video\/[a-z0-9.+-]+$/i),
+    mimeType: videoMimeTypeSchema,
     width: positiveInteger,
     height: positiveInteger,
     bytes: positiveInteger,
@@ -50,7 +57,7 @@ const videoAssetSchema = z
     id: routeSegmentSchema,
     kind: z.literal('video'),
     url: z.string().url(),
-    mimeType: z.string().regex(/^video\/[a-z0-9.+-]+$/i),
+    mimeType: videoMimeTypeSchema,
     width: positiveInteger,
     height: positiveInteger,
     bytes: positiveInteger,
@@ -299,6 +306,50 @@ export const toolDirectoryReleaseObjectSchema = z
   })
   .strict();
 
+const homeToolCardSchema = z
+  .object({
+    id: routeSegmentSchema,
+    entityId: routeSegmentSchema,
+    href: z.string().startsWith('/'),
+    title: nonEmpty,
+    description: nonEmpty,
+    media: z.tuple([resolvedMediaSchema, resolvedMediaSchema]),
+  })
+  .strict();
+
+const homeModelCardSchema = z
+  .object({
+    id: routeSegmentSchema,
+    entityId: routeSegmentSchema,
+    href: z.string().startsWith('/'),
+    title: nonEmpty,
+    description: nonEmpty,
+    media: resolvedMediaSchema,
+  })
+  .strict();
+
+export const homeProjectionReleaseObjectSchema = z
+  .object({
+    schemaVersion: z.literal(MARKETING_CONTENT_SCHEMA_VERSION),
+    kind: z.literal('home'),
+    locale: localeSchema,
+    media: z
+      .object({
+        hero: resolvedMediaSchema,
+        og: imageAssetSchema.extend({ alt: nonEmpty }).strict(),
+        examples: z.array(resolvedMediaSchema).length(8),
+        useCases: z.array(resolvedMediaSchema).length(3),
+      })
+      .strict(),
+    featured: z
+      .object({
+        tools: z.array(homeToolCardSchema),
+        models: z.array(homeModelCardSchema),
+      })
+      .strict(),
+  })
+  .strict();
+
 const manifestObjectFields = {
   bytes: positiveInteger,
   sha256: sha256Schema,
@@ -330,6 +381,15 @@ export const marketingContentManifestSchema = z
         })
         .strict()
     ),
+    projections: z.array(
+      z
+        .object({
+          kind: z.literal('home'),
+          locale: localeSchema,
+          ...manifestObjectFields,
+        })
+        .strict()
+    ),
   })
   .strict();
 
@@ -355,6 +415,9 @@ export type ToolDirectoryReleaseObject = {
   hero: { title: string; description: string };
   items: ToolDirectoryItem[];
 };
+export type HomeProjectionReleaseObject = z.infer<
+  typeof homeProjectionReleaseObjectSchema
+>;
 export type MarketingContentManifest = z.infer<
   typeof marketingContentManifestSchema
 >;
@@ -379,4 +442,12 @@ export function parseToolDirectoryReleaseObject(
   return toolDirectoryReleaseObjectSchema.parse(
     value
   ) as ToolDirectoryReleaseObject;
+}
+
+export function parseHomeProjectionReleaseObject(
+  value: unknown
+): HomeProjectionReleaseObject {
+  return homeProjectionReleaseObjectSchema.parse(
+    value
+  ) as HomeProjectionReleaseObject;
 }

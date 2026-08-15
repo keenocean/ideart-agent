@@ -13,11 +13,13 @@ import path from 'node:path';
 
 import { catalog } from '@/config/catalog/registry';
 import { resolveCatalogRoute } from '@/config/catalog/resolver';
+import { selectHomeEntries } from '@/config/catalog/selectors';
 import { toolCatalog } from '@/config/catalog/tools';
 import type { MarketingAsset, ToolDefinition } from '@/config/catalog/types';
 import type { AppLocale } from '@/config/locale';
 import {
   directorySourceFileSchema,
+  homeProjectionReleaseObjectSchema,
   MARKETING_CONTENT_RELEASE_PREFIX,
   MARKETING_CONTENT_SCHEMA_VERSION,
   marketingAssetsSourceSchema,
@@ -26,6 +28,7 @@ import {
   toolDirectoryReleaseObjectSchema,
   toolPageContentSchema,
   toolPageReleaseObjectSchema,
+  type HomeProjectionReleaseObject,
   type MarketingAssetsSource,
   type MarketingContentManifest,
   type ToolDirectoryReleaseObject,
@@ -263,6 +266,152 @@ function resolveToolContent(
   return toolPageContentSchema.parse(resolved) as ToolPageContent;
 }
 
+type LandingMessages = Record<string, unknown>;
+type ResolvedHomeMedia = MarketingAsset & { alt: string };
+
+function landingMessage(
+  messages: LandingMessages,
+  key: string,
+  locale: string
+): string {
+  const value = messages[key];
+  if (typeof value !== 'string' || !value.trim()) {
+    throw new Error(`Homepage message is missing: ${locale}:${key}`);
+  }
+  return value.trim();
+}
+
+function resolveHomeMedia(
+  messages: LandingMessages,
+  locale: string,
+  assetKey: string,
+  altKey: string,
+  assets: ReadonlyMap<string, MarketingAsset>
+): ResolvedHomeMedia {
+  const assetId = landingMessage(messages, assetKey, locale);
+  const asset = assets.get(assetId);
+  if (!asset) {
+    throw new Error(
+      `Unknown homepage asset ${assetId} in ${locale}:${assetKey}`
+    );
+  }
+  return {
+    ...asset,
+    alt: landingMessage(messages, altKey, locale),
+  };
+}
+
+function homeCardMedia(
+  content: ToolPageContent
+): readonly [ToolMediaReference, ToolMediaReference] {
+  const workflow = content.showcase.workflows.items[0];
+  if (workflow) return workflow.media;
+  if ('examples' in content && content.examples.items.length >= 2) {
+    return [content.examples.items[0]!.media, content.examples.items[1]!.media];
+  }
+  if ('comparisons' in content && content.comparisons.items[0]) {
+    const comparison = content.comparisons.items[0];
+    return [comparison.source, comparison.result];
+  }
+  throw new Error(
+    `Featured homepage tool needs two media assets: ${content.entityId}:${content.locale}`
+  );
+}
+
+async function buildHomeProjections(
+  locales: ReadonlySet<string>,
+  assets: ReadonlyMap<string, MarketingAsset>,
+  pages: readonly ToolPageReleaseObject[]
+): Promise<HomeProjectionReleaseObject[]> {
+  const pageByKey = new Map(
+    pages.map((page) => [`${page.entityId}:${page.locale}`, page] as const)
+  );
+  const projections: HomeProjectionReleaseObject[] = [];
+  for (const localeValue of [...locales].sort()) {
+    const locale = localeValue as AppLocale;
+    const messages = (await readJson(
+      path.join('messages', `${locale}.json`)
+    )) as LandingMessages;
+    const media = {
+      hero: resolveHomeMedia(
+        messages,
+        locale,
+        'landing.hero.media_asset_id',
+        'landing.hero.media_alt',
+        assets
+      ),
+      og: resolveHomeMedia(
+        messages,
+        locale,
+        'landing.seo.og_asset_id',
+        'landing.seo.og_alt',
+        assets
+      ),
+      examples: Array.from({ length: 8 }, (_, index) =>
+        resolveHomeMedia(
+          messages,
+          locale,
+          `landing.gallery.item_${index + 1}_asset_id`,
+          `landing.gallery.item_${index + 1}_alt`,
+          assets
+        )
+      ),
+      useCases: Array.from({ length: 3 }, (_, index) =>
+        resolveHomeMedia(
+          messages,
+          locale,
+          `landing.use_cases.item_${index + 1}.asset_id`,
+          `landing.use_cases.item_${index + 1}.alt`,
+          assets
+        )
+      ),
+    };
+    if (media.og.kind !== 'image') {
+      throw new Error(`Homepage OG asset must be an image: ${locale}`);
+    }
+
+    const featuredTools = selectHomeEntries(
+      toolCatalog,
+      locale,
+      (definition, targetLocale) =>
+        pageByKey.has(`${definition.entityId}:${targetLocale}`)
+    ).flatMap((definition) => {
+      if (definition.kind !== 'tool' || definition.publication !== 'listed') {
+        return [];
+      }
+      const page = pageByKey.get(`${definition.entityId}:${locale}`);
+      const localePage = definition.localePages[locale];
+      if (!page || !localePage) return [];
+      return [
+        {
+          id: definition.entityId,
+          entityId: definition.entityId,
+          href: resolveCatalogRoute('tool', locale, localePage.slug).path,
+          title: page.content.directory.title,
+          description: page.content.directory.description,
+          media: homeCardMedia(page.content),
+        },
+      ];
+    });
+
+    projections.push(
+      homeProjectionReleaseObjectSchema.parse({
+        schemaVersion: MARKETING_CONTENT_SCHEMA_VERSION,
+        kind: 'home',
+        locale,
+        media,
+        featured: {
+          tools: featuredTools,
+          // Model release resolvers fail closed today, so the homepage must not
+          // manufacture links to model pages that are not yet published.
+          models: [],
+        },
+      }) as HomeProjectionReleaseObject
+    );
+  }
+  return projections;
+}
+
 function listedTool(entityId: string, locale: string): ToolDefinition {
   const definition = toolCatalog.find((entry) => entry.entityId === entityId);
   if (
@@ -474,19 +623,30 @@ function directoryObjectKey(
   return `${MARKETING_CONTENT_RELEASE_PREFIX}/${releaseId}/directories/${directory.kind}/${directory.locale}.json`;
 }
 
+function homeProjectionObjectKey(
+  releaseId: string,
+  projection: HomeProjectionReleaseObject
+): string {
+  return `${MARKETING_CONTENT_RELEASE_PREFIX}/${releaseId}/projections/home/${projection.locale}.json`;
+}
+
 function manifestKey(releaseId: string): string {
   return `${MARKETING_CONTENT_RELEASE_PREFIX}/${releaseId}/manifest.json`;
 }
 
 function indexText(
   pages: readonly ToolPageReleaseObject[],
-  directories: readonly ToolDirectoryReleaseObject[]
+  directories: readonly ToolDirectoryReleaseObject[],
+  homeProjections: readonly HomeProjectionReleaseObject[]
 ): string {
   const pageKeys = pages
     .map((page) => `${page.kind}:${page.entityId}:${page.locale}`)
     .sort();
   const directoryKeys = directories
     .map((directory) => `${directory.kind}:${directory.locale}`)
+    .sort();
+  const homeProjectionLocales = homeProjections
+    .map((projection) => projection.locale)
     .sort();
   const literal = (values: readonly string[]) =>
     values.length === 0
@@ -497,11 +657,16 @@ function indexText(
     `// prettier-ignore\n` +
     `export const marketingPageKeys = ${literal(pageKeys)} as const;\n` +
     `// prettier-ignore\n` +
-    `export const marketingDirectoryKeys = ${literal(directoryKeys)} as const;\n`
+    `export const marketingDirectoryKeys = ${literal(directoryKeys)} as const;\n` +
+    `// prettier-ignore\n` +
+    `export const marketingHomeProjectionLocales = ${literal(homeProjectionLocales)} as const;\n`
   );
 }
 
-async function sourceDigest(sourceRoot: string): Promise<string> {
+async function sourceDigest(
+  sourceRoot: string,
+  homeProjections: readonly HomeProjectionReleaseObject[]
+): Promise<string> {
   const files: string[] = [];
   async function walk(directory: string) {
     for (const entry of await readdir(directory, { withFileTypes: true })) {
@@ -517,6 +682,12 @@ async function sourceDigest(sourceRoot: string): Promise<string> {
     hash.update(path.relative(sourceRoot, file).split(path.sep).join('/'));
     hash.update('\0');
     hash.update(await readFile(file));
+    hash.update('\0');
+  }
+  for (const projection of homeProjections) {
+    hash.update(`projections/home/${projection.locale}.json`);
+    hash.update('\0');
+    hash.update(jsonText(projection));
     hash.update('\0');
   }
   return hash.digest('hex');
@@ -547,6 +718,11 @@ async function buildRelease(options: Options) {
   const assets = resolveAssets(assetSource);
   const realPages = await discoverToolPages(sourceRoot, locales, assets);
   const directories = await buildDirectories(sourceRoot, realPages);
+  const homeProjections = await buildHomeProjections(
+    locales,
+    assets,
+    realPages
+  );
   const pages = withScaleFixtures(realPages, options.fixtures);
 
   const pageTexts = pages.map((page) => ({ page, text: jsonText(page) }));
@@ -554,9 +730,13 @@ async function buildRelease(options: Options) {
     directory,
     text: jsonText(directory),
   }));
+  const homeProjectionTexts = homeProjections.map((projection) => ({
+    projection,
+    text: jsonText(projection),
+  }));
   const manifestBase = {
     schemaVersion: MARKETING_CONTENT_SCHEMA_VERSION,
-    sourceSha256: await sourceDigest(sourceRoot),
+    sourceSha256: await sourceDigest(sourceRoot, homeProjections),
     pages: pageTexts.map(({ page, text }) => ({
       kind: page.kind,
       entityId: page.entityId,
@@ -569,6 +749,12 @@ async function buildRelease(options: Options) {
       kind: directory.kind,
       locale: directory.locale,
       itemCount: directory.items.length,
+      bytes: bytes(text),
+      sha256: sha256(text),
+    })),
+    projections: homeProjectionTexts.map(({ projection, text }) => ({
+      kind: projection.kind,
+      locale: projection.locale,
       bytes: bytes(text),
       sha256: sha256(text),
     })),
@@ -598,10 +784,18 @@ async function buildRelease(options: Options) {
     await writeFile(file, text, 'utf8');
     files.push({ key, file, sha256: sha256(text) });
   }
+  for (const { projection, text } of homeProjectionTexts) {
+    const key = homeProjectionObjectKey(releaseId, projection);
+    const file = path.join(outputRoot, key);
+    await mkdir(path.dirname(file), { recursive: true });
+    await writeFile(file, text, 'utf8');
+    files.push({ key, file, sha256: sha256(text) });
+  }
   const manifestText = jsonText(manifest);
   const totalBytes =
     pageTexts.reduce((total, item) => total + bytes(item.text), 0) +
     directoryTexts.reduce((total, item) => total + bytes(item.text), 0) +
+    homeProjectionTexts.reduce((total, item) => total + bytes(item.text), 0) +
     bytes(manifestText);
   const rollbackReleaseId =
     currentReleaseId && currentReleaseId !== releaseId
@@ -628,7 +822,7 @@ async function buildRelease(options: Options) {
     'utf8'
   );
 
-  const generatedIndex = indexText(realPages, directories);
+  const generatedIndex = indexText(realPages, directories, homeProjections);
   const indexFile = path.resolve(options.indexFile);
   if (options.syncIndex) {
     await mkdir(path.dirname(indexFile), { recursive: true });
@@ -651,6 +845,7 @@ async function buildRelease(options: Options) {
     outputRoot,
     pageCount: pages.length,
     directoryCount: directories.length,
+    projectionCount: homeProjections.length,
     totalBytes,
     previousReleaseId: rollbackReleaseId,
     files,
@@ -748,7 +943,7 @@ async function main(): Promise<void> {
   const options = parseArgs(process.argv.slice(2));
   const release = await buildRelease(options);
   console.log(
-    `Built ${release.pageCount} marketing pages and ${release.directoryCount} directories (${release.totalBytes} bytes) as release ${release.releaseId}`
+    `Built ${release.pageCount} marketing pages, ${release.directoryCount} directories, and ${release.projectionCount} projections (${release.totalBytes} bytes) as release ${release.releaseId}`
   );
   if (release.previousReleaseId) {
     console.log(`Rollback release: ${release.previousReleaseId}`);

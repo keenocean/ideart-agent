@@ -1,6 +1,6 @@
 # Marketing pages SEO map
 
-Reviewed on 2026-08-15. This is the durable page/locale decision record; runtime
+Reviewed on 2026-08-16. This is the durable page/locale decision record; runtime
 Catalog and server validation remain authoritative for product capability.
 
 Phase 3 opens one routable tool slice: `/tools` and
@@ -42,6 +42,46 @@ these results.
 Current fixed pages remain explicitly registered per locale: `/`, `/pricing`,
 `/privacy-policy`, and `/terms-of-service` are `index` for en and zh. Blog is
 database-driven and follows its separate explicit published-locale contract.
+
+## home · en
+
+- Route: `/`
+- Entity: `fixed:home`; locale: `en`; indexing decision: `index`
+- Primary intent: start a unified AI image or video creation task from text or reference media
+- Query cluster: `AI image and video creation agent`, `AI content creation`, adjacent `AI image generator` and `AI video generator`
+- User stage: discover and create
+- Canonical path: `/`; alternate: `/zh`
+- Cannibalization boundary: the homepage owns the cross-format agent workflow; focused tool pages own task-specific execution guidance, while model pages own named-model evaluation
+- Required visible evidence: executable prompt composer, real R2 image/video examples, three use cases, four workflow steps, content-backed featured tools, six visible FAQs, and a final creation CTA
+- Claim sources: Agent generation entry, attachment policy, image/video runtime modes, conversation output persistence, Catalog plus the exact-locale pinned homepage projection
+- Inbound links: site logo, fixed canonical/hreflang, sitemap
+- Outbound links: `/tools`, `/tools/ai-image-generator`, `/chat`, `/pricing`, and available Blog details; unpublished tools/models are omitted
+- OG asset: `tools-ai-image-generator-f2570c70c73667db` (`1815×867`, immutable R2 image); replace with a dedicated `1200×630` sharing asset before the next visual optimization pass
+- Structured data: `WebSite` identity plus `FAQPage` from the same six visible questions
+- Actual content updated at: 2026-08-16; reviewed at: 2026-08-16
+- Repository checks: passed 53 test files/317 tests, TypeScript, formatting, production build, exact 100-page external-content scale gate, route-bundle report, online verification of all 27 R2 assets, and the Cloudflare dry-run/budget gate on 2026-08-16
+- External verification: local production SSR returned 200 for `/`, the expected English H1, canonical/locale alternates, visible FAQ JSON-LD, R2-only marketing media, a valid `/tools` link, and no unpublished model link; production deployment smoke remains pending
+- Notes/risks: homepage copy is static `landing.*`; resolved media and featured Catalog cards come from the pinned home projection, so a declared but unreadable projection fails as `503` instead of rendering stale or partial content
+
+## home · zh
+
+- Route: `/zh`
+- Entity: `fixed:home`; locale: `zh`; indexing decision: `index`
+- Primary intent: 从文字或参考素材开始，在同一 Agent 对话中创作 AI 图片和视频
+- Query cluster: `AI 图片与视频创作 Agent`、`AI 内容创作`，邻近`AI 图片生成器`和`AI 视频生成器`
+- User stage: 发现与创作
+- Canonical path: `/zh`; alternate: `/`
+- Cannibalization boundary: 首页承担跨图片/视频的统一 Agent 工作流；具体工具页承担任务说明，模型页承担具名模型评估
+- Required visible evidence: 可执行输入框、真实 R2 图片/视频案例、三组使用场景、四步工作流、内容已发布的精选工具、六个可见 FAQ 和最终创作 CTA
+- Claim sources: Agent 生成入口、附件策略、图片/视频运行模式、对话结果留存、Catalog 与精确中文 pinned 首页投影
+- Inbound links: 站点 Logo、固定 canonical/hreflang、sitemap
+- Outbound links: 中文 `/tools`、`/tools/ai-image-generator`、`/chat`、`/pricing` 和已发布 Blog；未发布工具/模型不显示
+- OG asset: `tools-ai-image-generator-f2570c70c73667db`（`1815×867`，不可变 R2 图片）；下次视觉优化前替换为专用 `1200×630` 分享图
+- Structured data: `WebSite` identity 与页面同源的六问 `FAQPage`
+- Actual content updated at: 2026-08-16; reviewed at: 2026-08-16
+- Repository checks: 2026-08-16 已通过 53 个测试文件/317 项测试、TypeScript、格式、生产构建、精确 100 页面外置内容规模门禁、route bundle、全部 27 个 R2 资源在线验证，以及 Cloudflare dry-run/预算门禁
+- External verification: 本地 production SSR 的 `/zh` 返回 200，包含正确中文 H1、canonical/语言 alternates、可见 FAQ JSON-LD、只使用 R2 的营销媒体、有效 `/tools` 内链且没有未发布模型链接；生产部署 smoke 仍待执行
+- Notes/risks: 首页正文由静态 `landing.*` 提供；解析后的媒体和精选 Catalog 卡片来自 pinned home projection。声明应存在但读取失败时返回 `503`，不渲染陈旧或残缺页面
 
 ### 100+ page content-release decision
 

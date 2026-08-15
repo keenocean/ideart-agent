@@ -3,11 +3,13 @@ import type { AppLocale } from '@/config/locale';
 
 import {
   marketingDirectoryKeys,
+  marketingHomeProjectionLocales,
   marketingPageKeys,
 } from './release-index.generated';
 
 const pageKeySet = new Set<string>(marketingPageKeys);
 const directoryKeySet = new Set<string>(marketingDirectoryKeys);
+const homeProjectionLocaleSet = new Set<string>(marketingHomeProjectionLocales);
 
 export function marketingPageKey(
   kind: CatalogKind,
@@ -32,6 +34,12 @@ export function hasMarketingDirectory(
   return directoryKeySet.has(`${kind}:${locale}`);
 }
 
+export function hasMarketingHomeProjection(locale: AppLocale): boolean {
+  return homeProjectionLocaleSet.has(locale);
+}
+
 export const marketingContentPageKeys: readonly string[] = marketingPageKeys;
 export const marketingContentDirectoryKeys: readonly string[] =
   marketingDirectoryKeys;
+export const marketingContentHomeProjectionLocales: readonly string[] =
+  marketingHomeProjectionLocales;

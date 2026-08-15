@@ -13,6 +13,7 @@ export function Footer() {
       title: m['landing.footer.features'](),
       links: [
         { label: m['landing.nav.create'](), href: '/chat' },
+        { label: m['landing.nav.tools'](), href: '/tools' },
         { label: m['landing.footer.gallery'](), href: '/library' },
       ],
     },
