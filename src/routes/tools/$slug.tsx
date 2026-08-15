@@ -7,24 +7,19 @@ import { getLocale } from '@/paraglide/runtime.js';
 import { Footer } from '@/blocks/footer';
 import { Header } from '@/blocks/header';
 import { ToolDetail } from '@/blocks/tool-detail';
-import { MarketingContentUnavailableError } from '@/content/marketing/registry';
 import {
-  loadToolDetailPage,
-  loadToolDirectoryPage,
-} from '@/content/tools/listing';
-import { getImageToolReadinessFn } from '@/content/tools/server';
+  getImageToolReadinessFn,
+  getToolDetailRouteDataFn,
+} from '@/content/tools/server';
 
 export const Route = createFileRoute('/tools/$slug')({
   loader: async ({ params }) => {
     const locale = getLocale();
-    const page = await loadToolDetailPage(locale, params.slug);
-    if (!page) throw notFound();
-    const directory = await loadToolDirectoryPage(locale);
-    if (!directory) {
-      throw new MarketingContentUnavailableError(
-        `Parent tools directory is not published for ${locale}`
-      );
-    }
+    const routeData = await getToolDetailRouteDataFn({
+      data: { locale, slug: params.slug },
+    });
+    if (!routeData) throw notFound();
+    const { page, directory } = routeData;
     const readiness = await getImageToolReadinessFn({
       data: { entityId: page.entityId },
     });

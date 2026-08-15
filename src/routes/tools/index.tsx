@@ -10,14 +10,14 @@ import { getLocale } from '@/paraglide/runtime.js';
 import { Footer } from '@/blocks/footer';
 import { Header } from '@/blocks/header';
 import { ToolDirectory } from '@/blocks/tool-directory';
-import { loadToolDirectoryPage } from '@/content/tools/listing';
+import { getToolDirectoryPageFn } from '@/content/tools/server';
 
 export const Route = createFileRoute('/tools/')({
   loader: async () => {
     const locale = getLocale();
     const page = getFixedLocalePage('tools', locale);
     if (!page) throw new Error(`Tools is not registered for locale ${locale}`);
-    const directory = await loadToolDirectoryPage(locale);
+    const directory = await getToolDirectoryPageFn({ data: { locale } });
     if (!directory || directory.items.length === 0) throw notFound();
     const title = directory.seo.title.replace('{appName}', envConfigs.app_name);
     const description = directory.seo.description;

@@ -2,6 +2,7 @@ import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 
 const outputRoot = path.resolve('.output');
+const publicRoot = path.join(outputRoot, 'public');
 const forbidden = [
   'A studio product photo of a translucent orange water bottle',
   '把文字提示变成静态图片，并在同一个 Agent 对话中继续调整方向',
@@ -28,6 +29,15 @@ for (const file of await filesUnder(outputRoot)) {
   const marker = forbidden.find((candidate) => contents.includes(candidate));
   if (marker) {
     offenders.push(`${path.relative(process.cwd(), file)}: ${marker}`);
+  }
+}
+
+for (const file of await filesUnder(publicRoot)) {
+  const contents = await readFile(file, 'utf8');
+  if (contents.includes('node:fs/promises')) {
+    offenders.push(
+      `${path.relative(process.cwd(), file)}: server-only marketing filesystem import`
+    );
   }
 }
 
