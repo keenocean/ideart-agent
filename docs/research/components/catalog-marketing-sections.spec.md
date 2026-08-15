@@ -18,7 +18,11 @@ Two-column `0.78fr / 1.22fr` card with copy first and media second, 28px radius.
 
 ## CatalogMediaCarousel
 
-Horizontal snap rail with 20px gap, hidden scrollbar, 24px horizontal padding, and cards sized to 85vw up to 960px. Supports image/video and opens the shared preview dialog.
+Horizontal snap rail with 20px gap, hidden scrollbar, 24px horizontal padding, cards sized to 85vw up to 960px, 44px previous/next controls, mobile copy bodies, and desktop prompt overlays. Supports image/video and opens the shared preview dialog. Exact behavior lives in `catalog-video-inspiration-carousel.spec.md`.
+
+## CatalogShowcaseCardGrid
+
+Two reusable catalog groups reproduce the reference tool/model card geometry with dynamic inventory. Workflow cards accept paired R2 media and a prompt action; model cards accept a single R2 cover and only become interactive for a real runtime model. Exact behavior lives in `catalog-showcase-card-grid.spec.md`.
 
 ## CatalogFaq
 

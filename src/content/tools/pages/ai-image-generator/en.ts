@@ -49,9 +49,9 @@ export const content = {
     ],
   },
   examples: {
-    title: 'Image examples and motion component previews',
+    title: 'AI image prompt gallery',
     description:
-      'The stills show prompts you can adapt. The motion clips temporarily verify the shared video gallery for future video tool pages; they are not output claims for this image generator.',
+      'Explore still-image directions for products, editorial scenes, social campaigns, and cinematic concepts, then send any prompt back to the generator.',
     labels: {
       quickStart: 'Quick start',
       image: 'Image',
@@ -143,9 +143,9 @@ export const content = {
         },
       },
       {
-        title: 'Motion preview: floating loaf',
+        title: 'Floating loaf',
         description:
-          'Temporary R2 motion clip for validating lazy video playback, poster loading, and the shared preview dialog.',
+          'Warm character animation built around one impossible event and a clear reaction.',
         prompt:
           'Animate the loaf rising from the oven as flour drifts through warm light and the orange creature reacts with surprise.',
         media: {
@@ -154,9 +154,9 @@ export const content = {
         },
       },
       {
-        title: 'Motion preview: morning commute',
+        title: 'Morning commute',
         description:
-          'Temporary R2 motion clip used to verify mixed image/video masonry behavior without claiming video generation here.',
+          'Documentary camera movement gives an unusual commuter a believable place in the scene.',
         prompt:
           'Animate subtle subway movement, passing window light, and small reactions around the gentle green commuter.',
         media: {
@@ -165,9 +165,9 @@ export const content = {
         },
       },
       {
-        title: 'Motion preview: blue fireflies',
+        title: 'Blue fireflies',
         description:
-          'Temporary wide-format clip for testing responsive video sizing and range-based R2 delivery.',
+          'A panoramic night environment animated through drifting light and reflective water.',
         prompt:
           'Animate blue fireflies drifting over reflected water while moonlight moves softly across the conservatory glass.',
         media: {
@@ -176,9 +176,9 @@ export const content = {
         },
       },
       {
-        title: 'Motion preview: porcelain koi',
+        title: 'Porcelain koi',
         description:
-          'Temporary R2 motion clip for verifying video cards and the full-screen media controls planned for video tools.',
+          'Slow character motion, rain, and floating porcelain forms create a surreal editorial beat.',
         prompt:
           'Animate the dancer turning slowly as porcelain koi glide through the carriage and rain trails down the windows.',
         media: {
@@ -275,9 +275,9 @@ export const content = {
         },
       },
       {
-        title: 'Motion preview: volcanic asteroids',
+        title: 'Volcanic asteroids',
         description:
-          'Temporary R2 clip extending the shared video gallery with a high-motion space scene.',
+          'A high-motion space study with layered depth and two contrasting internal light sources.',
         prompt:
           'Animate the asteroid field drifting past camera as blue crystal and orange magma pulse beneath fractured rock.',
         media: {
@@ -286,9 +286,9 @@ export const content = {
         },
       },
       {
-        title: 'Motion preview: desert poppies',
+        title: 'Desert bloom',
         description:
-          'Temporary R2 clip for validating subtle natural motion and continuous waterfall playback.',
+          'Subtle natural motion turns a quiet desert landscape into a gradual reveal.',
         prompt:
           'Animate red poppies opening between dry desert grass while a light breeze crosses the sand.',
         media: {
@@ -297,9 +297,9 @@ export const content = {
         },
       },
       {
-        title: 'Motion preview: glacier titan',
+        title: 'Glacier titan',
         description:
-          'Temporary R2 clip adding a bright landscape test to the reusable video card set.',
+          'A monumental environmental reveal driven by fractured ice, snow, and aerial scale.',
         prompt:
           'Animate the stone titan rising through the glacier as ice plates fracture and snow falls into blue crevasses.',
         media: {
@@ -308,9 +308,9 @@ export const content = {
         },
       },
       {
-        title: 'Motion preview: mirror sphere',
+        title: 'Mirror sphere',
         description:
-          'Temporary R2 clip for checking reflections, street movement, and video controls.',
+          'Moving reflections bind a surreal object to the rhythm of a rainy city street.',
         prompt:
           'Animate the mirrored sphere gliding along the wet street as red buses and shop lights move across its surface.',
         media: {
@@ -319,9 +319,9 @@ export const content = {
         },
       },
       {
-        title: 'Motion preview: paper storybook',
+        title: 'Paper storybook',
         description:
-          'Temporary R2 clip testing a bright handcrafted scene within the mixed-media gallery.',
+          'Layered paper forms unfold with tactile, handcrafted stop-motion energy.',
         prompt:
           'Animate the paper storybook unfolding into a layered pastel landscape while cut-paper shapes rise from each page.',
         media: {
@@ -330,9 +330,9 @@ export const content = {
         },
       },
       {
-        title: 'Motion preview: puddle market',
+        title: 'Puddle market',
         description:
-          'Temporary R2 clip for verifying dark-scene poster quality and lazy playback.',
+          'A macro viewpoint reveals a miniature lantern market moving beneath a rain puddle.',
         prompt:
           'Animate lanterns and tiny shoppers beneath the puddle while raindrops ripple the street reflection above.',
         media: {
@@ -341,9 +341,9 @@ export const content = {
         },
       },
       {
-        title: 'Motion preview: sailcloth laundromat',
+        title: 'Sailcloth laundromat',
         description:
-          'Temporary R2 clip adding long fabric motion and a cool interior scene to the component test set.',
+          'Flowing white fabric transforms a symmetrical fluorescent interior into a surreal seascape.',
         prompt:
           'Animate white sailcloth flowing from the washing machines as mist rises under fluorescent light.',
         media: {
@@ -352,9 +352,9 @@ export const content = {
         },
       },
       {
-        title: 'Motion preview: tidal library',
+        title: 'Tidal library',
         description:
-          'Temporary R2 clip completing the expanded waterfall with reflective water and a quiet interior.',
+          'Quiet water movement and warm lamp reflections reshape an orderly historic reading room.',
         prompt:
           'Animate a gentle tide moving across the library floor while lamp reflections shimmer between the desks.',
         media: {
@@ -363,6 +363,110 @@ export const content = {
         },
       },
     ],
+  },
+  showcase: {
+    workflows: {
+      title: 'AI Image Tools',
+      description:
+        'Start with a focused image workflow, then keep refining the result in the same private agent conversation.',
+      items: [
+        {
+          id: 'text-to-image',
+          title: 'Text-to-image generator',
+          description:
+            'Turn a written visual brief into a composed still image.',
+          prompt:
+            'A premium skincare serum bottle on a shallow mirror of water, cool silver palette, soft diffused studio light, close product crop, clean luxury campaign photography, no extra objects.',
+          media: [
+            {
+              assetId: 'tools-ai-image-generator-0241fe76c3058fcd',
+              alt: 'Glass serum bottle in a cool silver studio scene',
+            },
+            {
+              assetId: 'tools-ai-image-generator-5d01838c8320ab5f',
+              alt: 'Navy and coral editorial illustration above a city',
+            },
+          ],
+        },
+        {
+          id: 'campaign-visuals',
+          title: 'Campaign image generator',
+          description:
+            'Direct product, launch, and social visuals with precise composition.',
+          prompt:
+            'Vertical 9:16 launch visual for a running shoe, shoe suspended above a red track with a sharp burst of chalk dust, energetic side light, bold modern sports photography, clear space at the top for copy.',
+          media: [
+            {
+              assetId: 'tools-ai-image-generator-eee9f320ac365d1e',
+              alt: 'Running shoe launch visual over a red track',
+            },
+            {
+              assetId: 'tools-ai-image-generator-c59b7a4f2cbfdc3b',
+              alt: 'Orange creature in a cinematic moonlit bakery',
+            },
+          ],
+        },
+        {
+          id: 'reference-guided-edit',
+          title: 'Reference-guided image edit',
+          description:
+            'Add an image to guide subject, composition, or visual direction.',
+          prompt:
+            'Use my reference image as the composition guide. Preserve the main subject and framing, then rebuild the scene with cinematic natural light, realistic materials, and a restrained color palette.',
+          media: [
+            {
+              assetId: 'tools-ai-image-generator-39da1e8785d8efb2',
+              alt: 'Green creature riding a subway with commuters',
+            },
+            {
+              assetId: 'tools-ai-image-generator-f2570c70c73667db',
+              alt: 'Flooded night conservatory filled with blue fireflies',
+            },
+          ],
+        },
+        {
+          id: 'style-transform',
+          title: 'Style transformation',
+          description:
+            'Restyle a reference while keeping its core subject recognizable.',
+          prompt:
+            'Restyle my reference as a tactile handmade paper illustration. Keep the central subject and overall silhouette recognizable, use layered cut-paper shapes, soft warm directional light, and a restrained pastel palette.',
+          media: [
+            {
+              assetId: 'tools-ai-image-generator-4465b33d8cac5a5f',
+              alt: 'Dancer and porcelain koi in a cinematic train carriage',
+            },
+            {
+              assetId: 'tools-ai-image-generator-fb51d0665ffb5fbf',
+              alt: 'Handmade paper storybook landscape',
+            },
+          ],
+        },
+      ],
+    },
+    models: {
+      title: 'AI Image Models',
+      description:
+        'GPT Image 2 is the image model currently connected to this generator. More model cards will appear only after their runtime routes are available.',
+      items: [
+        {
+          id: 'gpt-image-2',
+          runtimeModelKey: 'gpt-image-2',
+          title: 'GPT Image 2',
+          description:
+            'Prompt-faithful image generation and reference-guided editing with flexible aspect ratios and quality controls.',
+          media: {
+            assetId: 'tools-ai-image-generator-126e53051fa7c68f',
+            alt: 'Mirrored sphere reflecting a rainy city street',
+          },
+        },
+      ],
+    },
+  },
+  videoInspiration: {
+    title: 'Get Inspired by AI-Generated Videos',
+    description:
+      'Explore motion studies and open any clip for its full prompt. These R2-hosted videos are creative references; this page still generates images.',
   },
   workflow: {
     title: 'How the image workflow works',

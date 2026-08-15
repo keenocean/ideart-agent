@@ -6,6 +6,7 @@ import { hasLocalePage } from '@/config/catalog/selectors';
 import { toolCatalog } from '@/config/catalog/tools';
 import type { CatalogDefinition } from '@/config/catalog/types';
 import type { AppLocale } from '@/config/locale';
+import { imageModelOptionFor } from '@/lib/agent-settings';
 import { buildSeoHead } from '@/lib/seo';
 import {
   isCatalogPageContentAvailable,
@@ -173,6 +174,23 @@ describe('tool route content gate', () => {
       expect(
         marketingAssets.filter((asset) => exampleAssetIds.has(asset.id))
       ).toHaveLength(examples.length);
+      expect(detail?.content.showcase.workflows.items).toHaveLength(4);
+      for (const workflow of detail?.content.showcase.workflows.items ?? []) {
+        expect(workflow.prompt.trim().length).toBeGreaterThan(0);
+        expect(workflow.media).toHaveLength(2);
+        for (const media of workflow.media) {
+          expect(media.alt.trim().length).toBeGreaterThan(0);
+          expect(getMarketingAsset(media.assetId).kind).toBe('image');
+        }
+      }
+      expect(detail?.content.showcase.models.items).toHaveLength(1);
+      for (const model of detail?.content.showcase.models.items ?? []) {
+        expect(imageModelOptionFor(model.runtimeModelKey)).toBeDefined();
+        expect(getMarketingAsset(model.media.assetId).kind).toBe('image');
+      }
+      expect(
+        detail?.content.videoInspiration.title.trim().length
+      ).toBeGreaterThan(0);
       expect(detail?.content.faq.items.length).toBeGreaterThanOrEqual(3);
       expect(detail?.related).toEqual([]);
     }

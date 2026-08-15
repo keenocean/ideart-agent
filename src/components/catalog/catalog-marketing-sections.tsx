@@ -1,5 +1,12 @@
-import { useState, type ReactNode } from 'react';
-import { ArrowRight, CheckCircle2, Play, WandSparkles } from 'lucide-react';
+import { useRef, useState, type ReactNode } from 'react';
+import {
+  ArrowRight,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  Play,
+  WandSparkles,
+} from 'lucide-react';
 
 import { Link } from '@/core/i18n/navigation';
 import { cn } from '@/lib/utils';
@@ -376,6 +383,7 @@ export function CatalogMediaCarousel({
   onUsePrompt?: (item: CatalogGalleryItem) => void;
 }) {
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
+  const railRef = useRef<HTMLDivElement>(null);
   const preview = previewIndex === null ? null : (items[previewIndex] ?? null);
 
   function navigate(offset: number) {
@@ -385,40 +393,115 @@ export function CatalogMediaCarousel({
     });
   }
 
+  function scrollRail(offset: -1 | 1) {
+    const rail = railRef.current;
+    const firstCard = rail?.querySelector<HTMLElement>('[data-carousel-card]');
+    if (!rail || !firstCard) return;
+
+    const step = firstCard.offsetWidth + 20;
+    const maximum = Math.max(0, rail.scrollWidth - rail.clientWidth);
+    const atStart = rail.scrollLeft <= step / 2;
+    const atEnd = rail.scrollLeft >= maximum - step / 2;
+    const left =
+      offset < 0 && atStart
+        ? maximum
+        : offset > 0 && atEnd
+          ? 0
+          : rail.scrollLeft + offset * step;
+    const reduceMotion = window.matchMedia(
+      '(prefers-reduced-motion: reduce)'
+    ).matches;
+    rail.scrollTo({ left, behavior: reduceMotion ? 'auto' : 'smooth' });
+  }
+
+  if (items.length === 0) return null;
+
   return (
-    <section className="bg-muted/35 border-border w-full border-y py-20 sm:py-28">
+    <section
+      id="prompt-examples"
+      className="bg-foreground text-background w-full scroll-mt-20 py-20 sm:py-28"
+    >
       <div className="mx-auto max-w-5xl px-6 text-center">
-        <CatalogSectionHeading
-          title={title}
-          description={description}
-          size="editorial"
-        />
+        <h2 className="font-serif text-4xl leading-[1.08] font-normal tracking-[-0.02em] text-balance sm:text-5xl">
+          {title}
+        </h2>
+        {description && (
+          <p className="text-background/65 mx-auto mt-4 max-w-2xl text-base leading-relaxed sm:text-lg">
+            {description}
+          </p>
+        )}
       </div>
-      <div className="mt-10 flex w-full snap-x snap-mandatory [scroll-padding:0_1.5rem] gap-5 overflow-x-auto px-6 py-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {items.map((item, index) => (
-          <button
-            key={item.id}
-            type="button"
-            onClick={() => setPreviewIndex(index)}
-            className="border-border bg-card group focus-visible:ring-ring relative aspect-video w-[85vw] max-w-[60rem] shrink-0 snap-start overflow-hidden rounded-3xl border text-left shadow-sm focus-visible:ring-2 focus-visible:outline-none"
-          >
-            <CatalogMedia
-              asset={item.media}
-              className="transition-transform duration-500 ease-out group-hover:scale-[1.03] motion-reduce:transition-none"
-            />
-            {item.media.kind === 'video' && (
-              <span className="absolute top-1/2 left-1/2 flex size-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/30 bg-black/45 text-white opacity-0 backdrop-blur-md transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
-                <Play
-                  aria-hidden="true"
-                  className="ml-0.5 size-4 fill-current"
+      <div className="relative mt-8 sm:mt-10">
+        <div
+          ref={railRef}
+          className="flex w-full snap-x snap-mandatory [scroll-padding:0_1.5rem] gap-5 overflow-x-auto px-6 py-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
+          {items.map((item, index) => (
+            <button
+              key={item.id}
+              type="button"
+              data-carousel-card
+              onClick={() => setPreviewIndex(index)}
+              aria-label={item.title}
+              className="border-background/15 bg-background/8 group focus-visible:ring-background relative w-[85vw] max-w-[60rem] shrink-0 snap-start overflow-hidden rounded-3xl border text-left shadow-[0_18px_55px_rgba(0,0,0,0.24)] focus-visible:ring-2 focus-visible:outline-none"
+            >
+              <span className="bg-muted relative block aspect-video overflow-hidden">
+                <CatalogMedia
+                  asset={item.media}
+                  className="transition-transform duration-500 ease-out group-hover:scale-[1.03] motion-reduce:transition-none"
                 />
+                {item.media.kind === 'video' && (
+                  <span className="absolute top-1/2 left-1/2 flex size-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/30 bg-black/45 text-white opacity-0 backdrop-blur-md transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
+                    <Play
+                      aria-hidden="true"
+                      className="ml-0.5 size-4 fill-current"
+                    />
+                  </span>
+                )}
+                <span className="absolute inset-x-0 bottom-0 hidden bg-gradient-to-t from-black/80 to-transparent px-6 pt-20 pb-5 text-sm font-medium text-white transition-opacity duration-300 group-hover:opacity-0 group-focus-visible:opacity-0 sm:block">
+                  {item.title}
+                </span>
+                <span className="absolute inset-0 hidden flex-col justify-end bg-gradient-to-t from-black/90 via-black/45 to-transparent p-6 text-white opacity-0 transition-opacity duration-300 group-hover:opacity-100 group-focus-visible:opacity-100 sm:flex">
+                  <strong className="text-lg leading-tight font-semibold">
+                    {item.title}
+                  </strong>
+                  <span className="mt-2 line-clamp-4 text-sm leading-6 text-white/80">
+                    {item.prompt}
+                  </span>
+                </span>
               </span>
-            )}
-            <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 to-transparent px-6 pt-16 pb-5 text-sm font-medium text-white">
-              {item.title}
-            </span>
-          </button>
-        ))}
+              <span className="block min-h-40 p-5 sm:hidden">
+                <strong className="text-background block text-lg leading-tight font-semibold">
+                  {item.title}
+                </strong>
+                <span className="text-background/65 mt-2 [display:-webkit-box] block overflow-hidden text-sm leading-[1.6] [-webkit-box-orient:vertical] [-webkit-line-clamp:4]">
+                  {item.description ?? item.prompt}
+                </span>
+              </span>
+            </button>
+          ))}
+        </div>
+
+        {items.length > 1 && (
+          <>
+            <button
+              type="button"
+              onClick={() => scrollRail(-1)}
+              aria-label={labels.previous}
+              className="border-background/20 bg-foreground/90 text-background focus-visible:ring-background hover:bg-foreground absolute top-[calc(1rem+min(23.90625vw,17rem))] left-2 flex size-11 -translate-y-1/2 items-center justify-center rounded-full border shadow-lg backdrop-blur-md transition-colors focus-visible:ring-2 focus-visible:outline-none"
+            >
+              <ChevronLeft aria-hidden="true" className="size-5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => scrollRail(1)}
+              aria-label={labels.next}
+              className="border-background/20 bg-foreground/90 text-background focus-visible:ring-background hover:bg-foreground absolute top-[calc(1rem+min(23.90625vw,17rem))] right-2 flex size-11 -translate-y-1/2 items-center justify-center rounded-full border shadow-lg backdrop-blur-md transition-colors focus-visible:ring-2 focus-visible:outline-none"
+            >
+              <ChevronRight aria-hidden="true" className="size-5" />
+            </button>
+          </>
+        )}
       </div>
 
       <CatalogMediaPreviewDialog

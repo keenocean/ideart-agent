@@ -14,6 +14,23 @@ export type ToolPromptExample = ToolCopyItem & {
   };
 };
 
+export type ToolMediaReference = {
+  assetId: MarketingAssetId;
+  alt: string;
+};
+
+export type ToolWorkflowShowcaseItem = ToolCopyItem & {
+  id: string;
+  prompt: string;
+  media: readonly [ToolMediaReference, ToolMediaReference];
+};
+
+export type ToolModelShowcaseItem = ToolCopyItem & {
+  id: string;
+  runtimeModelKey: string;
+  media: ToolMediaReference;
+};
+
 export type ToolFaqItem = {
   question: string;
   answer: string;
@@ -65,6 +82,22 @@ export type ToolPageContent = {
       expand: string;
     };
     items: readonly ToolPromptExample[];
+  };
+  showcase: {
+    workflows: {
+      title: string;
+      description: string;
+      items: readonly ToolWorkflowShowcaseItem[];
+    };
+    models: {
+      title: string;
+      description: string;
+      items: readonly ToolModelShowcaseItem[];
+    };
+  };
+  videoInspiration: {
+    title: string;
+    description: string;
   };
   workflow: {
     title: string;

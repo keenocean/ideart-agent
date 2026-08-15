@@ -16,7 +16,7 @@ Desktop viewport: `1440 × 900`. The page uses a 57px public header and seven ma
 | 6     | FAQ                    | 1024px inner width                                      | single accordion/list column                                                        |
 | 7     | Final CTA              | 1024px bordered card inside 64px section padding        | width follows viewport with 16px gutters                                            |
 
-Desktop section padding is consistently `64px 16px`. Headings use the serif display face, normal weight, and centered alignment. The reference uses 30px section headings and 36px hero/CTA headings; UGCMind keeps its own font and semantic color tokens.
+Desktop section padding is consistently `64px 16px`. Headings use the serif display face and normal weight; tool/model exploration headings are left aligned while gallery and editorial sections are centered. The reference uses 30px section headings and 36px hero/CTA headings; UGCMind keeps its own font and semantic color tokens.
 
 ## Video-lite reference
 
@@ -34,5 +34,7 @@ Desktop viewport: `1440 × 900`. The page has ten main sections. These sections 
 | 8     | Pricing                  | existing product pricing surface                                        | not part of this tool-page implementation                         |
 | 9     | FAQ                      | 1280px two-column numbered list                                         | one column on mobile                                              |
 | 10    | Final CTA                | 1280px bordered card, 28px radius                                       | fluid card with 16px outer gutters                                |
+
+The inspiration section itself uses 112px vertical padding on desktop and 80px on mobile. Its 1024px heading container precedes a 24px-padded rail; cards are `85vw` up to 960px, with 44px edge navigation buttons. At 390px the card is 331.5px wide, its media is 185.34px high, and its fixed-minimum copy body brings the card to approximately 347px.
 
 Reference captures live under `docs/design-references/`. Desktop captures are full-page; the image mobile/tablet captures are first-screen evidence because the source page exceeds the browser capture height limit. DOM measurements cover the full responsive page.

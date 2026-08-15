@@ -49,9 +49,9 @@ export const content = {
     ],
   },
   examples: {
-    title: '图片案例与视频组件预览',
+    title: 'AI 图片提示词案例',
     description:
-      '静态图片展示可改写的提示词；视频暂时用于验证未来视频工具页会复用的媒体瀑布流，不代表这个图片生成器能够输出视频。',
+      '浏览产品、编辑、社媒和电影概念等静态图片方向，并把任一提示词直接带回生成器。',
     labels: {
       quickStart: '快速开始',
       image: '图片',
@@ -136,9 +136,8 @@ export const content = {
         },
       },
       {
-        title: '视频预览：漂浮的面包',
-        description:
-          '临时 R2 视频，用于验证懒加载播放、poster 和通用媒体预览弹窗。',
+        title: '漂浮的面包',
+        description: '用一个不可能事件和清晰角色反应构成的温暖动画片段。',
         prompt:
           '让面包从烤箱中缓慢升起，面粉在暖光中飘散，橙色怪兽露出惊讶反应。',
         media: {
@@ -147,9 +146,8 @@ export const content = {
         },
       },
       {
-        title: '视频预览：清晨通勤',
-        description:
-          '临时 R2 视频，用于验证图文混合瀑布流，不代表当前页面提供视频生成。',
+        title: '清晨通勤',
+        description: '纪实镜头运动让一位不寻常的通勤者自然融入日常场景。',
         prompt:
           '加入轻微的地铁晃动、掠过车窗的晨光，以及乘客面对绿色怪兽时的细小反应。',
         media: {
@@ -158,8 +156,8 @@ export const content = {
         },
       },
       {
-        title: '视频预览：蓝色萤火虫',
-        description: '临时宽幅视频，用于验证响应式比例和 R2 Range 分段传输。',
+        title: '蓝色萤火虫',
+        description: '漂移的光点与水面倒影让全景夜间环境产生流动感。',
         prompt: '让蓝色萤火虫缓慢掠过倒影水面，月光在温室玻璃上轻微移动。',
         media: {
           assetId: 'tools-ai-image-generator-c72381045001af4e',
@@ -167,9 +165,8 @@ export const content = {
         },
       },
       {
-        title: '视频预览：瓷器锦鲤',
-        description:
-          '临时 R2 视频，用于验证视频卡片和未来视频工具页的全屏媒体控制。',
+        title: '瓷器锦鲤',
+        description: '缓慢人物动作、雨水和漂浮瓷器形体构成超现实编辑片段。',
         prompt: '让舞者缓慢旋转，瓷器锦鲤穿过车厢，雨水沿着列车窗户滑落。',
         media: {
           assetId: 'tools-ai-image-generator-7da3695ed4c4a534',
@@ -257,8 +254,8 @@ export const content = {
         },
       },
       {
-        title: '视频预览：火山小行星',
-        description: '临时 R2 视频，用高速太空画面补充通用视频瀑布流。',
+        title: '火山小行星',
+        description: '以多层景深和两种对比内光源构建的高速太空运动研究。',
         prompt:
           '让小行星群从镜头旁漂过，岩石裂缝下的蓝色晶体和橙色岩浆有节奏地闪动。',
         media: {
@@ -267,8 +264,8 @@ export const content = {
         },
       },
       {
-        title: '视频预览：沙漠花开',
-        description: '临时 R2 视频，用于验证轻微自然运动和连续瀑布流播放。',
+        title: '沙漠花开',
+        description: '细微自然运动把安静的沙漠风景变成渐进式揭示。',
         prompt: '让红色虞美人在枯草间逐渐开放，微风轻轻掠过沙地。',
         media: {
           assetId: 'tools-ai-image-generator-dc695c6c59eedafa',
@@ -276,8 +273,8 @@ export const content = {
         },
       },
       {
-        title: '视频预览：冰川巨物',
-        description: '临时 R2 视频，为可复用视频卡片补充明亮雪景测试。',
+        title: '冰川巨物',
+        description: '由碎裂冰层、落雪和航拍尺度推动的宏大环境揭示。',
         prompt: '让石质巨物从冰川中升起，冰层破裂，积雪落入蓝色冰隙。',
         media: {
           assetId: 'tools-ai-image-generator-28464f03f575b12e',
@@ -285,8 +282,8 @@ export const content = {
         },
       },
       {
-        title: '视频预览：镜面球',
-        description: '临时 R2 视频，用于检查反射、街道运动和视频控制。',
+        title: '镜面球',
+        description: '流动反射把一个超现实物体与雨天城市街道的节奏连接起来。',
         prompt: '让镜面球沿湿润街道滑行，红色巴士和商店灯光不断掠过球面。',
         media: {
           assetId: 'tools-ai-image-generator-ef56dc352549bc2b',
@@ -294,8 +291,8 @@ export const content = {
         },
       },
       {
-        title: '视频预览：纸艺故事书',
-        description: '临时 R2 视频，用明亮手工场景验证混合媒体瀑布流。',
+        title: '纸艺故事书',
+        description: '层叠纸艺形体展开，呈现可触摸的手工定格动画质感。',
         prompt: '让纸艺故事书展开成层叠的粉彩景观，剪纸形状从每一页立起。',
         media: {
           assetId: 'tools-ai-image-generator-cd6a1545d0bb900d',
@@ -303,8 +300,8 @@ export const content = {
         },
       },
       {
-        title: '视频预览：水洼夜市',
-        description: '临时 R2 视频，用于验证暗场 poster 清晰度和懒加载播放。',
+        title: '水洼夜市',
+        description: '微距视角揭示雨水洼下方正在活动的微缩灯笼夜市。',
         prompt:
           '让水洼下的灯笼和微缩行人活动起来，雨滴在上方街道倒影中荡开涟漪。',
         media: {
@@ -313,8 +310,8 @@ export const content = {
         },
       },
       {
-        title: '视频预览：帆布洗衣房',
-        description: '临时 R2 视频，为组件测试补充长布料运动和冷色室内画面。',
+        title: '帆布洗衣房',
+        description: '流动白色织物把对称荧光灯室内空间变成超现实海景。',
         prompt: '让白色帆布从洗衣机中持续流出，雾气在荧光灯下缓慢升起。',
         media: {
           assetId: 'tools-ai-image-generator-e89f518697d042d0',
@@ -322,8 +319,8 @@ export const content = {
         },
       },
       {
-        title: '视频预览：潮汐图书馆',
-        description: '临时 R2 视频，以水面倒影和安静室内画面填充扩展瀑布流。',
+        title: '潮汐图书馆',
+        description: '安静水流和暖色台灯倒影重塑有秩序的历史阅读室。',
         prompt: '让轻柔潮水流过图书馆地板，台灯倒影在两张书桌之间轻微摇动。',
         media: {
           assetId: 'tools-ai-image-generator-f657512a8700976c',
@@ -331,6 +328,106 @@ export const content = {
         },
       },
     ],
+  },
+  showcase: {
+    workflows: {
+      title: 'AI 图片工具',
+      description:
+        '从一个明确的图片工作流开始，再在同一个私密 Agent 对话中持续调整结果。',
+      items: [
+        {
+          id: 'text-to-image',
+          title: '文生图生成器',
+          description: '把文字视觉需求转成构图完整的静态图片。',
+          prompt:
+            '一瓶高端护肤精华放在浅水镜面上，冷银色调，柔和漫射棚拍光，近景产品构图，干净克制的奢华广告摄影，不出现其他物体。',
+          media: [
+            {
+              assetId: 'tools-ai-image-generator-0241fe76c3058fcd',
+              alt: '冷银色棚拍环境中的玻璃精华瓶',
+            },
+            {
+              assetId: 'tools-ai-image-generator-5d01838c8320ab5f',
+              alt: '城市上空的深蓝与珊瑚红编辑插画',
+            },
+          ],
+        },
+        {
+          id: 'campaign-visuals',
+          title: '广告图片生成器',
+          description: '用明确构图控制产品、发布和社媒视觉。',
+          prompt:
+            '9:16 竖版跑鞋新品发布视觉，一只跑鞋悬浮在红色跑道上方，白色粉尘锐利爆开，强烈侧光，现代运动摄影风格，顶部留出清晰文案区域。',
+          media: [
+            {
+              assetId: 'tools-ai-image-generator-eee9f320ac365d1e',
+              alt: '红色跑道上方的跑鞋发布视觉',
+            },
+            {
+              assetId: 'tools-ai-image-generator-c59b7a4f2cbfdc3b',
+              alt: '电影感月夜面包房里的橙色怪兽',
+            },
+          ],
+        },
+        {
+          id: 'reference-guided-edit',
+          title: '参考图引导编辑',
+          description: '添加图片来约束主体、构图或视觉方向。',
+          prompt:
+            '使用我的参考图作为构图依据。保留主要主体和画面结构，以电影感自然光、写实材质和克制色板重新构建场景。',
+          media: [
+            {
+              assetId: 'tools-ai-image-generator-39da1e8785d8efb2',
+              alt: '绿色怪兽与通勤者一起乘坐地铁',
+            },
+            {
+              assetId: 'tools-ai-image-generator-f2570c70c73667db',
+              alt: '布满蓝色萤火虫的积水夜间温室',
+            },
+          ],
+        },
+        {
+          id: 'style-transform',
+          title: '风格转换',
+          description: '在保留核心主体辨识度的同时重塑参考图风格。',
+          prompt:
+            '把我的参考图重塑成可触摸的手工纸艺插画。保留中心主体和整体轮廓，使用层叠剪纸形状、柔和暖色方向光和克制粉彩色板。',
+          media: [
+            {
+              assetId: 'tools-ai-image-generator-4465b33d8cac5a5f',
+              alt: '电影感列车车厢中的舞者与瓷器锦鲤',
+            },
+            {
+              assetId: 'tools-ai-image-generator-fb51d0665ffb5fbf',
+              alt: '手工纸艺故事书景观',
+            },
+          ],
+        },
+      ],
+    },
+    models: {
+      title: 'AI 图片模型',
+      description:
+        'GPT Image 2 是当前已经接入这个生成器的图片模型。其他模型只有在运行时路由可用后才会出现在这里。',
+      items: [
+        {
+          id: 'gpt-image-2',
+          runtimeModelKey: 'gpt-image-2',
+          title: 'GPT Image 2',
+          description:
+            '忠实遵循提示词的图片生成与参考图引导编辑，支持灵活比例和质量控制。',
+          media: {
+            assetId: 'tools-ai-image-generator-126e53051fa7c68f',
+            alt: '镜面球映出雨天城市街道',
+          },
+        },
+      ],
+    },
+  },
+  videoInspiration: {
+    title: '从 AI 生成视频中获取灵感',
+    description:
+      '浏览动态创意并打开任一视频查看完整提示词。这些 R2 视频用于创意参考；当前页面仍然只生成图片。',
   },
   workflow: {
     title: '文生图工作流程',

@@ -13,6 +13,8 @@
 ## Image-reference behaviors
 
 - Four quick-start cards fill the prompt; the gallery dialog exposes the prompt and a prompt-reuse action.
+- Tool showcase cards apply a truthful workflow prompt and focus the real composer. Model cards select only runtime-backed image models; unpublished models are not rendered as fake links.
+- Tool cards pair two typed R2 images in a 4:3 frame. Model cards use one 16:9 R2 cover and the inventory grows dynamically.
 - Gallery items keep their natural aspect ratios and are distributed into balanced lanes rather than cropped into a uniform grid.
 - Use-case rows alternate media left/right at `md` and above. Mobile ordering is media then copy for every row.
 - FAQ uses native expandable disclosure behavior.
@@ -24,6 +26,8 @@
 - Video showcase uses CSS columns with break-inside avoidance: 4 columns desktop, 3 tablet, 2 mobile, 8px gaps.
 - The visible showcase is height-clipped and ends with a gradient fade plus a single expansion action.
 - Inspiration cards form a horizontal, mandatory-snap rail. Cards are 85vw up to 960px and support pointer/touch scrolling.
+- Circular previous/next controls move exactly one measured card plus its 20px gap and wrap at either end.
+- Mobile cards keep a 160px copy body below the 16:9 media. Desktop cards move title/prompt copy into hover and focus overlays.
 - The video preview panel shows position, master download, media title, prompt, optional reference-media metadata, “Use this prompt,” and an optional “Use video as reference” action.
 
 ## Product constraints

@@ -15,6 +15,7 @@ import {
   CatalogFeatureGrid,
   CatalogFinalCta,
   CatalogLimitations,
+  CatalogMediaCarousel,
   ToolQuickStarts,
 } from '@/components/catalog/catalog-marketing-sections';
 import {
@@ -23,15 +24,28 @@ import {
 } from '@/components/catalog/catalog-masonry-gallery';
 import { CatalogMediaFeatureList } from '@/components/catalog/catalog-media-feature-list';
 import { CatalogSectionHeading } from '@/components/catalog/catalog-section-heading';
+import {
+  CatalogShowcaseCardGrid,
+  type CatalogModelShowcaseItem,
+  type CatalogWorkflowShowcaseItem,
+} from '@/components/catalog/catalog-showcase-card-grid';
 import type { ToolPageContent, ToolPromptExample } from '@/content/tools/types';
 
 type ToolDetailPromptExample = Omit<ToolPromptExample, 'media'> & {
   media: MarketingAsset & { alt: string };
 };
 
-type ToolDetailPageContent = Omit<ToolPageContent, 'examples'> & {
+type ToolDetailPageContent = Omit<ToolPageContent, 'examples' | 'showcase'> & {
   examples: Omit<ToolPageContent['examples'], 'items'> & {
     items: readonly ToolDetailPromptExample[];
+  };
+  showcase: {
+    workflows: Omit<ToolPageContent['showcase']['workflows'], 'items'> & {
+      items: readonly CatalogWorkflowShowcaseItem[];
+    };
+    models: Omit<ToolPageContent['showcase']['models'], 'items'> & {
+      items: readonly CatalogModelShowcaseItem[];
+    };
   };
 };
 
@@ -52,6 +66,7 @@ export function ToolDetailPage({
   relatedItems,
   workbench,
   onUsePrompt,
+  onSelectModel,
 }: {
   content: ToolDetailPageContent;
   availabilityLabel: string;
@@ -61,6 +76,7 @@ export function ToolDetailPage({
   relatedItems: readonly ToolDetailRelatedItem[];
   workbench: ReactNode;
   onUsePrompt: (prompt: string) => void;
+  onSelectModel: (modelKey: string) => void;
 }) {
   const galleryItems: CatalogGalleryItem[] = content.examples.items.map(
     (item, index) => ({
@@ -74,6 +90,8 @@ export function ToolDetailPage({
   const quickStartItems = galleryItems
     .filter((item) => item.media.kind === 'image')
     .slice(0, 4);
+  const imageItems = galleryItems.filter((item) => item.media.kind === 'image');
+  const videoItems = galleryItems.filter((item) => item.media.kind === 'video');
   const featureItems = [
     ...content.features.items.map((item) => ({
       ...item,
@@ -164,6 +182,13 @@ export function ToolDetailPage({
         ]}
       />
 
+      <CatalogShowcaseCardGrid
+        workflows={content.showcase.workflows}
+        models={content.showcase.models}
+        onSelectWorkflow={(item) => onUsePrompt(item.prompt)}
+        onSelectModel={(item) => onSelectModel(item.runtimeModelKey)}
+      />
+
       <section id="showcase" className="scroll-mt-20 px-4 py-16 sm:px-6">
         <div className="mx-auto w-full max-w-6xl">
           <CatalogSectionHeading
@@ -172,14 +197,22 @@ export function ToolDetailPage({
           />
           <div className="mt-10">
             <CatalogMasonryGallery
-              items={galleryItems}
+              items={imageItems}
               labels={galleryLabels}
-              collapsedHeight={galleryItems.length > 12 ? 1120 : undefined}
+              collapsedHeight={imageItems.length > 12 ? 1120 : undefined}
               onUsePrompt={usePrompt}
             />
           </div>
         </div>
       </section>
+
+      <CatalogMediaCarousel
+        title={content.videoInspiration.title}
+        description={content.videoInspiration.description}
+        items={videoItems}
+        labels={galleryLabels}
+        onUsePrompt={usePrompt}
+      />
 
       <CatalogFeatureGrid
         id="features"

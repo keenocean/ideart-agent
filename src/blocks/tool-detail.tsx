@@ -2,10 +2,17 @@ import { useMemo, useRef } from 'react';
 import { CircleAlert, CircleCheck, Save } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { getMarketingAsset } from '@/config/catalog/assets';
+import {
+  getMarketingAsset,
+  getMarketingImageAsset,
+} from '@/config/catalog/assets';
 import { generationPresetFor } from '@/config/catalog/generation';
 import { toolCatalog } from '@/config/catalog/tools';
 import type { DeploymentReadiness } from '@/config/catalog/types';
+import {
+  isImageModelOptionValue,
+  settingsForImageModel,
+} from '@/lib/agent-settings';
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
 import { useGenerationEntry } from '@/hooks/use-generation-entry';
@@ -69,6 +76,10 @@ export function ToolDetail({
     ...item,
     actionLabel: m['tools.directory.view_tool'](),
   }));
+  const resolveShowcaseImage = (media: {
+    assetId: Parameters<typeof getMarketingImageAsset>[0];
+    alt: string;
+  }) => ({ ...getMarketingImageAsset(media.assetId), alt: media.alt });
   const content = {
     ...page.content,
     examples: {
@@ -81,8 +92,42 @@ export function ToolDetail({
         },
       })),
     },
+    showcase: {
+      workflows: {
+        ...page.content.showcase.workflows,
+        items: page.content.showcase.workflows.items.map((item) => ({
+          ...item,
+          media: [
+            resolveShowcaseImage(item.media[0]),
+            resolveShowcaseImage(item.media[1]),
+          ] as const,
+        })),
+      },
+      models: {
+        ...page.content.showcase.models,
+        items: page.content.showcase.models.items.map(({ media, ...item }) => ({
+          ...item,
+          media: resolveShowcaseImage(media),
+        })),
+      },
+    },
   };
   const ReadyIcon = readiness.executable ? CircleCheck : CircleAlert;
+
+  function focusWorkbench(value: string) {
+    requestAnimationFrame(() => {
+      const textarea = textareaRef.current;
+      if (!textarea) return;
+      textarea.focus();
+      textarea.setSelectionRange(value.length, value.length);
+      textarea.scrollIntoView({
+        behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches
+          ? 'auto'
+          : 'smooth',
+        block: 'center',
+      });
+    });
+  }
 
   return (
     <ToolDetailPage
@@ -94,19 +139,12 @@ export function ToolDetail({
       relatedItems={related}
       onUsePrompt={(prompt) => {
         entry.setValue(prompt);
-        requestAnimationFrame(() => {
-          const textarea = textareaRef.current;
-          if (!textarea) return;
-          textarea.focus();
-          textarea.setSelectionRange(prompt.length, prompt.length);
-          textarea.scrollIntoView({
-            behavior: window.matchMedia('(prefers-reduced-motion: reduce)')
-              .matches
-              ? 'auto'
-              : 'smooth',
-            block: 'center',
-          });
-        });
+        focusWorkbench(prompt);
+      }}
+      onSelectModel={(modelKey) => {
+        if (!isImageModelOptionValue(modelKey)) return;
+        entry.setSettings(settingsForImageModel(entry.settings, modelKey));
+        focusWorkbench(entry.value);
       }}
       workbench={
         <section aria-labelledby="tool-workbench-title" className="mx-auto">
