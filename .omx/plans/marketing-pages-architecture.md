@@ -752,7 +752,7 @@ Google 当前指导同样要求优先修复站点自己链接或提交的 404，
 #### 首页、工具页与模型页实施状态（2026-08-15）
 
 - 阶段 0/1 的 Catalog、resolver/selectors、SEO helper、固定公开路由、sitemap/llms 和 R2 检查底座已经落地；阶段 3 已为 `ai-image-generator` 增加真实同语言正文和路由，但工具/模型 locale route 当前仍全部保持 `noindex`。
-- 阶段 2 的共享生成入口安全链路已经完成：`PromptLauncher` 已成为复用 `useGenerationEntry` + `GenerationWorkbench` 的兼容 wrapper，图片模型状态已贯通，服务端会从 `entryContext` 重建 policy 并在 API/tool 两层执行锁定与附件约束，Agent guard/认证页/邮箱验证已保留原 session callback。
+- 阶段 2 的共享生成入口安全链路及 2.5 收口已经完成：`PromptLauncher` 已成为复用 `useGenerationEntry` + `GenerationWorkbench` 的兼容 wrapper，图片模型状态已贯通；服务端会从 `entryContext` 与精确语言正文共同重建 policy，并在 API/tool 两层执行锁定、附件来源与媒体复用约束。Agent guard/认证页/邮箱验证保留原 session callback，402 拒绝不会提前消费首轮 stash。
 - 阶段 3 的首个工具纵向切片已经完成：`/tools`、`/tools/$slug`、纯 props Catalog 组件、工具 Blocks、精确语言 content manifest/resolver 和服务端 DeploymentReadiness 已存在；仅 `ai-image-generator` 有 en/zh 正文并可访问。阶段 4 模型切片尚未开始，`src/routes/models/*` 与 model content modules 仍不存在，Block registry 和 marketing asset registry 仍为空。
 - 阶段 5 尚未开始：首页仍是旧的 `Header → Hero(PromptLauncher) → Blog → Footer → SupportWidget`，登录用户仍自动跳转 `/chat`。仓库中未接线的 `Features`、`ModelsStrip`、`Gallery`、`FAQ`、`CTA` 等旧/demo Blocks 不计为本计划首页实施，其中渐变 placeholder 不符合真实 R2 案例门禁。
 - Header/Footer 和首页尚未接入 Tools/Models；`/tools` 已成为首个 Catalog directory 消费者，related selector 只输出具备同语言正文的目标。sitemap/llms 虽已接线，但因为 Catalog locale pages 均为 noindex，不输出这些 URL。
@@ -774,6 +774,16 @@ Google 当前指导同样要求优先修复站点自己链接或提交的 404，
 - `imageModelOption` 已覆盖 composer 默认值与控件、持久化升级、handoff、runtime/API normalization、价格重算、系统 Prompt 和 `generate_image` tool fallback/lock；客户端价格字段仍会被服务端重算。
 - Agent auth guard 保留当前 locale-free path + query；sign-in/sign-up、已登录分支、邮箱验证和 OAuth callback 共用 `sanitizeAuthCallback()`。验证邮件落到无 payload 的 completion page，只通过 `BroadcastChannel` 发信号；原标签页确认 session 后才回到原 `/chat/$sessionId` 消费 stash，验证标签页明确说明原标签关闭后无法恢复草稿。
 - 自动验证覆盖 preset 优先级、图片模型规范化、handoff、Catalog policy、伪造 entry、附件绑定、tool 参数绕过、callback sanitizer 与跨标签 signal contract。真实 OAuth/provider 和浏览器跨标签 smoke 未在无凭据环境中伪造成功，留给有合法回调域的发布环境。
+
+#### 阶段 2.5 安全与发布门禁收口（2026-08-15）
+
+- 首轮与后续上传现在由服务端签发短期 HMAC media receipt，绑定 `userId + chatId + mediaType + exact URL + expiry`；空密钥、开发占位密钥、过期、篡改、超长或跨会话凭证均 fail closed。上传仍先完成鉴权、MIME allowlist 与 magic-byte 校验，去重对象也只为最终公开 URL 签名。
+- Agent API 只接受当前有效 receipt，或 owner-scoped 同一 chat 中由历史 user audit metadata / 关联成功的内置媒体 tool result 证明过的精确类型与 URL。跨 chat Library 选择必须再次通过 owner-scoped source message 校验并签发目标 chat receipt；legacy text-only URL 不自动升级为可信附件。
+- 当前 turn 的已验证媒体写入 user audit metadata，receipt 本身不持久化；工具只能从“当前已验证 + 同 chat 历史 allowlist”的并集中选引用。入口 minimum 只统计 policy 接受的媒体类型，tool 调用仍独立执行 minimum/maximum/type 校验。
+- `POST /api/agent/chat` 在读取历史或校验媒体前先完成 owner、active lease 与 active task 门禁；402 不触发 client `onAccepted`，因此首轮 sessionStorage payload 保留供充值/订阅后重试。App 已登录分支与认证页继续共用 `sanitizeAuthCallback()`。
+- Catalog policy 不再有正文 availability 默认值；生产调用必须显式注入 `isCatalogPageContentAvailable`。Sitemap 合并固定路由、Catalog 与 Blog 后统一去重并保留各自真实 `lastmod`；llms 标题/摘要来自精确语言正文投影。
+- R2 发布验证统一检查精确 MIME、`inline`、immutable cache、对象字节数和视频 range；route gzip 基线增长超过 100 KiB 必须有非空审阅说明。Cloudflare dry-run 每次先清理旧产物，同时门禁 Worker gzip、静态文件数与单文件大小；Docker 发布依赖同一 quality-gates job。
+- 收口验证通过 51 个测试文件/309 项测试、TypeScript、Prettier、生产构建、离线营销资源检查和 route bundle gate。清理后 Cloudflare dry-run 为 Worker gzip 2,207,282 / 2,516,582 bytes、235 / 250 个静态资产、最大静态文件 4,731,048 / 26,214,400 bytes。R2 inventory 当前为 0，因此真实 R2 online check、OAuth/provider、浏览器生成、Lighthouse、生产抓取与 Search Console 仍是外部待验证项；页面继续 `noindex`。
 
 ### 已完成：阶段 3 第一个工具纵向切片（2026-08-15）
 

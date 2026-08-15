@@ -5,6 +5,7 @@ import {
   marketingAssetKey,
   normalizeMarketingPublicDomain,
   verifyMarketingImageAsset,
+  verifyMarketingPublishedAsset,
 } from './marketing';
 
 describe('marketing R2 asset contract', () => {
@@ -62,6 +63,7 @@ describe('marketing R2 asset contract', () => {
         headers: {
           'content-type': 'image/webp',
           'content-length': '42000',
+          'content-disposition': 'inline',
           'cache-control': 'public, max-age=31536000, immutable',
         },
       })
@@ -77,6 +79,60 @@ describe('marketing R2 asset contract', () => {
       )
     ).resolves.toBe(url);
     expect(fetchMock).toHaveBeenCalledWith(url, { method: 'HEAD' });
+  });
+
+  it('verifies video byte ranges against the full asset size', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(null, {
+        status: 206,
+        headers: {
+          'content-type': 'video/mp4',
+          'content-range': 'bytes 0-0/900000',
+          'content-disposition': 'inline; filename="clip.mp4"',
+          'cache-control': 'public, max-age=31536000, immutable',
+        },
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const url =
+      'https://cdn.example.com/uploads/marketing/tools/clip/abcdef0123456789.mp4';
+
+    await expect(
+      verifyMarketingPublishedAsset(
+        { url, kind: 'video', mimeType: 'video/mp4', bytes: 900_000 },
+        'https://cdn.example.com'
+      )
+    ).resolves.toBe(url);
+    expect(fetchMock).toHaveBeenCalledWith(url, {
+      method: 'GET',
+      headers: { Range: 'bytes=0-0' },
+    });
+  });
+
+  it('requires inline delivery for published marketing assets', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(null, {
+          status: 200,
+          headers: {
+            'content-type': 'image/webp',
+            'content-length': '42000',
+            'cache-control': 'public, max-age=31536000, immutable',
+          },
+        })
+      )
+    );
+    await expect(
+      verifyMarketingImageAsset(
+        {
+          url: 'https://cdn.example.com/uploads/marketing/blog/post/abcdef0123456789.webp',
+          mimeType: 'image/webp',
+          bytes: 42_000,
+        },
+        'https://cdn.example.com'
+      )
+    ).rejects.toThrow('inline disposition');
   });
 
   it('rejects missing or mismatched public image responses', async () => {

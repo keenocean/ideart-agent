@@ -77,6 +77,14 @@ describe('tool content manifest', () => {
         ({ definition }) => definition.entityId
       )
     ).toEqual(['ai-image-generator']);
+    expect(await selectLoadableLlmsEntries(indexableTools, 'zh')).toEqual([
+      expect.objectContaining({
+        path: '/tools/ai-image-generator',
+        title: 'AI 图片生成器',
+        summary:
+          '把文字提示变成静态图片，并在同一个 Agent 对话中继续调整方向。',
+      }),
+    ]);
   });
 
   it('keeps exact Catalog paths when translated slugs differ', () => {

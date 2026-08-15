@@ -4,7 +4,7 @@ import path from 'node:path';
 
 import {
   assertMarketingAssetUrl,
-  MARKETING_ASSET_CACHE_CONTROL,
+  verifyMarketingPublishedAsset,
 } from '@/core/storage/marketing';
 import { marketingAssets } from '@/config/catalog/assets';
 
@@ -138,29 +138,9 @@ for (const asset of marketingAssets) registerAsset(asset);
 
 if (process.argv.includes('--online')) {
   for (const asset of assets.values()) {
-    const response = await fetch(asset.url, {
-      method: asset.kind === 'video' ? 'GET' : 'HEAD',
-      headers: asset.kind === 'video' ? { Range: 'bytes=0-0' } : undefined,
-    });
-    const expectedStatus = asset.kind === 'video' ? 206 : 200;
-    if (response.status !== expectedStatus) {
-      failures.push(
-        `${asset.id}: HTTP ${response.status}, expected ${expectedStatus}`
-      );
-    }
-    const contentType = response.headers.get('content-type') ?? '';
-    if (!contentType.startsWith(asset.mimeType)) {
-      failures.push(`${asset.id}: unexpected MIME ${contentType}`);
-    }
-    const cacheControl = response.headers.get('cache-control') ?? '';
-    if (cacheControl !== MARKETING_ASSET_CACHE_CONTROL) {
-      failures.push(`${asset.id}: unexpected Cache-Control ${cacheControl}`);
-    }
-    if (asset.kind === 'video' && !response.headers.get('content-range')) {
-      failures.push(
-        `${asset.id}: byte-range response is missing Content-Range`
-      );
-    }
+    await verifyMarketingPublishedAsset(asset, requestedDomain ?? '').catch(
+      (error) => failures.push(`${asset.id}: ${(error as Error).message}`)
+    );
   }
 }
 

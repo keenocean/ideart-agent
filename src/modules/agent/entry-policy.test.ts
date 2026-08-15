@@ -10,46 +10,74 @@ import {
   validateToolPolicyAttachments,
 } from './entry-policy';
 
+const exactLocaleContentAvailable = (
+  definition: {
+    entityId: string;
+    localePages?: Record<string, unknown>;
+  },
+  locale: string
+) =>
+  definition.entityId === 'ai-image-generator' &&
+  Boolean(definition.localePages?.[locale]);
+
 describe('server generation entry policy', () => {
-  it('rebuilds tool and model locks from the server Catalog', () => {
+  it('rebuilds locks only for exact-locale content-backed Catalog pages', () => {
     expect(
-      resolveEffectiveGenerationPolicy({
-        kind: 'tool',
-        entityId: 'image-to-video',
-        locale: 'en',
-      })
+      resolveEffectiveGenerationPolicy(
+        {
+          kind: 'tool',
+          entityId: 'ai-image-generator',
+          locale: 'en',
+        },
+        exactLocaleContentAvailable
+      )
     ).toMatchObject({
-      source: 'tool:image-to-video',
-      lockedMediaMode: 'video',
-      inputPolicy: { minimum: 1, maximum: 2, accepts: ['image'] },
-    });
-    expect(
-      resolveEffectiveGenerationPolicy({
-        kind: 'model',
-        entityId: 'gpt-image-2',
-        locale: 'zh',
-      })
-    ).toMatchObject({
-      source: 'model:gpt-image-2',
+      source: 'tool:ai-image-generator',
       lockedMediaMode: 'image',
-      lockedImageModel: 'gpt-image-2',
+      inputPolicy: { minimum: 0, maximum: 16, accepts: ['image'] },
     });
   });
 
-  it('rejects forged, missing, or locale-mismatched Catalog identity', () => {
+  it('rejects forged, missing, contentless, or locale-mismatched Catalog identity', () => {
     expect(() =>
-      resolveEffectiveGenerationPolicy({
-        kind: 'model',
-        entityId: 'retired-model',
-        locale: 'en',
-      })
+      resolveEffectiveGenerationPolicy(
+        {
+          kind: 'model',
+          entityId: 'retired-model',
+          locale: 'en',
+        },
+        exactLocaleContentAvailable
+      )
     ).toThrow(/not available/);
     expect(() =>
-      resolveEffectiveGenerationPolicy({
-        kind: 'tool',
-        entityId: 'ai-image-generator',
-        locale: 'fr' as 'en',
-      })
+      resolveEffectiveGenerationPolicy(
+        {
+          kind: 'tool',
+          entityId: 'ai-image-generator',
+          locale: 'fr' as 'en',
+        },
+        exactLocaleContentAvailable
+      )
+    ).toThrow(/not available/);
+    expect(() =>
+      resolveEffectiveGenerationPolicy(
+        {
+          kind: 'tool',
+          entityId: 'image-to-video',
+          locale: 'en',
+        },
+        exactLocaleContentAvailable
+      )
+    ).toThrow(/not available/);
+    expect(() =>
+      resolveEffectiveGenerationPolicy(
+        {
+          kind: 'model',
+          entityId: 'gpt-image-2',
+          locale: 'en',
+        },
+        exactLocaleContentAvailable
+      )
     ).toThrow(/not available/);
   });
 
@@ -59,14 +87,16 @@ describe('server generation entry policy', () => {
       modelName: 'seedance-2-5',
       imageModelName: 'gpt-image-2',
     })!;
-    const policy = resolveEffectiveGenerationPolicy({
-      kind: 'model',
-      entityId: 'gpt-image-2',
-      locale: 'en',
-    });
+    const policy = resolveEffectiveGenerationPolicy(
+      {
+        kind: 'tool',
+        entityId: 'ai-image-generator',
+        locale: 'en',
+      },
+      exactLocaleContentAvailable
+    );
     expect(applyEffectiveGenerationPolicy(client, policy)).toMatchObject({
       mediaMode: 'image',
-      imageModelName: 'gpt-image-2',
     });
   });
 });
@@ -84,34 +114,45 @@ describe('server generation attachment boundary', () => {
         message:
           'Animate this\n\nAttached media:\n- image 1: https://cdn.example.com/start.png',
         attachments: attachments!,
-        policy: resolveEffectiveGenerationPolicy({
-          kind: 'tool',
-          entityId: 'image-to-video',
-          locale: 'en',
-        }),
+        policy: resolveEffectiveGenerationPolicy(
+          {
+            kind: 'tool',
+            entityId: 'ai-image-generator',
+            locale: 'en',
+          },
+          exactLocaleContentAvailable
+        ),
         settings: normalizeClientGenerationSettings({
-          mediaMode: 'video',
-          modelName: 'seedance-2-0',
+          mediaMode: 'image',
+          imageModelName: 'gpt-image-2',
         })!,
       })
     ).toBeNull();
   });
 
-  it('rejects private URLs, message mismatches, disallowed media and excess inputs', () => {
+  it('rejects private URLs, media-type mismatches, message mismatches, disallowed media and excess inputs', () => {
     expect(
       parseGenerationRequestAttachments([
         { mediaType: 'image', url: 'http://127.0.0.1/private.png' },
       ])
     ).toBeNull();
+    expect(
+      parseGenerationRequestAttachments([
+        { mediaType: 'image', url: 'https://cdn.example.com/start.mp4' },
+      ])
+    ).toBeNull();
 
-    const policy = resolveEffectiveGenerationPolicy({
-      kind: 'tool',
-      entityId: 'image-to-video',
-      locale: 'en',
-    });
+    const policy = resolveEffectiveGenerationPolicy(
+      {
+        kind: 'tool',
+        entityId: 'ai-image-generator',
+        locale: 'en',
+      },
+      exactLocaleContentAvailable
+    );
     const settings = normalizeClientGenerationSettings({
-      mediaMode: 'video',
-      modelName: 'seedance-2-0',
+      mediaMode: 'image',
+      imageModelName: 'gpt-image-2',
     })!;
     expect(
       validateRequestAttachments({
@@ -138,11 +179,14 @@ describe('server generation attachment boundary', () => {
 
   it('does not let an Agent tool invent reference media outside the validated payload', () => {
     const policy = {
-      ...resolveEffectiveGenerationPolicy({
-        kind: 'tool' as const,
-        entityId: 'image-to-video',
-        locale: 'en' as const,
-      }),
+      ...resolveEffectiveGenerationPolicy(
+        {
+          kind: 'tool' as const,
+          entityId: 'ai-image-generator',
+          locale: 'en' as const,
+        },
+        exactLocaleContentAvailable
+      ),
       requestAttachments: [
         { mediaType: 'image' as const, url: 'https://cdn.example.com/a.png' },
       ],
@@ -152,5 +196,52 @@ describe('server generation attachment boundary', () => {
         { mediaType: 'image', url: 'https://cdn.example.com/b.png' },
       ])
     ).toMatch(/validated entry attachments/);
+  });
+
+  it('allows a tool to reuse current or same-chat verified media only', () => {
+    const policy = {
+      ...resolveEffectiveGenerationPolicy(
+        {
+          kind: 'tool' as const,
+          entityId: 'ai-image-generator',
+          locale: 'en' as const,
+        },
+        exactLocaleContentAvailable
+      ),
+      requestAttachments: [
+        { mediaType: 'image' as const, url: 'https://cdn.example.com/new.png' },
+      ],
+      allowedAttachments: [
+        { mediaType: 'image' as const, url: 'https://cdn.example.com/old.png' },
+        { mediaType: 'image' as const, url: 'https://cdn.example.com/new.png' },
+      ],
+    };
+
+    expect(
+      validateToolPolicyAttachments(policy, [
+        { mediaType: 'image', url: 'https://cdn.example.com/old.png' },
+        { mediaType: 'image', url: 'https://cdn.example.com/new.png' },
+      ])
+    ).toBeNull();
+    expect(
+      validateToolPolicyAttachments(policy, [
+        { mediaType: 'image', url: 'https://cdn.example.com/forged.png' },
+      ])
+    ).toMatch(/validated entry attachments/);
+  });
+
+  it('keeps the tool-level minimum even when the request-level minimum used same-chat history', () => {
+    const policy = {
+      entryContext: { kind: 'home' as const },
+      source: 'home',
+      inputPolicy: { minimum: 1, maximum: 1, accepts: ['image'] as const },
+      allowedAttachments: [
+        { mediaType: 'image' as const, url: 'https://cdn.example.com/old.png' },
+      ],
+    };
+
+    expect(validateToolPolicyAttachments(policy, [])).toMatch(
+      /requires at least 1 attachment/
+    );
   });
 });

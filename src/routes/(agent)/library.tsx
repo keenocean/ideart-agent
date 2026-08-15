@@ -22,7 +22,9 @@ interface LibraryImage {
   src: string;
   name: string;
   alt: string;
+  mediaType: 'image' | 'video';
   chatId: string;
+  sourceMessageId: string;
   chatTitle: string;
   createdAt: string;
   model?: string;

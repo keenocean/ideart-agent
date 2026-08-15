@@ -2,10 +2,18 @@ import type { NormalizedMessageParam } from '@keenocean/open-agent-sdk';
 
 import type {
   AgentAssistantMessageMetadataV1,
+  AgentMediaType,
   AgentMessageMetadata,
   AgentTurnMetadataV1,
+  AgentVerifiedMedia,
 } from '@/core/agent/types';
-import { getChatWithMessages, type StoredPart } from '@/modules/chats/service';
+import {
+  getChatWithMessages,
+  type ChatWithMessages,
+  type StoredPart,
+} from '@/modules/chats/service';
+
+import { isTrustedGenerationAttachmentUrl } from './entry-policy';
 
 export const LONG_RUNNING_MEDIA_TOOL_NAMES = [
   'generate_image',
@@ -53,9 +61,10 @@ export async function loadAgentHistory(
   chatId: string,
   userId: string,
   excludeMessageId?: string,
-  currentToolNames: readonly string[] = []
+  currentToolNames: readonly string[] = [],
+  preloaded?: ChatWithMessages
 ): Promise<NormalizedMessageParam[]> {
-  const chat = await getChatWithMessages(chatId, userId);
+  const chat = preloaded ?? (await getChatWithMessages(chatId, userId));
   if (!chat) return [];
   return mapRowsToHistory(chat.messages, excludeMessageId, currentToolNames);
 }
@@ -76,6 +85,40 @@ export function assistantLongRunningToolNames(
     result.set(rowIndex, audit.longRunningToolNames);
   }
   return result;
+}
+
+export function collectAllowedMediaAttachments(
+  rows: HistoryRow[]
+): AgentVerifiedMedia[] {
+  const allowed = new Map<string, AgentVerifiedMedia>();
+  const add = (media: AgentVerifiedMedia) => {
+    allowed.set(mediaKey(media), media);
+  };
+
+  for (const row of rows) {
+    if (row.role !== 'user' || row.metadata?.kind !== 'user') continue;
+    for (const media of row.metadata.media ?? []) add(media);
+  }
+
+  const associations = buildTurnAssociations(rows);
+  for (const [rowIndex, audit] of associations.assistantAudit) {
+    const row = rows[rowIndex];
+    for (const part of row.parts) {
+      if (
+        part.type !== 'tool_call' ||
+        !audit.longRunningToolNames.includes(part.name)
+      ) {
+        continue;
+      }
+      const mediaType = generatedMediaTypeForTool(part.name);
+      if (!mediaType) continue;
+      for (const url of extractSuccessfulToolFiles(part.result, mediaType)) {
+        add({ mediaType, url });
+      }
+    }
+  }
+
+  return [...allowed.values()];
 }
 
 /**
@@ -186,6 +229,38 @@ function buildTurnAssociations(rows: HistoryRow[]) {
 
 function assistantRoundKey(metadata: AgentAssistantMessageMetadataV1) {
   return `${metadata.turnId}\u0000${metadata.roundIndex}`;
+}
+
+function generatedMediaTypeForTool(name: string): AgentMediaType | null {
+  if (name === 'generate_image') return 'image';
+  if (name === 'generate_video' || name === 'animate_image') return 'video';
+  return null;
+}
+
+function mediaKey(media: AgentVerifiedMedia): string {
+  return `${media.mediaType}\u0000${media.url}`;
+}
+
+function extractSuccessfulToolFiles(
+  result: string | undefined,
+  mediaType: AgentMediaType
+): string[] {
+  if (!result) return [];
+  try {
+    const payload = JSON.parse(result) as {
+      status?: unknown;
+      files?: unknown;
+    };
+    if (payload.status !== 'success') return [];
+    if (!Array.isArray(payload.files)) return [];
+    return payload.files.filter(
+      (file): file is string =>
+        typeof file === 'string' &&
+        isTrustedGenerationAttachmentUrl(mediaType, file)
+    );
+  } catch {
+    return [];
+  }
 }
 
 function summarizeToolCall(

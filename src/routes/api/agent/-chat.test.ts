@@ -14,6 +14,9 @@ const mocks = vi.hoisted(() => ({
   getCurrentSubscription: vi.fn(),
   getPromptSkill: vi.fn(),
   getSession: vi.fn(),
+  getChatWithMessages: vi.fn(),
+  collectAllowedMediaAttachments: vi.fn(),
+  verifyAgentMediaReceipt: vi.fn(),
   applyEffectiveGenerationPolicy: vi.fn(),
   parseGenerationRequestAttachments: vi.fn(),
   prepareAgentTurn: vi.fn(),
@@ -29,6 +32,12 @@ vi.mock('@tanstack/react-router', () => ({
 }));
 vi.mock('@/core/auth', () => ({
   getAuth: () => ({ api: { getSession: mocks.getSession } }),
+}));
+vi.mock('@/core/agent/media-receipt', () => ({
+  verifyAgentMediaReceipt: mocks.verifyAgentMediaReceipt,
+}));
+vi.mock('@/content/catalog-pages', () => ({
+  isCatalogPageContentAvailable: vi.fn(() => true),
 }));
 vi.mock('@/lib/rate-limit', () => ({
   enforceMinIntervalRateLimit: vi.fn(() => null),
@@ -54,6 +63,9 @@ vi.mock('@/modules/agent/skills', () => ({
   getPromptSkill: mocks.getPromptSkill,
   SkillRegistryUnavailableError: class extends Error {},
 }));
+vi.mock('@/modules/agent/history', () => ({
+  collectAllowedMediaAttachments: mocks.collectAllowedMediaAttachments,
+}));
 vi.mock('@/modules/agent/service', () => ({
   prepareAgentTurn: mocks.prepareAgentTurn,
   runAgentTurn: mocks.runAgentTurn,
@@ -73,6 +85,7 @@ vi.mock('@/modules/chats/service', () => ({
   appendMessage: mocks.appendMessage,
   ensureChat: mocks.ensureChat,
   findChatOwnerId: mocks.findChatOwnerId,
+  getChatWithMessages: mocks.getChatWithMessages,
 }));
 vi.mock('@/modules/credits/service', () => ({ getBalance: mocks.getBalance }));
 vi.mock('@/modules/subscriptions/service', () => ({
@@ -102,6 +115,9 @@ describe('Agent chat database admission', () => {
     mocks.parseGenerationRequestAttachments.mockReturnValue([]);
     mocks.validateRequestAttachments.mockReturnValue(null);
     mocks.findChatOwnerId.mockResolvedValue(undefined);
+    mocks.getChatWithMessages.mockResolvedValue(undefined);
+    mocks.collectAllowedMediaAttachments.mockReturnValue([]);
+    mocks.verifyAgentMediaReceipt.mockResolvedValue(null);
     mocks.getActiveTurnLease.mockResolvedValue(undefined);
     mocks.getActiveTasksForSession.mockResolvedValue([]);
     mocks.acquireTurnLease.mockResolvedValue(true);
@@ -159,7 +175,22 @@ describe('Agent chat database admission', () => {
       code: 'turn_in_progress',
     });
     expect(mocks.getActiveTasksForSession).not.toHaveBeenCalled();
+    expect(mocks.getChatWithMessages).not.toHaveBeenCalled();
+    expect(mocks.collectAllowedMediaAttachments).not.toHaveBeenCalled();
+    expect(mocks.verifyAgentMediaReceipt).not.toHaveBeenCalled();
     expect(mocks.acquireTurnLease).not.toHaveBeenCalled();
+  });
+
+  it('does not preload media history for a foreign chat', async () => {
+    mocks.findChatOwnerId.mockResolvedValue('user-2');
+
+    const response = await POST({ request: chatRequest() });
+
+    expect(response.status).toBe(404);
+    expect(mocks.getActiveTurnLease).not.toHaveBeenCalled();
+    expect(mocks.getChatWithMessages).not.toHaveBeenCalled();
+    expect(mocks.collectAllowedMediaAttachments).not.toHaveBeenCalled();
+    expect(mocks.verifyAgentMediaReceipt).not.toHaveBeenCalled();
   });
 
   it('requires Stop when an orphan or legacy task remains', async () => {
@@ -233,6 +264,118 @@ describe('Agent chat database admission', () => {
         settings: locked,
         policy: expect.objectContaining({ source: 'home' }),
       })
+    );
+  });
+
+  it('rejects current attachments without a valid receipt or same-chat history', async () => {
+    mocks.parseGenerationRequestAttachments.mockReturnValue([
+      {
+        mediaType: 'image',
+        url: 'https://cdn.example.com/start.png',
+        receipt: 'bad',
+      },
+    ]);
+    mocks.verifyAgentMediaReceipt.mockResolvedValue(null);
+
+    const response = await POST({ request: chatRequest() });
+
+    expect(response.status).toBe(400);
+    expect(await response.text()).toContain('invalid attachment receipt');
+    expect(mocks.acquireTurnLease).not.toHaveBeenCalled();
+  });
+
+  it('passes verified media to preparation without persisting receipts in policy', async () => {
+    mocks.parseGenerationRequestAttachments.mockReturnValue([
+      {
+        mediaType: 'image',
+        url: 'https://cdn.example.com/start.png',
+        receipt: 'receipt',
+      },
+    ]);
+    mocks.verifyAgentMediaReceipt.mockResolvedValue({
+      mediaType: 'image',
+      url: 'https://cdn.example.com/start.png',
+    });
+
+    const response = await POST({ request: chatRequest() });
+    expect(response.status).toBe(200);
+    await response.text();
+
+    expect(mocks.prepareAgentTurn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        policy: expect.objectContaining({
+          requestAttachments: [
+            {
+              mediaType: 'image',
+              url: 'https://cdn.example.com/start.png',
+            },
+          ],
+          allowedAttachments: [
+            {
+              mediaType: 'image',
+              url: 'https://cdn.example.com/start.png',
+            },
+          ],
+        }),
+      })
+    );
+    expect(
+      mocks.prepareAgentTurn.mock.calls[0][0].policy.requestAttachments[0]
+    ).not.toHaveProperty('receipt');
+  });
+
+  it('accepts an exact same-chat historical attachment without a fresh receipt', async () => {
+    const historical = {
+      mediaType: 'image',
+      url: 'https://cdn.example.com/previous.png',
+    } as const;
+    mocks.findChatOwnerId.mockResolvedValue('user-1');
+    mocks.getChatWithMessages.mockResolvedValue({
+      chat: { id: 'session-1' },
+      messages: [],
+    });
+    mocks.collectAllowedMediaAttachments.mockReturnValue([historical]);
+    mocks.parseGenerationRequestAttachments.mockReturnValue([historical]);
+
+    const response = await POST({ request: chatRequest() });
+    expect(response.status).toBe(200);
+    await response.text();
+
+    expect(mocks.verifyAgentMediaReceipt).not.toHaveBeenCalled();
+    expect(mocks.prepareAgentTurn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        preloadedChat: expect.objectContaining({
+          chat: { id: 'session-1' },
+        }),
+        policy: expect.objectContaining({
+          requestAttachments: [historical],
+          allowedAttachments: [historical],
+        }),
+      })
+    );
+  });
+
+  it('does not count incompatible historical media toward the entry minimum', async () => {
+    mocks.resolveEffectiveGenerationPolicy.mockReturnValue({
+      entryContext: { kind: 'home' },
+      source: 'home',
+      inputPolicy: { minimum: 1, maximum: 1, accepts: ['image'] },
+    });
+    mocks.findChatOwnerId.mockResolvedValue('user-1');
+    mocks.getChatWithMessages.mockResolvedValue({
+      chat: { id: 'session-1' },
+      messages: [],
+    });
+    mocks.collectAllowedMediaAttachments.mockReturnValue([
+      { mediaType: 'video', url: 'https://cdn.example.com/previous.mp4' },
+    ]);
+
+    const response = await POST({ request: chatRequest() });
+    expect(response.status).toBe(200);
+    await response.text();
+
+    expect(mocks.validateRequestAttachments).toHaveBeenCalledWith(
+      expect.objectContaining({ minimumSatisfiedByAllowedMedia: false })
     );
   });
 

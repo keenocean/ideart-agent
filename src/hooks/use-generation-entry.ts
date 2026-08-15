@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import { useSession } from '@/core/auth/client';
 import { useRouter } from '@/core/i18n/navigation';
 import {
+  authorizeLibraryMediaForChat,
   isLocalChatMediaUrl,
   mediaTypeForFile,
   newAgentSessionId,
@@ -56,6 +57,7 @@ export type GenerationEntryController = {
   submitting: boolean;
   uploading: boolean;
   hasUploaded: boolean;
+  ensureSessionId: () => string;
   addFiles: (files: File[]) => Promise<void>;
   addLibraryMedia: (media: LibraryMedia[]) => Promise<void>;
   removeAttachment: (id: string) => void;
@@ -79,6 +81,12 @@ export function useGenerationEntry({
   const [settingSources, setSettingSources] = useState(initial.sources);
   const [skillName, setSkillName] = useComposerSkill();
   const [submitting, setSubmitting] = useState(false);
+  const pendingSessionId = useRef<string | null>(null);
+
+  const ensureSessionId = useCallback(() => {
+    pendingSessionId.current ??= newAgentSessionId();
+    return pendingSessionId.current;
+  }, []);
 
   useEffect(() => {
     const applied = applyGenerationPreset(
@@ -157,14 +165,22 @@ export function useGenerationEntry({
         ...created.map(({ file: _file, ...attachment }) => attachment),
       ]);
       try {
-        const urls = await uploadChatMedia(created.map((item) => item.file));
+        const uploaded = await uploadChatMedia(
+          created.map((item) => item.file),
+          ensureSessionId()
+        );
         setAttachments((current) =>
           current.map((item) => {
             const index = created.findIndex(
               (createdItem) => createdItem.id === item.id
             );
-            return index >= 0 && urls[index]
-              ? { ...item, url: urls[index], status: 'uploaded' }
+            return index >= 0 && uploaded[index]
+              ? {
+                  ...item,
+                  url: uploaded[index].url,
+                  receipt: uploaded[index].receipt,
+                  status: 'uploaded',
+                }
               : item;
           })
         );
@@ -181,7 +197,12 @@ export function useGenerationEntry({
         );
       }
     },
-    [policyRemaining, preset?.inputPolicy?.accepts, session?.user]
+    [
+      ensureSessionId,
+      policyRemaining,
+      preset?.inputPolicy?.accepts,
+      session?.user,
+    ]
   );
 
   const addLibraryMedia = useCallback(
@@ -195,17 +216,15 @@ export function useGenerationEntry({
             )
         )
         .filter((item) => {
-          const type = isVideoUrl(item.src) ? 'video' : 'image';
+          const type =
+            item.mediaType ?? (isVideoUrl(item.src) ? 'video' : 'image');
           return (
             !preset?.inputPolicy || preset.inputPolicy.accepts.includes(type)
           );
         })
         .slice(0, policyRemaining(media.length));
       if (selected.length === 0) return;
-      if (
-        selected.some((item) => isLocalChatMediaUrl(item.src)) &&
-        !session?.user
-      ) {
+      if (!session?.user) {
         toast.error(m['landing.hero.sign_in_to_upload']());
         return;
       }
@@ -213,34 +232,43 @@ export function useGenerationEntry({
       const created: PendingAttachment[] = selected.map((item) => ({
         id: newAttachmentId(),
         name: item.name || 'media',
-        kind: isVideoUrl(item.src) ? 'video' : 'image',
+        kind: item.mediaType ?? (isVideoUrl(item.src) ? 'video' : 'image'),
         preview: item.src,
         ...(isLocalChatMediaUrl(item.src) ? {} : { url: item.src }),
-        status: isLocalChatMediaUrl(item.src) ? 'uploading' : 'uploaded',
+        status: 'uploading',
       }));
       setAttachments((previous) => [...previous, ...created]);
       try {
-        const urls = await publishChatMediaSources(
-          selected.map((item) => ({ src: item.src, name: item.name }))
+        const targetSessionId = ensureSessionId();
+        const uploaded = await Promise.all(
+          selected.map((item) =>
+            isLocalChatMediaUrl(item.src)
+              ? publishChatMediaSources(
+                  [{ src: item.src, name: item.name }],
+                  targetSessionId
+                ).then(([uploadedItem]) => uploadedItem)
+              : authorizeLibraryMediaForChat(item, targetSessionId)
+          )
         );
         setAttachments((current) =>
           current.map((item) => {
             const index = created.findIndex(
               (createdItem) => createdItem.id === item.id
             );
-            return index >= 0 && urls[index]
-              ? { ...item, url: urls[index], status: 'uploaded' }
+            return index >= 0 && uploaded[index]
+              ? {
+                  ...item,
+                  url: uploaded[index].url,
+                  receipt: uploaded[index].receipt,
+                  status: 'uploaded',
+                }
               : item;
           })
         );
       } catch (error) {
         const message = (error as Error).message || 'Upload failed';
         toast.error(message);
-        const ids = new Set(
-          created
-            .filter((item) => item.status === 'uploading')
-            .map((item) => item.id)
-        );
+        const ids = new Set(created.map((item) => item.id));
         setAttachments((current) =>
           current.map((item) =>
             ids.has(item.id)
@@ -250,7 +278,13 @@ export function useGenerationEntry({
         );
       }
     },
-    [attachments, policyRemaining, preset?.inputPolicy, session?.user]
+    [
+      attachments,
+      ensureSessionId,
+      policyRemaining,
+      preset?.inputPolicy,
+      session?.user,
+    ]
   );
 
   const removeAttachment = useCallback((id: string) => {
@@ -279,7 +313,7 @@ export function useGenerationEntry({
       }
     }
     setSubmitting(true);
-    const sessionId = newAgentSessionId();
+    const sessionId = ensureSessionId();
     try {
       sessionStorage.setItem(
         initialTurnStorageKey(sessionId),
@@ -297,6 +331,7 @@ export function useGenerationEntry({
     router.push(`/chat/${sessionId}`);
   }, [
     attachments,
+    ensureSessionId,
     entryContext,
     hasUploaded,
     preset?.inputPolicy,
@@ -322,6 +357,7 @@ export function useGenerationEntry({
     submitting,
     uploading,
     hasUploaded,
+    ensureSessionId,
     addFiles,
     addLibraryMedia,
     removeAttachment,

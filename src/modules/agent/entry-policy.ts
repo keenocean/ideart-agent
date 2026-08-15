@@ -37,6 +37,8 @@ export type EffectiveGenerationPolicy = {
   inputPolicy: GenerationInputPolicy;
   /** Bound by the API after message/payload validation, before tool creation. */
   requestAttachments?: readonly GenerationRequestAttachment[];
+  /** Current verified request media plus same-chat historical generated media. */
+  allowedAttachments?: readonly GenerationRequestAttachment[];
 };
 
 export class GenerationEntryPolicyError extends Error {
@@ -46,13 +48,20 @@ export class GenerationEntryPolicyError extends Error {
   }
 }
 
-function localePageExists(
+export type CatalogPageAvailability = (
   definition: CatalogDefinition,
   locale: AppLocale
+) => boolean;
+
+function localePageExists(
+  definition: CatalogDefinition,
+  locale: AppLocale,
+  isPageAvailable: CatalogPageAvailability
 ): boolean {
   return definition.publication === 'hidden'
     ? false
-    : Boolean(definition.localePages[locale]);
+    : Boolean(definition.localePages?.[locale]) &&
+        isPageAvailable(definition, locale);
 }
 
 function modelInputPolicy(definition: ModelDefinition): GenerationInputPolicy {
@@ -72,7 +81,8 @@ function modelInputPolicy(definition: ModelDefinition): GenerationInputPolicy {
 
 /** Rebuild client page intent from the server-owned Catalog. */
 export function resolveEffectiveGenerationPolicy(
-  context: GenerationEntryContext
+  context: GenerationEntryContext,
+  isPageAvailable: CatalogPageAvailability
 ): EffectiveGenerationPolicy {
   if (context.kind === 'home') {
     return {
@@ -96,7 +106,7 @@ export function resolveEffectiveGenerationPolicy(
     !definition ||
     definition.publication === 'hidden' ||
     definition.availability === 'coming-soon' ||
-    !localePageExists(definition, context.locale)
+    !localePageExists(definition, context.locale, isPageAvailable)
   ) {
     throw new GenerationEntryPolicyError('Generation entry is not available.');
   }
@@ -174,21 +184,60 @@ export function parseGenerationRequestAttachments(
         record.mediaType as (typeof ALL_ATTACHMENT_TYPES)[number]
       ) ||
       typeof record.url !== 'string' ||
+      (record.receipt !== undefined && typeof record.receipt !== 'string') ||
       !/^https?:\/\//i.test(record.url)
     ) {
       return null;
     }
-    try {
-      resolveReferenceImage(record.url);
-    } catch {
-      return null;
-    }
+    const mediaType =
+      record.mediaType as GenerationRequestAttachment['mediaType'];
+    const url = record.url.trim();
+    if (!isTrustedGenerationAttachmentUrl(mediaType, url)) return null;
     parsed.push({
-      mediaType: record.mediaType as GenerationRequestAttachment['mediaType'],
-      url: record.url.trim(),
+      mediaType,
+      url,
+      ...(record.receipt ? { receipt: record.receipt } : {}),
     });
   }
   return parsed;
+}
+
+export function isTrustedGenerationAttachmentUrl(
+  mediaType: GenerationRequestAttachment['mediaType'],
+  url: string
+): boolean {
+  try {
+    resolveReferenceImage(url);
+  } catch {
+    return false;
+  }
+  return declaredMediaTypeMatchesUrl(mediaType, url);
+}
+
+function declaredMediaTypeMatchesUrl(
+  mediaType: GenerationRequestAttachment['mediaType'],
+  rawUrl: string
+): boolean {
+  const extension = mediaExtension(rawUrl);
+  if (!extension) return true;
+  if (mediaType === 'image') {
+    return ['jpg', 'jpeg', 'png', 'webp'].includes(extension);
+  }
+  if (mediaType === 'audio') {
+    return ['mp3', 'm4a', 'ogg', 'wav', 'webm'].includes(extension);
+  }
+  return ['mp4', 'mov', 'webm', 'm4v'].includes(extension);
+}
+
+function mediaExtension(rawUrl: string): string | null {
+  try {
+    const pathname = new URL(rawUrl).pathname;
+    const last = pathname.split('/').pop() ?? '';
+    const extension = last.includes('.') ? last.split('.').pop() : null;
+    return extension ? extension.toLowerCase() : null;
+  } catch {
+    return null;
+  }
 }
 
 function messageAttachments(message: string): GenerationRequestAttachment[] {
@@ -209,6 +258,7 @@ export function validateRequestAttachments(params: {
   attachments: readonly GenerationRequestAttachment[];
   policy: EffectiveGenerationPolicy;
   settings: AgentGenerationSettings;
+  minimumSatisfiedByAllowedMedia?: boolean;
 }): string | null {
   const declared = params.attachments.map(attachmentKey).sort();
   const embedded = messageAttachments(params.message).map(attachmentKey).sort();
@@ -218,10 +268,12 @@ export function validateRequestAttachments(params: {
   ) {
     return 'Attachment payload does not match the message attachment block.';
   }
-  const policyError = validateGenerationAttachments(
-    params.attachments,
-    params.policy.inputPolicy
-  );
+  const policyError = validateGenerationAttachments(params.attachments, {
+    ...params.policy.inputPolicy,
+    minimum: params.minimumSatisfiedByAllowedMedia
+      ? 0
+      : params.policy.inputPolicy.minimum,
+  });
   if (policyError) return policyError;
 
   const imageCount = params.attachments.filter(
@@ -249,8 +301,10 @@ export function validateToolPolicyAttachments(
     policy.inputPolicy
   );
   if (policyError) return policyError;
-  if (!policy.requestAttachments) return null;
-  const allowed = new Set(policy.requestAttachments.map(attachmentKey));
+  const allowedAttachments =
+    policy.allowedAttachments ?? policy.requestAttachments;
+  if (!allowedAttachments) return null;
+  const allowed = new Set(allowedAttachments.map(attachmentKey));
   const undeclared = attachments.find(
     (attachment) => !allowed.has(attachmentKey(attachment))
   );

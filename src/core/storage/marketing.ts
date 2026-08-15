@@ -72,28 +72,63 @@ export async function verifyMarketingImageAsset(
   asset: { url: string; mimeType: string; bytes: number },
   publicDomain: string
 ): Promise<string> {
+  return verifyMarketingPublishedAsset(
+    { ...asset, kind: 'image' },
+    publicDomain
+  );
+}
+
+export async function verifyMarketingPublishedAsset(
+  asset: {
+    url: string;
+    mimeType: string;
+    bytes: number;
+    kind: 'image' | 'video';
+  },
+  publicDomain: string
+): Promise<string> {
   const url = assertMarketingAssetUrl(asset.url, publicDomain);
-  const response = await fetch(url, { method: 'HEAD' });
-  if (response.status !== 200) {
-    throw new Error(`Published image returned HTTP ${response.status}`);
+  const response = await fetch(url, {
+    method: asset.kind === 'video' ? 'GET' : 'HEAD',
+    headers: asset.kind === 'video' ? { Range: 'bytes=0-0' } : undefined,
+  });
+  const expectedStatus = asset.kind === 'video' ? 206 : 200;
+  if (response.status !== expectedStatus) {
+    throw new Error(
+      `Published ${asset.kind} returned HTTP ${response.status}, expected ${expectedStatus}`
+    );
   }
   const contentType = (response.headers.get('content-type') || '')
     .split(';', 1)[0]
     .trim()
     .toLowerCase();
   if (contentType !== asset.mimeType) {
-    throw new Error('Published image MIME does not match its metadata');
+    throw new Error(`Published ${asset.kind} MIME does not match its metadata`);
   }
   if (response.headers.get('cache-control') !== MARKETING_ASSET_CACHE_CONTROL) {
-    throw new Error('Published image is missing immutable cache metadata');
+    throw new Error(
+      `Published ${asset.kind} is missing immutable cache metadata`
+    );
   }
-  const contentLengthHeader = response.headers.get('content-length');
-  if (
-    contentLengthHeader === null ||
-    !/^\d+$/.test(contentLengthHeader) ||
-    Number(contentLengthHeader) !== asset.bytes
-  ) {
-    throw new Error('Published image size does not match its metadata');
+  const disposition = response.headers.get('content-disposition') ?? '';
+  if (!/^inline(?:\s*;|$)/i.test(disposition.trim())) {
+    throw new Error(`Published ${asset.kind} must use inline disposition`);
+  }
+  const bytes =
+    asset.kind === 'video'
+      ? bytesFromContentRange(response.headers.get('content-range'))
+      : bytesFromContentLength(response.headers.get('content-length'));
+  if (bytes !== asset.bytes) {
+    throw new Error(`Published ${asset.kind} size does not match its metadata`);
   }
   return url;
+}
+
+function bytesFromContentLength(value: string | null): number | undefined {
+  return value !== null && /^\d+$/.test(value) ? Number(value) : undefined;
+}
+
+function bytesFromContentRange(value: string | null): number | undefined {
+  const total = value?.match(/^bytes \d+-\d+\/(\d+)$/i)?.[1];
+  return total ? Number(total) : undefined;
 }

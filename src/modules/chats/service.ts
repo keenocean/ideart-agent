@@ -278,7 +278,9 @@ export interface GeneratedImageItem {
   src: string;
   name: string;
   alt: string;
+  mediaType: 'image' | 'video';
   chatId: string;
+  sourceMessageId: string;
   chatTitle: string;
   createdAt: Date;
   /** The model that produced it, when the stored tool result named one. */
@@ -471,6 +473,10 @@ export async function listGeneratedImages(
   for (const row of rows) {
     for (const part of decodeParts(row.parts)) {
       if (part.type !== 'tool_call') continue;
+      const mediaType =
+        part.name === 'generate_video' || part.name === 'animate_image'
+          ? 'video'
+          : 'image';
       const model = extractModelFromResult(part.result);
       for (const src of extractGeneratedImagesFromResult(part.result)) {
         const dedupeKey = `${row.chatId}:${src}`;
@@ -482,7 +488,9 @@ export async function listGeneratedImages(
           src,
           name,
           alt: name,
+          mediaType,
           chatId: row.chatId,
+          sourceMessageId: row.id,
           chatTitle: row.chatTitle || 'New Chat',
           createdAt: row.createdAt,
           model,

@@ -1,7 +1,9 @@
 import type {
   AgentAssistantMessageMetadataV1,
+  AgentMediaType,
   AgentMessageMetadata,
   AgentTurnMetadataV1,
+  AgentVerifiedMedia,
 } from './types';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -20,6 +22,29 @@ function stringArray(value: unknown): string[] | null {
   if (!Array.isArray(value) || !value.every(isNonEmptyString)) return null;
   if (new Set(value).size !== value.length) return null;
   return [...value];
+}
+
+function mediaType(value: unknown): AgentMediaType | null {
+  return value === 'image' || value === 'audio' || value === 'video'
+    ? value
+    : null;
+}
+
+function verifiedMediaArray(value: unknown): AgentVerifiedMedia[] | null {
+  if (value === undefined) return [];
+  if (!Array.isArray(value)) return null;
+  const parsed: AgentVerifiedMedia[] = [];
+  const seen = new Set<string>();
+  for (const item of value) {
+    if (!isRecord(item)) return null;
+    const type = mediaType(item.mediaType);
+    if (!type || !isNonEmptyString(item.url)) return null;
+    const key = `${type}\u0000${item.url}`;
+    if (seen.has(key)) return null;
+    seen.add(key);
+    parsed.push({ mediaType: type, url: item.url });
+  }
+  return parsed;
 }
 
 export function parseAgentMessageMetadata(
@@ -48,6 +73,7 @@ export function parseAgentMessageMetadata(
   if (value.kind !== 'user') return null;
   const toolNames = stringArray(value.toolNames);
   const longRunningToolNames = stringArray(value.longRunningToolNames);
+  const media = verifiedMediaArray(value.media);
   if (
     !isNonEmptyString(value.agentDefinitionId) ||
     !isNonEmptyString(value.businessPromptHash) ||
@@ -59,6 +85,7 @@ export function parseAgentMessageMetadata(
     !isNullableString(value.skillReleaseId) ||
     !toolNames ||
     !longRunningToolNames ||
+    !media ||
     longRunningToolNames.some((name) => !toolNames.includes(name))
   ) {
     return null;
@@ -78,6 +105,7 @@ export function parseAgentMessageMetadata(
     skillReleaseId: value.skillReleaseId,
     toolNames,
     longRunningToolNames,
+    ...(media.length > 0 ? { media } : {}),
   } satisfies AgentTurnMetadataV1;
 }
 

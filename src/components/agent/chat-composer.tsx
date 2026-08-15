@@ -60,6 +60,9 @@ export interface LibraryMedia {
   src: string;
   name: string;
   alt: string;
+  mediaType?: 'image' | 'video';
+  chatId?: string;
+  sourceMessageId?: string;
 }
 
 export interface ChatComposerProps {

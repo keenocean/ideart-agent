@@ -5,6 +5,7 @@ import { promptByteLength } from '@/core/agent/prompt-config';
 import type { PreparedAgentTurn } from '@/core/agent/types';
 import { envConfigs } from '@/config';
 import { DEFAULT_AGENT_SYSTEM_PROMPT } from '@/config/agent';
+import type { ChatWithMessages } from '@/modules/chats/service';
 import { getAllConfigs } from '@/modules/config/service';
 import type { AgentGenerationSettings } from '@/lib/agent-settings';
 import {
@@ -72,6 +73,7 @@ export interface PrepareAgentTurnParams {
   settings?: AgentGenerationSettings;
   leaseOwner?: PreparedAgentTurn['leaseOwner'];
   policy?: EffectiveGenerationPolicy;
+  preloadedChat?: ChatWithMessages;
 }
 
 export async function prepareAgentTurn(
@@ -101,7 +103,8 @@ export async function prepareAgentTurn(
       params.sessionId,
       params.userId,
       params.persistedUserMessageId,
-      toolNames
+      toolNames,
+      params.preloadedChat
     ),
   ]);
   const llm = resolveLlm(configs);
@@ -162,6 +165,14 @@ export async function prepareAgentTurn(
       toolNames,
       longRunningToolNames,
       ...(params.policy ? { generationEntrySource: params.policy.source } : {}),
+      ...(params.policy?.requestAttachments?.length
+        ? {
+            media: params.policy.requestAttachments.map((attachment) => ({
+              mediaType: attachment.mediaType,
+              url: attachment.url,
+            })),
+          }
+        : {}),
     },
   };
 }
