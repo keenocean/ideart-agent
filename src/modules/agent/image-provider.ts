@@ -80,6 +80,17 @@ export function resolveImageProviderModel(params: {
   );
 }
 
+export function hasConfiguredImageProvider(
+  configs: Record<string, any>
+): boolean {
+  return Boolean(
+    configs.evolink_api_key ||
+    (configs.grouter_api_key && configs.grouter_base_url) ||
+    configs.fal_api_key ||
+    configs.replicate_api_token
+  );
+}
+
 export function pickImageProvider(
   configs: Record<string, any>,
   modelKey: string = DEFAULT_IMAGE_MODEL,

@@ -21,6 +21,18 @@ describe('locale switch destination', () => {
     ).toBe('/blog');
   });
 
+  it('uses the registered target path when translated slugs differ', () => {
+    expect(
+      getLocaleSwitchDestination('zh', {
+        localeHrefs: {
+          en: '/tools/english-tool',
+          zh: '/tools/zhongwen-tool',
+        },
+        fallbackHref: '/tools',
+      })
+    ).toBe('/tools/zhongwen-tool');
+  });
+
   it('preserves the default global language-switch behavior', () => {
     expect(getLocaleSwitchDestination('zh')).toBeUndefined();
   });

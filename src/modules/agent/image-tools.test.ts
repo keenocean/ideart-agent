@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_IMAGE_MODEL } from '@/lib/agent-settings';
 
 import {
+  hasConfiguredImageProvider,
   imageProviderOptionsFor,
   imageProviderOptionsForProvider,
   pickImageProvider,
@@ -61,6 +62,17 @@ describe('readGeneratedImage', () => {
 });
 
 describe('pickImageProvider', () => {
+  it('treats gRouter as configured only when key and base URL are present', () => {
+    expect(hasConfiguredImageProvider({})).toBe(false);
+    expect(hasConfiguredImageProvider({ grouter_api_key: 'g' })).toBe(false);
+    expect(
+      hasConfiguredImageProvider({
+        grouter_api_key: 'g',
+        grouter_base_url: 'https://gateway.example.com',
+      })
+    ).toBe(true);
+  });
+
   it('returns null when no image provider is configured', () => {
     expect(pickImageProvider({})).toBeNull();
   });

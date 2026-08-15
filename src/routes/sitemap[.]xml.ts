@@ -1,11 +1,11 @@
 import { createFileRoute } from '@tanstack/react-router';
 
 import { catalog } from '@/config/catalog';
-import { selectIndexableUrls } from '@/config/catalog/selectors';
 import type { AppLocale } from '@/config/locale';
 import { selectIndexableFixedUrls } from '@/config/seo/public-routes';
 import { buildAbsoluteSeoUrl, type SeoRouteRef } from '@/lib/seo';
 import { baseLocale, locales } from '@/paraglide/runtime.js';
+import { selectLoadableIndexableCatalogUrls } from '@/content/catalog-pages';
 import { getPublishedBlogLocales } from '@/content/posts';
 
 type LocalizedEntry = {
@@ -70,9 +70,9 @@ function fixedEntries(): LocalizedEntry[] {
   return [...groups.values()];
 }
 
-function catalogEntries(): LocalizedEntry[] {
+async function catalogEntries(): Promise<LocalizedEntry[]> {
   const groups = new Map<string, LocalizedEntry>();
-  for (const record of selectIndexableUrls(catalog)) {
+  for (const record of await selectLoadableIndexableCatalogUrls(catalog)) {
     const groupId = `${record.kind}:${record.entityId}`;
     const group = groups.get(groupId) ?? { groupId, routes: [] };
     group.routes.push({ locale: record.locale, path: record.path });
@@ -159,7 +159,7 @@ export const Route = createFileRoute('/sitemap.xml')({
         try {
           const entries = deduplicate([
             ...fixedEntries(),
-            ...catalogEntries(),
+            ...(await catalogEntries()),
             ...(await blogEntries()),
           ]);
           const body = [

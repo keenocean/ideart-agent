@@ -19,15 +19,55 @@ const routes = [
   '/zh/terms-of-service',
   '/blog',
   '/zh/blog',
+  '/tools',
+  '/zh/tools',
+  '/tools/ai-image-generator',
+  '/zh/tools/ai-image-generator',
   '/robots.txt',
   '/sitemap.xml',
   '/llms.txt',
   '/llms-full.txt',
   '/tools/missing',
   '/zh/tools/missing',
+  '/tools/ai-image-editor',
+  '/zh/tools/ai-image-editor',
   '/models/missing',
   '/zh/models/missing',
 ];
+
+const stage3Expectations = new Map([
+  [
+    '/tools',
+    { status: 200, robots: 'noindex,follow', jsonLd: ['BreadcrumbList'] },
+  ],
+  [
+    '/zh/tools',
+    { status: 200, robots: 'noindex,follow', jsonLd: ['BreadcrumbList'] },
+  ],
+  [
+    '/tools/ai-image-generator',
+    {
+      status: 200,
+      robots: 'noindex,follow',
+      jsonLd: ['BreadcrumbList', 'FAQPage'],
+    },
+  ],
+  [
+    '/zh/tools/ai-image-generator',
+    {
+      status: 200,
+      robots: 'noindex,follow',
+      jsonLd: ['BreadcrumbList', 'FAQPage'],
+    },
+  ],
+  ['/tools/missing', { status: 404 }],
+  ['/zh/tools/missing', { status: 404 }],
+  ['/tools/ai-image-editor', { status: 404 }],
+  ['/zh/tools/ai-image-editor', { status: 404 }],
+  ['/models/missing', { status: 404 }],
+  ['/zh/models/missing', { status: 404 }],
+]);
+const failures = [];
 
 function attribute(tag, name) {
   return tag.match(new RegExp(`${name}=["']([^"']*)["']`, 'i'))?.[1] ?? '';
@@ -115,4 +155,48 @@ for (const route of routes) {
     jsonLdTypes: jsonLdTypes(body),
   };
   console.log(JSON.stringify(result));
+
+  const expected = stage3Expectations.get(route);
+  if (!expected) continue;
+  if (result.status !== expected.status) {
+    failures.push(
+      `${route}: HTTP ${result.status}, expected ${expected.status}`
+    );
+    continue;
+  }
+  if (expected.status !== 200) continue;
+  if (result.robots !== expected.robots) {
+    failures.push(
+      `${route}: robots ${String(result.robots)}, expected ${expected.robots}`
+    );
+  }
+  if (!result.title || !result.description) {
+    failures.push(`${route}: missing title or description`);
+  }
+  if (result.canonical.length !== 1) {
+    failures.push(`${route}: expected exactly one canonical`);
+  } else {
+    const canonical = new URL(result.canonical[0]);
+    if (canonical.pathname !== route) {
+      failures.push(
+        `${route}: canonical pathname ${canonical.pathname}, expected ${route}`
+      );
+    }
+    if (result.openGraph.url !== result.canonical[0]) {
+      failures.push(`${route}: og:url does not match canonical`);
+    }
+  }
+  if (result.alternates.length > 0) {
+    failures.push(`${route}: noindex page emitted hreflang alternates`);
+  }
+  for (const type of expected.jsonLd ?? []) {
+    if (!result.jsonLdTypes.includes(type)) {
+      failures.push(`${route}: missing ${type} JSON-LD`);
+    }
+  }
+}
+
+if (failures.length > 0) {
+  console.error(failures.map((failure) => `- ${failure}`).join('\n'));
+  process.exitCode = 1;
 }

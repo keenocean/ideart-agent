@@ -65,15 +65,15 @@ JSON 只负责 i18n 文案；重复卡片和页面实体由 Typed Catalog 驱动
 
 “内容数据化”不等于“页面 JSON 化”。本次实施固定使用以下边界：
 
-| 内容/规则                                                          | 权威位置                                               | 格式与加载方式                                             |
-| ------------------------------------------------------------------ | ------------------------------------------------------ | ---------------------------------------------------------- |
-| 页面 section 顺序、交互和特殊布局                                  | `src/routes/*` + `src/blocks/*`                        | React/TypeScript 显式 composition                          |
-| 导航、按钮、状态、短标题和短 metadata                              | `messages/<locale>.json`                               | flat JSON key，已知 key 静态调用                           |
-| entityId、slug、publication、indexing、placement、related、variant | `src/config/catalog/*`                                 | Typed TypeScript Catalog                                   |
-| 介绍、案例说明、Prompt 教程、限制、长 FAQ 等 SEO 正文              | `tool-content/<slug>.<locale>.ts`、`model-content/...` | 可序列化 typed module，按 `slug + locale` 懒加载并参与 SSR |
-| 模型能力、参数、积分、Provider、权限和执行限制                     | Runtime/服务端权威源                                   | 运行时派生并在服务端验证                                   |
-| 图片、视频、poster 和分享图                                        | R2 + typed asset ref                                   | 代码只保存已验证的稳定公网引用和展示 metadata              |
-| Blog 正文                                                          | 数据库                                                 | 按 `(slug, locale)` 精确读取                               |
+| 内容/规则                                                          | 权威位置                                          | 格式与加载方式                                                |
+| ------------------------------------------------------------------ | ------------------------------------------------- | ------------------------------------------------------------- |
+| 页面 section 顺序、交互和特殊布局                                  | `src/routes/*` + `src/blocks/*`                   | React/TypeScript 显式 composition                             |
+| 导航、按钮、状态、短标题和短 metadata                              | `messages/<locale>.json`                          | flat JSON key，已知 key 静态调用                              |
+| entityId、slug、publication、indexing、placement、related、variant | `src/config/catalog/*`                            | Typed TypeScript Catalog                                      |
+| 介绍、案例说明、Prompt 教程、限制、长 FAQ 等 SEO 正文              | `src/content/<kind>/pages/<entityId>/<locale>.ts` | 可序列化 typed module，按实体与语言自动发现、懒加载并参与 SSR |
+| 模型能力、参数、积分、Provider、权限和执行限制                     | Runtime/服务端权威源                              | 运行时派生并在服务端验证                                      |
+| 图片、视频、poster 和分享图                                        | R2 + typed asset ref                              | 代码只保存已验证的稳定公网引用和展示 metadata                 |
+| Blog 正文                                                          | 数据库                                            | 按 `(slug, locale)` 精确读取                                  |
 
 不得建立包含任意 `sections[]`、component name 或 props 的通用页面 JSON，也不得把长正文、Base64 媒体或业务能力复制进 messages/Catalog。typed content module 只提供内容数据；最终 section 顺序仍由 React 决定。若生产 bundle 证明某段长正文能保持 route-local，允许继续使用静态 Paraglide message functions，但必须以 route bundle 报告为证据，不能凭源码 import 形态推断。
 
@@ -101,18 +101,23 @@ src/
 │   └── legacy-routes.ts
 ├── config/seo/
 │   └── public-routes.ts           # 固定公开路由的逐语言 index 状态
+├── content/
+│   ├── catalog-pages.ts            # Catalog × content 发布门禁与精确 locale target
+│   ├── tools/
+│   │   ├── manifest.ts            # 非 eager glob + 精确语言 resolver
+│   │   └── pages/<entityId>/<locale>.ts
+│   └── models/                    # 阶段 4 沿用同一约定
+│       ├── manifest.ts
+│       └── pages/<entityId>/<locale>.ts
 ├── blocks/                        # 现有公开内容层保持扁平，以领域前缀分组
 │   ├── hero.tsx
 │   ├── features.tsx
 │   ├── models-strip.tsx
-│   ├── catalog-content.ts             # lazy module key manifest + 同语言内容 resolver
 │   ├── tool-directory.tsx
 │   ├── tool-detail.tsx
-│   ├── tool-content/                # 按 slug + locale 懒加载的长正文
 │   ├── tool-detail-variants.tsx
 │   ├── model-directory.tsx
 │   ├── model-detail.tsx
-│   ├── model-content/               # 按 slug + locale 懒加载的长正文
 │   └── model-detail-variants.tsx
 └── routes/
     ├── index.tsx
@@ -122,7 +127,7 @@ src/
     └── models/$slug.tsx
 ```
 
-`src/blocks/` 中可执行的 React Blocks 保持扁平，不再增加重复的 `blocks/marketing/` 命名空间；`tool-content/`、`model-content/` 只是按路由懒加载的序列化正文模块，不是新的 Block 层。Catalog 同时驱动路由、目录、Related、Sitemap 与 llms 投影，因此使用 `config/catalog/`，避免把它误解为仅供营销文案使用。`components/catalog/` 只容纳工具/模型目录真正共享的纯展示组件；SectionHeading、Steps、FeatureGrid、FAQList、FinalCTA 等通用抽象必须在出现至少两个真实消费者后再提取，优先复用现有 blocks 和 UI primitives。
+`src/blocks/` 中可执行的 React Blocks 保持扁平，不再增加重复的 `blocks/marketing/` 命名空间；序列化正文统一放在 `src/content/<kind>/pages/`，不是新的 Block 层。Catalog 同时驱动路由、目录、Related、Sitemap 与 llms 投影，因此使用 `config/catalog/`，避免把它误解为仅供营销文案使用。`components/catalog/` 只容纳工具/模型目录真正共享的纯展示组件；SectionHeading、Steps、FeatureGrid、FAQList、FinalCTA 等通用抽象必须在出现至少两个真实消费者后再提取，优先复用现有 blocks 和 UI primitives。
 
 ### 3.3 Catalog 分离“发布”“逐语言收录”与“能力”
 
@@ -207,13 +212,13 @@ URL 与路由规则必须复用本项目及 `shipany-tanstack` 已验证的三�
 - `resolveCatalogRoute(kind, locale, slug)` 是详情 loader、内容 resolver、head 和 redirect 共用的唯一解析器。当前语言记录不存在、slug 不匹配、实体 unknown/hidden 时先 `throw notFound()`，不得 fallback 到 base locale。
 - 首页、Pricing、静态页、`/tools`、`/models` 等固定公开文件路由在 `src/config/seo/public-routes.ts` 以 `FixedPublicRoute` 显式登记逐语言 index 状态，但不伪装成 Catalog 详情实体。注册校验必须证明每个 path 由真实文件路由接受。
 
-首页、目录、related、sitemap 和 llms 文档必须共享同一个 selector 模块和状态语义，但不能误用成完全相同的过滤函数：
+首页、目录、related、sitemap 和 llms 文档必须共享同一个 selector 模块和状态语义，但不能误用成完全相同的过滤函数。所有 Catalog selector 都必须显式接收 `CatalogPageAvailability`；生产消费端统一传入 `isCatalogPageContentAvailable`，测试 fixture 才能传入其他 predicate，禁止留下绕过正文门禁的默认值：
 
 - `selectHomeEntries(locale)`：`listed + placement.home + localePages[locale]`，按 `placement.home.order`。
 - `selectDirectoryEntries(locale)`：`listed + localePages[locale]`，按 `directoryOrder`；coming-soon 是否展示必须通过显式 placement/policy 决定，不得写成“可选”却没有类型落点。
 - `selectRelatedEntries(definition, locale)`：只保留 definition 显式引用、存在、非自身、`listed` 且该 locale 页面真实存在的目标。
-- `selectIndexableUrls()`：展开为 `{ kind, entityId, locale, path, modifiedAt? }[]`，只保留 `listed + localePages[locale].indexing === 'index'` 的 canonical URL，作为 sitemap 的 Catalog 输入。
-- `selectLlmsEntries(locale)`：只保留该 locale 允许公开发现的已发布能力；不得输出 unlisted/hidden、缺失语言版本或部署秘密。
+- `selectIndexableUrls(..., isPageAvailable)`：展开为 `{ kind, entityId, locale, path, modifiedAt? }[]`，只保留 `listed + localePages[locale].indexing === 'index' + 同语言正文存在` 的 canonical URL，作为 sitemap 的 Catalog 输入。
+- `selectLlmsEntries(locale, isPageAvailable)`：只保留该 locale 允许公开发现且存在同语言正文的已发布能力；不得输出 unlisted/hidden、缺失语言版本或部署秘密。
 
 新项目无需改页面代码即可调整展示集合和顺序；类型校验与 selector 测试共同阻止各消费端状态漂移。测试必须证明 `localePages` 非空、同一 kind/locale 下 slug 唯一、placement 组合合法、每个 selector 返回的 path 都能被同一个 resolver 反向解析。
 
@@ -222,7 +227,7 @@ URL 与路由规则必须复用本项目及 `shipany-tanstack` 已验证的三�
 1. Catalog resolver 证明 entity、locale route、publication/indexing 状态合法。
 2. 内容 resolver 的 lazy module key manifest 证明对应 `kind + entityId + locale` 内容存在，并能按需加载。
 
-内容 manifest 只能保存模块 key 与动态 loader，禁止 eager import 全部正文。首页、目录和 Related 在真正渲染链接前组合 selector 结果与 content availability；详情 loader 先解析 Catalog，再加载同语言内容，任一门禁失败即 404。`indexing: 'index'` 的注册校验和发布 smoke 还必须证明内容模块、真实文件路由、SSR 正文与发现面同时存在，避免仅修改 Catalog 就把薄页或 404 放入 sitemap。
+内容 manifest 通过非 eager `import.meta.glob('./pages/*/*.ts')` 从约定目录自动建立模块 key 与动态 loader，禁止手工重复登记或 eager import 全部正文。manifest 校验 entityId 路径、路径语言与加载后的 entityId/locale 身份；Catalog locale page 仍是独立发布门禁。`src/content/catalog-pages.ts` 将各 kind 的精确语言 manifest 汇总为唯一 availability predicate 和 locale-free target 投影；尚未实现 content resolver 的 kind 一律 fail closed。首页、目录和 Related 在 selector 内组合 Catalog 与该 predicate；Sitemap 与 llms 还会按需加载候选模块并验证导出身份，不能只凭文件路径存在就公开 URL。详情 loader 加载同语言内容，任一门禁失败即 404。语言切换消费 `locale → Catalog path`，不得假设不同语言共享 slug。`indexing: 'index'` 的注册校验和发布 smoke 还必须证明内容模块、真实文件路由、SSR 正文与发现面同时存在，避免仅修改 Catalog 就把薄页或 404 放入 sitemap。
 
 ### 3.4 Catalog 不成为业务权威
 
@@ -556,7 +561,7 @@ Background Remover 页面必须明确：
 
 - 短 UI、导航、表单、状态、title/description 等新增为 `marketing.home.*`、`marketing.tools.*`、`marketing.models.*` flat keys 到中英文消息文件，保持全站 Paraglide 习惯与 key parity。
 - 已知固定文案使用静态 `m['key']()` 调用；公共营销 import graph 禁止调用 `tDynamic()` 或把 `m` cast 成动态 record。动态 slug 通过显式静态 resolver 映射，不能拼接 key。
-- 阶段 0 先记录当前全局 messages chunk 和各 route preload。只有生产 manifest 证明新增正文留在目标 route chunk 时，长正文才可继续放 messages；否则将案例说明、Prompt 教程、FAQ 正文等迁到 `src/blocks/tool-content/<slug>.<locale>.ts`、`model-content/...` 或同等的 typed locale module，并通过 `import.meta.glob(..., { eager: false })` 按“当前 slug + 当前 locale”加载。不得使用 eager glob、单体 `tool-content.ts` 或根模块静态 import 所有正文。
+- 阶段 0 先记录当前全局 messages chunk 和各 route preload。只有生产 manifest 证明新增正文留在目标 route chunk 时，长正文才可继续放 messages；否则将案例说明、Prompt 教程、FAQ 正文等迁到 `src/content/<kind>/pages/<entityId>/<locale>.ts`，并通过 `import.meta.glob(..., { eager: false })` 按实体与当前 locale 加载。不得使用 eager glob、单体 content 文件或根模块静态 import 所有正文。
 - locale content module 只导出经过类型约束、可序列化的页面内容；它不是任意 JSON renderer。缺少当前 locale module 时 resolver 返回缺失并触发 404/noindex gate，绝不 fallback 到 baseLocale 伪装成译文。
 - Catalog 只保存 id/逐语言 slug/状态/关联/素材/能力引用，不保存双语长文案。
 - 每个新项目替换 blocks、Catalog、messages 和 assets；通用 components/routes 保留。
@@ -746,12 +751,12 @@ Google 当前指导同样要求优先修复站点自己链接或提交的 404，
 
 #### 首页、工具页与模型页实施状态（2026-08-15）
 
-- 阶段 0/1 的 Catalog、resolver/selectors、SEO helper、固定公开路由、sitemap/llms 和 R2 检查底座已经落地；Catalog 中的工具/模型 locale route 当前仍全部为 `noindex` 基础设施登记。
+- 阶段 0/1 的 Catalog、resolver/selectors、SEO helper、固定公开路由、sitemap/llms 和 R2 检查底座已经落地；阶段 3 已为 `ai-image-generator` 增加真实同语言正文和路由，但工具/模型 locale route 当前仍全部保持 `noindex`。
 - 阶段 2 的共享生成入口安全链路已经完成：`PromptLauncher` 已成为复用 `useGenerationEntry` + `GenerationWorkbench` 的兼容 wrapper，图片模型状态已贯通，服务端会从 `entryContext` 重建 policy 并在 API/tool 两层执行锁定与附件约束，Agent guard/认证页/邮箱验证已保留原 session callback。
-- 阶段 3/4 尚未开始页面纵向切片：`src/routes/tools/*`、`src/routes/models/*`、`src/components/catalog/*`、同语言 tool/model content modules 均不存在，Block registry 和 marketing asset registry 仍为空。
+- 阶段 3 的首个工具纵向切片已经完成：`/tools`、`/tools/$slug`、纯 props Catalog 组件、工具 Blocks、精确语言 content manifest/resolver 和服务端 DeploymentReadiness 已存在；仅 `ai-image-generator` 有 en/zh 正文并可访问。阶段 4 模型切片尚未开始，`src/routes/models/*` 与 model content modules 仍不存在，Block registry 和 marketing asset registry 仍为空。
 - 阶段 5 尚未开始：首页仍是旧的 `Header → Hero(PromptLauncher) → Blog → Footer → SupportWidget`，登录用户仍自动跳转 `/chat`。仓库中未接线的 `Features`、`ModelsStrip`、`Gallery`、`FAQ`、`CTA` 等旧/demo Blocks 不计为本计划首页实施，其中渐变 placeholder 不符合真实 R2 案例门禁。
-- Header/Footer 尚未接入 Tools/Models，Catalog home/directory/related selectors 尚无页面消费者；sitemap/llms 虽已接线，但因为 Catalog locale pages 均为 noindex，不输出这些 URL。
-- 阶段 2 完成后全量 46 个测试文件/267 项测试、`pnpm exec tsc --noEmit`、`pnpm format:check` 与 `pnpm build` 通过；构建仍有既有大 chunk warning。真实 OAuth/provider、跨标签邮箱浏览器 smoke、完整视觉、HTTP inventory、Lighthouse 与生产 R2 online check 仍只在具备相应环境时执行，不能据此宣告阶段 3–8 页面已完成。
+- Header/Footer 和首页尚未接入 Tools/Models；`/tools` 已成为首个 Catalog directory 消费者，related selector 只输出具备同语言正文的目标。sitemap/llms 虽已接线，但因为 Catalog locale pages 均为 noindex，不输出这些 URL。
+- 阶段 3 完成后全量 47 个测试文件/281 项测试、`pnpm exec tsc --noEmit`、`pnpm format:check`、`pnpm build`、HTTP route inventory、营销资源检查和 Cloudflare 构建/预算门禁均通过；构建仍有既有大 chunk warning。真实 OAuth/provider、浏览器生成 smoke、完整视觉、Lighthouse、生产抓取、Search Console 与 R2 online check 仍只在具备相应环境时执行，不能据此宣告阶段 4–9 已完成或开放索引。
 
 ### 已完成：阶段 2 共享生成入口安全链路（2026-08-15）
 
@@ -770,12 +775,23 @@ Google 当前指导同样要求优先修复站点自己链接或提交的 404，
 - Agent auth guard 保留当前 locale-free path + query；sign-in/sign-up、已登录分支、邮箱验证和 OAuth callback 共用 `sanitizeAuthCallback()`。验证邮件落到无 payload 的 completion page，只通过 `BroadcastChannel` 发信号；原标签页确认 session 后才回到原 `/chat/$sessionId` 消费 stash，验证标签页明确说明原标签关闭后无法恢复草稿。
 - 自动验证覆盖 preset 优先级、图片模型规范化、handoff、Catalog policy、伪造 entry、附件绑定、tool 参数绕过、callback sanitizer 与跨标签 signal contract。真实 OAuth/provider 和浏览器跨标签 smoke 未在无凭据环境中伪造成功，留给有合法回调域的发布环境。
 
-### 阶段 3：第一个工具纵向切片
+### 已完成：阶段 3 第一个工具纵向切片（2026-08-15）
 
 1. 以已经作为 noindex 基础设施登记的 `ai-image-generator` 作为唯一开放切片；实现 `/tools`、`/tools/$slug`、同语言 content manifest/resolver、404 和统一 SEO head。其他工具即使已存在 Catalog definition，也必须在同语言正文与 route inventory 完成前保持不可发现。
 2. 以这个真实页面实现最小目录卡片、详情 shell、案例 gallery、related 与 Workbench；组件只接收 props，不读 i18n、不访问 server modules。切片用到的图片、视频、poster 和分享图必须先进入 R2 typed asset ref，不得引用 `public/` 历史路径。
 3. 长正文先测 bundle：若 Paraglide 不能让该 route 独享内容，则迁移到按 `slug + locale` 懒加载的类型安全 content module；不允许 fallback 到另一语言。
 4. 运行该切片的 route inventory：en/zh 目录和详情为 200，missing/hidden 为 404，head/noindex/canonical 正确，页面产生的每个链接都能解析并返回预期状态。
+
+#### 阶段 3 实施检查点
+
+- `/tools` 和 `/tools/ai-image-generator` 已提供独立 en/zh SSR 页面。详情 loader 先解析 Catalog route，再从 `src/content/tools/pages/<entityId>/<locale>.ts` 约定目录自动发现并加载精确语言 content module；任一门禁缺失都返回真实 404，不回退到另一语言。新增工具/语言内容文件无需再手写 manifest loader，自动化测试遍历所有发现模块而不复制页面清单。
+- Catalog selectors 强制注入同语言内容 availability；目录与 Related 无法仅凭 Catalog `listed` 输出内容缺失的 URL，Sitemap 与 llms 还会验证 lazy 模块确实可加载且导出身份匹配。详情语言切换使用内容-backed Catalog locale target，可支持各语言不同 slug；模型正文 resolver 尚未实现时保持 fail closed。
+- 工具目录和详情组件只接收 props；Blocks 负责 i18n、Catalog preset、`useGenerationEntry` 与 `GenerationWorkbench` 接线。公开 readiness 只返回 Agent LLM、图片 Provider、模型 route 和存储是否配置，不向客户端序列化凭据。
+- `ai-image-generator` 正文覆盖输入/输出、三组提示词案例、步骤、功能、提示词指导、使用场景、限制、FAQ 和 CTA。当前没有已在线验证的 R2 结果图或分享图，因此不伪造 gallery：只展示提示词案例并输出 summary card，marketing asset registry 继续为空。
+- 四个开放 URL 均经生产 HTTP 快照验证为 `200 + noindex,follow + self canonical`，无 hreflang；目录输出可见 `BreadcrumbList`，详情输出与可见内容同源的 `BreadcrumbList + FAQPage`。`/tools/missing`、`/zh/tools/missing` 和尚未开放的 `ai-image-editor` en/zh URL 均为 404。
+- 内容按语言拆成独立 client chunks（en 约 2.89 KiB gzip，zh 约 3.20 KiB gzip）；代表路由报告为 `/tools/` 约 362.7 KiB gzip、`/tools/$slug` 约 381.9 KiB gzip，根路由不 preload 工具内容。
+- 全量 47 个测试文件/281 项测试、TypeScript、Prettier、生产构建、营销资源检查、Cloudflare build/dry-run/budget 均通过；Worker gzip 2,203,272 bytes，低于 free 预算 2,516,582 bytes。HTTP 快照中的 Blog/Sitemap 503 来自本地 SQLite 未初始化的既有数据库依赖，不是工具页回归。
+- 页面继续保持 noindex，Header/Home、sitemap、hreflang 和 llms 发现面留到阶段 7。上线前还需在真实 Provider/Storage 配置下完成浏览器生成 smoke；加入案例/分享媒体时必须先走不可变 R2 typed asset 与 online check。
 
 ### 阶段 4：第一个模型纵向切片与克制抽取
 

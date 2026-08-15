@@ -23,11 +23,15 @@ import { toolCatalog } from './tools';
 import type { CatalogDefinition } from './types';
 import { validateCatalog } from './validate';
 
+const everyCatalogPageAvailable = () => true;
+
 describe('Catalog contract', () => {
   it('validates the initial tool/model Catalog and keeps every locale noindex', () => {
     expect(() => validateCatalog(catalog, legacyCatalogRoutes)).not.toThrow();
-    expect(selectIndexableUrls(catalog)).toEqual([]);
-    expect(selectLlmsEntries(catalog, 'en')).toEqual([]);
+    expect(selectIndexableUrls(catalog, everyCatalogPageAvailable)).toEqual([]);
+    expect(selectLlmsEntries(catalog, 'en', everyCatalogPageAvailable)).toEqual(
+      []
+    );
     expect(
       catalog.flatMap((entry) =>
         Object.values(entry.localePages ?? {}).map((page) =>
@@ -120,18 +124,27 @@ describe('Catalog contract', () => {
       (entry) => entry.entityId === 'ai-image-generator'
     )!;
     expect(
-      selectHomeEntries(toolCatalog, 'en').map((entry) => entry.entityId)
-    ).toEqual(['ai-image-generator', 'text-to-video', 'image-to-video']);
-    expect(
-      selectHomeEntries(modelCatalog, 'en').map((entry) => entry.entityId)
-    ).toEqual(['gpt-image-2', 'minimax-h3']);
-    expect(selectDirectoryEntries(catalog, 'en')).toHaveLength(catalog.length);
-    expect(
-      selectRelatedEntries(catalog, imageGenerator, 'en').map(
+      selectHomeEntries(toolCatalog, 'en', everyCatalogPageAvailable).map(
         (entry) => entry.entityId
       )
+    ).toEqual(['ai-image-generator', 'text-to-video', 'image-to-video']);
+    expect(
+      selectHomeEntries(modelCatalog, 'en', everyCatalogPageAvailable).map(
+        (entry) => entry.entityId
+      )
+    ).toEqual(['gpt-image-2', 'minimax-h3']);
+    expect(
+      selectDirectoryEntries(catalog, 'en', everyCatalogPageAvailable)
+    ).toHaveLength(catalog.length);
+    expect(
+      selectRelatedEntries(
+        catalog,
+        imageGenerator,
+        'en',
+        everyCatalogPageAvailable
+      ).map((entry) => entry.entityId)
     ).toEqual(['ai-image-editor', 'gpt-image-2']);
-    expect(selectIndexableUrls(catalog)).toEqual([]);
+    expect(selectIndexableUrls(catalog, everyCatalogPageAvailable)).toEqual([]);
   });
 
   it('projects modality-safe UI presets without making them authoritative', () => {

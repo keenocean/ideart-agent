@@ -1,23 +1,36 @@
 # Marketing pages SEO map
 
-Reviewed on 2026-08-14. This is the durable page/locale decision record; runtime
+Reviewed on 2026-08-15. This is the durable page/locale decision record; runtime
 Catalog and server validation remain authoritative for product capability.
 
-All Catalog routes below are infrastructure registrations only. They have no
-public detail route or substantive localized body in phase 1, so every concrete
-locale URL is `noindex` and omitted from sitemap, hreflang, llms, navigation,
-and other discovery surfaces. A later phase may change one locale to `index`
-only after its own content and release gate passes; the other locale does not
-follow automatically.
+Phase 3 opens one routable tool slice: `/tools` and
+`/tools/ai-image-generator` now return substantive en/zh pages. Both remain
+`noindex` and are omitted from sitemap, hreflang, llms, Header/Home navigation,
+and other discovery surfaces until the later discovery and production release
+gate. The directory filters through the exact-locale content manifest, so every
+other Catalog tool still returns 404 despite having an infrastructure route
+registration. A later phase may change one locale to `index` only after its own
+release gate passes; the other locale does not follow automatically.
+
+External follow-up remains conditional on a production deployment: repeat the
+representative URL fetch and review Search Console on 2026-08-22 (day 7) and
+2026-09-14 (day 30). If the pages are not deployed by either checkpoint, record
+that fact here and reschedule from the actual release date rather than treating
+the repository snapshot as production evidence.
 
 Search-result review showed distinct task language for text-to-image, editing,
 background work, text/image/reference-to-video, and model evaluation in both
 English and Chinese. This supports separate task pages while keeping model pages
-focused on evaluation/specification. Intent evidence reviewed: Runway AI Video
-Generator, Pixlr, Alibaba Cloud Model Studio video generation, MiniMax model/API
-documentation, and ByteDance Seedance 2.0 official model/launch pages. No search
-volume, ranking, pricing, or unsupported model capability is inferred from those
-results.
+focused on evaluation/specification. Phase 3 image intent evidence reviewed on
+2026-08-15: [QuillBot AI Image Generator](https://quillbot.com/ai-image-generator)
+and [Cloudinary image prompt guidance](https://cloudinary.com/guides/image-generation/image-generation-prompts)
+for English task/prompt result shapes; [Alibaba Cloud Model Studio text-to-image
+prompt guidance](https://help.aliyun.com/zh/model-studio/text-to-image-prompt)
+and [Vidu AI 图片生成器](https://www.vidu.com/zh/ai-image-generator) for Chinese
+task language. Earlier video/model evidence remains Runway, Pixlr, Alibaba Cloud
+Model Studio, MiniMax, and ByteDance official pages reviewed 2026-08-14. No
+search volume, ranking, pricing, or unsupported capability is inferred from
+these results.
 
 Current fixed pages remain explicitly registered per locale: `/`, `/pricing`,
 `/privacy-policy`, and `/terms-of-service` are `index` for en and zh. Blog is
@@ -27,34 +40,99 @@ Shared fields for the entries below:
 
 - Publication: `listed`; canonical paths are locale-free inputs.
 - Indexable alternates: none while `noindex`.
-- OG asset: pending immutable R2 upload; no local fallback is permitted.
+- OG asset: pending immutable R2 upload; pages without a verified asset emit a
+  summary card and never fall back to local marketing media.
 - Structured data: visible `BreadcrumbList`; `FAQPage` only if the same FAQ is
   rendered on the page. No Product/ratings/reviews schema.
-- Actual content updated at: unknown; phase 1 contains no detail content.
-- Repository checks: phase 0/1 test, type, format, asset, bundle, and build gate.
+- Actual content updated at: unknown unless an entry below records a date.
+- Repository checks: phase 3 test, type, format, asset, bundle, build, route inventory, and Cloudflare budget gate passed on 2026-08-15.
 - External verification: not available before production deployment.
+
+## tools-directory · en
+
+- Route: `/tools`
+- Entity: `directory:tools`; locale: `en`; publication: routable
+- Availability: live directory; indexing decision: `noindex`
+- Primary intent/query cluster: discover available creation workflows; `AI tools`, adjacent `AI image tools`
+- User stage: discover
+- Canonical path: `/tools`; indexable alternates: none while noindex
+- Adjacent pages: `/tools/ai-image-generator`, future `/models`
+- Cannibalization boundary: category discovery only; the detail page owns text-to-image task completion
+- Required visible evidence: one content-backed tool card and truthful availability state
+- Claim sources: Catalog selector plus exact-locale tool content manifest
+- Inbound links: none before the phase 7 discovery wiring
+- Outbound links: `/tools/ai-image-generator` → “AI Image Generator”
+- OG asset: none until an immutable R2 sharing asset is uploaded
+- Structured data: visible `BreadcrumbList`
+- Actual content updated at: 2026-08-15; reviewed at: 2026-08-15
+- Repository checks: passed phase 3 full test/type/format/build, route inventory, asset, route-bundle, and Cloudflare budget gates on 2026-08-15
+- External verification: pending production deployment
+- Notes/risks: stays noindex and absent from sitemap/llms until intentional inbound links and production checks exist
+
+## tools-directory · zh
+
+- Route: `/tools`
+- Entity: `directory:tools`; locale: `zh`; publication: routable
+- Availability: live directory; indexing decision: `noindex`
+- Primary intent/query cluster: 发现可用的 AI 创作工作流；`AI 工具`、邻近`AI 图片工具`
+- User stage: discover
+- Canonical path: `/tools`; indexable alternates: noindex 期间为空
+- Adjacent pages: 中文 `/tools/ai-image-generator`，未来 `/models`
+- Cannibalization boundary: 只承担类别发现；文生图任务由详情页完成
+- Required visible evidence: 一个具备同语言正文的工具卡片和真实可用状态
+- Claim sources: Catalog selector 与精确语言 tool content manifest
+- Inbound links: 阶段 7 接入发现面之前暂无
+- Outbound links: `/tools/ai-image-generator` →“AI 图片生成器”
+- OG asset: 等待不可变 R2 分享图，不使用本地回退
+- Structured data: 与页面一致的 `BreadcrumbList`
+- Actual content updated at: 2026-08-15; reviewed at: 2026-08-15
+- Repository checks: 2026-08-15 已通过阶段 3 全量测试、类型、格式、构建、路由清单、资源、route bundle 与 Cloudflare 预算门禁
+- External verification: 等待生产部署
+- Notes/risks: 在有意接入内链和生产验证前保持 noindex，不进入 sitemap/llms
 
 ## ai-image-generator · en
 
 - Route: `/tools/ai-image-generator`
-- Entity: `tool:ai-image-generator`; availability: `live`; decision: `noindex`
-- Primary intent/query cluster: create an AI image from a text prompt; `AI image generator`, `text to image`
+- Entity: `tool:ai-image-generator`; locale: `en`
+- Publication: `listed`; availability: `live`; indexing decision: `noindex`
+- Primary intent: create an image from a written visual brief
+- Query cluster: `AI image generator`, `text to image`, `AI image prompts`
 - User stage: create
-- Boundary: task completion page, not a GPT Image 2 model evaluation page
-- Required evidence/limits: real prompt examples, image settings, editing boundary, model/runtime limits
-- Claim source: `AGENT_IMAGE_MODEL_OPTIONS`, `generate_image`
-- Inbound/outbound: `/tools` and homepage → “AI image generator”; related to image editor and GPT Image 2
+- Canonical path: `/tools/ai-image-generator`; indexable alternates: none while noindex
+- Adjacent pages: future `/models/gpt-image-2`, `/tools/ai-image-editor`
+- Cannibalization boundary: completes a general text-to-image task; it does not evaluate GPT Image 2 or promise reference-image editing as the primary workflow
+- Required visible evidence: three adaptable prompt examples, workflow, output controls, prompt guidance, use cases, runtime-backed limitations, visible FAQ
+- Claim sources: `AGENT_IMAGE_MODEL_OPTIONS`, `DEFAULT_IMAGE_MODEL`, server cost normalization, `generate_image`, Catalog entry policy
+- Inbound links: `/tools` → “AI Image Generator”; homepage intentionally deferred to phase 5/7
+- Outbound/related links: breadcrumb to `/tools`, CTA to `/pricing`; unopened Catalog relations are filtered out rather than linked to 404s
+- OG asset: none pending immutable R2 upload; summary card only
+- Structured data: visible `BreadcrumbList` and `FAQPage` from the same typed content
+- Actual content updated at: 2026-08-15; reviewed at: 2026-08-15
+- Repository checks: passed phase 3 full test/type/format/build, route inventory, asset, route-bundle, and Cloudflare budget gates on 2026-08-15
+- External verification: production fetch and Search Console not authorized
+- Notes/risks: generated results vary; no result gallery is claimed without verified R2 examples
 
 ## ai-image-generator · zh
 
 - Route: `/tools/ai-image-generator`
-- Entity: `tool:ai-image-generator`; availability: `live`; decision: `noindex`
-- Primary intent/query cluster: 用提示词生成图片；`AI 图片生成器`、`文生图`
+- Entity: `tool:ai-image-generator`; locale: `zh`
+- Publication: `listed`; availability: `live`; indexing decision: `noindex`
+- Primary intent: 用清晰的文字需求生成图片
+- Query cluster: `AI 图片生成器`、`文生图`、`AI 图片提示词`
 - User stage: create
-- Boundary: 解决生成任务，不承担 GPT Image 2 模型评估意图
-- Required evidence/limits: 中文提示词案例、图片设置、编辑边界和运行时限制
-- Claim source: `AGENT_IMAGE_MODEL_OPTIONS`, `generate_image`
-- Inbound/outbound: 中文 `/tools` 与首页 →“AI 图片生成器”；关联图片编辑和 GPT Image 2
+- Canonical path: `/tools/ai-image-generator`; indexable alternates: noindex 期间为空
+- Adjacent pages: 未来 `/models/gpt-image-2`、`/tools/ai-image-editor`
+- Cannibalization boundary: 完成通用文生图任务；不承担 GPT Image 2 模型评估，也不把参考图编辑作为主要意图
+- Required visible evidence: 三组可改写中文提示词、工作流、输出控制、提示词指导、使用场景、运行时限制和可见 FAQ
+- Claim sources: `AGENT_IMAGE_MODEL_OPTIONS`、`DEFAULT_IMAGE_MODEL`、服务端价格重算、`generate_image`、Catalog entry policy
+- Inbound links: 中文 `/tools` →“AI 图片生成器”；首页内链留到阶段 5/7
+- Outbound/related links: 面包屑返回 `/tools`，CTA 到 `/pricing`；未开放的 Catalog 关联页会被过滤，不产生 404 内链
+- OG asset: 等待不可变 R2 分享图；当前只输出 summary card
+- Structured data: 与页面同源的 `BreadcrumbList` 与 `FAQPage`
+- Actual content updated at: 2026-08-15; reviewed at: 2026-08-15
+- Repository checks: 2026-08-15 已通过阶段 3 全量测试、类型、格式、构建、路由清单、资源、route bundle 与 Cloudflare 预算门禁
+- External verification: 未授权生产抓取和 Search Console
+- Notes/risks: 生成结果具有随机性；没有已验证 R2 案例时不宣称结果 gallery
 
 ## ai-image-editor · en
 

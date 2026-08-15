@@ -1,9 +1,17 @@
 import { catalogRouteSegment } from './paths';
 import type { ToolDefinition } from './types';
 
-const localePages = (slug: string) => ({
-  en: { slug: catalogRouteSegment(slug), indexing: 'noindex' as const },
-  zh: { slug: catalogRouteSegment(slug), indexing: 'noindex' as const },
+const localePages = (slug: string, contentModifiedAt?: string) => ({
+  en: {
+    slug: catalogRouteSegment(slug),
+    indexing: 'noindex' as const,
+    ...(contentModifiedAt ? { contentModifiedAt } : {}),
+  },
+  zh: {
+    slug: catalogRouteSegment(slug),
+    indexing: 'noindex' as const,
+    ...(contentModifiedAt ? { contentModifiedAt } : {}),
+  },
 });
 
 export const toolCatalog = [
@@ -12,7 +20,7 @@ export const toolCatalog = [
     entityId: 'ai-image-generator',
     publication: 'listed',
     availability: 'live',
-    localePages: localePages('ai-image-generator'),
+    localePages: localePages('ai-image-generator', '2026-08-15'),
     placement: {
       directoryOrder: 10,
       home: { featured: true, order: 10 },

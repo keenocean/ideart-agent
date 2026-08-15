@@ -7,6 +7,11 @@ import type {
   ResolvedCatalogRoute,
 } from './types';
 
+export type CatalogPageAvailability = (
+  definition: CatalogDefinition,
+  locale: AppLocale
+) => boolean;
+
 function pageFor(definition: CatalogDefinition, locale: AppLocale) {
   return definition.publication === 'hidden'
     ? definition.localePages?.[locale]
@@ -15,14 +20,16 @@ function pageFor(definition: CatalogDefinition, locale: AppLocale) {
 
 export function selectHomeEntries(
   definitions: readonly CatalogDefinition[],
-  locale: AppLocale
+  locale: AppLocale,
+  isPageAvailable: CatalogPageAvailability
 ): CatalogDefinition[] {
   return definitions
     .filter(
       (entry) =>
         entry.publication === 'listed' &&
         !!entry.placement.home &&
-        !!entry.localePages[locale]
+        !!entry.localePages[locale] &&
+        isPageAvailable(entry, locale)
     )
     .sort((left, right) =>
       left.publication === 'listed' && right.publication === 'listed'
@@ -33,11 +40,15 @@ export function selectHomeEntries(
 
 export function selectDirectoryEntries(
   definitions: readonly CatalogDefinition[],
-  locale: AppLocale
+  locale: AppLocale,
+  isPageAvailable: CatalogPageAvailability
 ): CatalogDefinition[] {
   return definitions
     .filter(
-      (entry) => entry.publication === 'listed' && !!entry.localePages[locale]
+      (entry) =>
+        entry.publication === 'listed' &&
+        !!entry.localePages[locale] &&
+        isPageAvailable(entry, locale)
     )
     .sort((left, right) =>
       left.publication === 'listed' && right.publication === 'listed'
@@ -49,7 +60,8 @@ export function selectDirectoryEntries(
 export function selectRelatedEntries(
   definitions: readonly CatalogDefinition[],
   definition: CatalogDefinition,
-  locale: AppLocale
+  locale: AppLocale,
+  isPageAvailable: CatalogPageAvailability
 ): CatalogDefinition[] {
   const byId = new Map(definitions.map((entry) => [entry.entityId, entry]));
   return (definition.related ?? [])
@@ -59,17 +71,19 @@ export function selectRelatedEntries(
         !!entry &&
         entry.entityId !== definition.entityId &&
         entry.publication === 'listed' &&
-        !!entry.localePages[locale]
+        !!entry.localePages[locale] &&
+        isPageAvailable(entry, locale)
     );
 }
 
 export function selectIndexableUrls(
-  definitions: readonly CatalogDefinition[]
+  definitions: readonly CatalogDefinition[],
+  isPageAvailable: CatalogPageAvailability
 ): CatalogUrlRecord[] {
   return definitions.flatMap((entry) => {
     if (entry.publication !== 'listed') return [];
     return Object.entries(entry.localePages).flatMap(([locale, page]) =>
-      page?.indexing === 'index'
+      page?.indexing === 'index' && isPageAvailable(entry, locale as AppLocale)
         ? [
             {
               kind: entry.kind,
@@ -86,12 +100,14 @@ export function selectIndexableUrls(
 
 export function selectLlmsEntries(
   definitions: readonly CatalogDefinition[],
-  locale: AppLocale
+  locale: AppLocale,
+  isPageAvailable: CatalogPageAvailability
 ): ResolvedCatalogRoute[] {
   return definitions.flatMap((entry) => {
     if (entry.publication !== 'listed') return [];
     const page = entry.localePages[locale];
-    if (!page || page.indexing !== 'index') return [];
+    if (!page || page.indexing !== 'index' || !isPageAvailable(entry, locale))
+      return [];
     return [
       {
         definition: entry,

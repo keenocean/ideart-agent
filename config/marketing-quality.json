@@ -5,6 +5,8 @@
       "/",
       "/pricing",
       "/(pages)",
+      "/tools/",
+      "/tools/$slug",
       "/blog/",
       "/blog/$slug"
     ],
@@ -21,8 +23,10 @@
       "src/blocks",
       "src/components/catalog",
       "src/config/catalog",
+      "src/content/tools",
       "src/routes/index.tsx",
       "src/routes/pricing.tsx",
+      "src/routes/tools",
       "src/routes/blog",
       "src/routes/(pages)"
     ],

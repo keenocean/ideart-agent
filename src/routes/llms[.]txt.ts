@@ -2,14 +2,18 @@ import { createFileRoute } from '@tanstack/react-router';
 
 import { envConfigs } from '@/config';
 import { catalog } from '@/config/catalog';
-import { selectLlmsEntries } from '@/config/catalog/selectors';
-import { selectIndexableFixedUrls } from '@/config/seo/public-routes';
+import {
+  selectIndexableFixedUrls,
+  type FixedRouteId,
+} from '@/config/seo/public-routes';
 import { buildAbsoluteSeoUrl } from '@/lib/seo';
 import { baseLocale } from '@/paraglide/runtime.js';
+import { selectLoadableLlmsEntries } from '@/content/catalog-pages';
 import type { BlogPost } from '@/content/posts';
 
 const FIXED_PAGE_COPY = {
   home: { title: 'Home', description: 'AI image and video creation agent' },
+  tools: { title: 'AI Tools', description: 'Focused AI creation tools' },
   pricing: { title: 'Pricing', description: 'Pricing plans' },
   'privacy-policy': {
     title: 'Privacy Policy',
@@ -19,7 +23,10 @@ const FIXED_PAGE_COPY = {
     title: 'Terms of Service',
     description: 'Terms for using the service',
   },
-} as const;
+} as const satisfies Record<
+  FixedRouteId,
+  { title: string; description: string }
+>;
 
 function localizedUrl(path: string): string {
   return buildAbsoluteSeoUrl({ locale: baseLocale, path: path || '/' });
@@ -33,7 +40,10 @@ export const Route = createFileRoute('/llms.txt')({
         const fixedPages = selectIndexableFixedUrls().filter(
           (page) => page.locale === baseLocale
         );
-        const catalogPages = selectLlmsEntries(catalog, baseLocale);
+        const catalogPages = await selectLoadableLlmsEntries(
+          catalog,
+          baseLocale
+        );
 
         let posts: BlogPost[] = [];
         try {
