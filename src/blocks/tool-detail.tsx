@@ -109,37 +109,19 @@ export function ToolDetail({
         });
       }}
       workbench={
-        <section
-          aria-labelledby="tool-workbench-title"
-          className="border-border bg-card mx-auto rounded-3xl border p-4 shadow-sm sm:p-5"
-        >
-          <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <h2 id="tool-workbench-title" className="text-xl font-semibold">
-                {page.content.workbench.title}
-              </h2>
-              <p className="text-muted-foreground mt-2 max-w-2xl text-sm leading-6">
-                {page.content.workbench.description}
-              </p>
-            </div>
-            <span
-              className={cn(
-                'flex shrink-0 items-start gap-2 rounded-xl px-3 py-2 text-xs leading-5 sm:max-w-64',
-                readiness.executable
-                  ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
-                  : 'bg-amber-500/10 text-amber-800 dark:text-amber-300'
-              )}
-            >
-              <ReadyIcon
-                aria-hidden="true"
-                className="mt-0.5 size-3.5 shrink-0"
-              />
-              {readinessDescription(readiness)}
-            </span>
-          </div>
+        <section aria-labelledby="tool-workbench-title" className="mx-auto">
+          <h2 id="tool-workbench-title" className="sr-only">
+            {page.content.workbench.title}
+          </h2>
+          <p className="sr-only">{page.content.workbench.description}</p>
 
           <GenerationWorkbench
             textareaRef={textareaRef}
+            presentation="tool"
+            inputModeLabels={{
+              prompt: m['tools.workbench.text_prompt'](),
+              reference: m['tools.workbench.reference_image'](),
+            }}
             locks={preset.locks}
             value={entry.value}
             onValueChange={entry.setValue}
@@ -153,17 +135,32 @@ export function ToolDetail({
             onSettingsChange={entry.setSettings}
             skillName={entry.skillName}
             onSkillNameChange={entry.setSkillName}
-            disabled={!readiness.executable}
-            submitDisabled={entry.uploading || entry.submitting}
+            submitDisabled={
+              !readiness.executable || entry.uploading || entry.submitting
+            }
             size="lg"
           />
 
-          <div className="mt-4 flex justify-end">
+          <div className="mt-3 flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <span
+              className={cn(
+                'flex min-w-0 items-start gap-2 px-1 text-xs leading-5',
+                readiness.executable
+                  ? 'text-emerald-700 dark:text-emerald-300'
+                  : 'text-amber-800 dark:text-amber-300'
+              )}
+            >
+              <ReadyIcon
+                aria-hidden="true"
+                className="mt-0.5 size-3.5 shrink-0"
+              />
+              {readinessDescription(readiness)}
+            </span>
             <Button
               type="button"
               variant="ghost"
               size="sm"
-              className="gap-2"
+              className="h-8 shrink-0 gap-2 self-end px-2 text-xs sm:self-auto"
               onClick={() => {
                 entry.saveSettingsAsDefault();
                 toast.success(m['tools.workbench.default_saved']());

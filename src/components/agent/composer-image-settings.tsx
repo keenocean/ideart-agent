@@ -92,10 +92,12 @@ export function ComposerImageSettings({
   settings,
   onChange,
   disabled,
+  compact = false,
 }: {
   settings: AgentComposerSettings;
   onChange: (settings: AgentComposerSettings) => void;
   disabled?: boolean;
+  compact?: boolean;
 }) {
   function update(patch: Partial<AgentComposerSettings>) {
     onChange({ ...settings, ...patch });
@@ -105,6 +107,9 @@ export function ComposerImageSettings({
     settings.imageAspectRatio === 'auto'
       ? m['agent.composer.auto']()
       : settings.imageAspectRatio;
+  const settingsSummary = `${settings.imageResolution} · ${qualityLabel(
+    settings.imageQuality
+  )} · ${aspectLabel}`;
 
   return (
     <DropdownMenu>
@@ -115,14 +120,16 @@ export function ComposerImageSettings({
             variant="ghost"
             size="sm"
             disabled={disabled}
+            aria-label={compact ? settingsSummary : undefined}
+            title={compact ? settingsSummary : undefined}
             className="bg-muted/70 text-foreground hover:bg-muted h-9 gap-1.5 rounded-md px-3 text-xs"
           />
         }
       >
-        <span className="truncate">
-          {settings.imageResolution} · {qualityLabel(settings.imageQuality)} ·{' '}
-          {aspectLabel}
+        <span className={cn('truncate', compact && 'hidden sm:inline')}>
+          {settingsSummary}
         </span>
+        {compact && <span className="sm:hidden">{aspectLabel}</span>}
         <ChevronDown className="text-muted-foreground size-3.5" />
       </DropdownMenuTrigger>
 

@@ -72,6 +72,8 @@
   "tools.workbench.provider_unconfigured": "An AI provider still needs to be configured before this tool can run.",
   "tools.workbench.model_unavailable": "The image model route is not available in this deployment.",
   "tools.workbench.storage_unconfigured": "Storage still needs to be configured before generated files can be delivered.",
+  "tools.workbench.text_prompt": "Text to image",
+  "tools.workbench.reference_image": "Image to image",
   "tools.workbench.save_default": "Save these settings as my default",
   "tools.workbench.default_saved": "Image settings saved as your default.",
   "common.sign.invite_code_placeholder": "Enter your invite code",

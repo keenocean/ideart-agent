@@ -11,11 +11,13 @@ import {
   Check,
   FileAudio2,
   Film,
+  ImagePlus,
   Images,
   Loader2,
   Paperclip,
   Plus,
   Square,
+  Type,
   X,
 } from 'lucide-react';
 
@@ -88,6 +90,12 @@ export interface ChatComposerProps {
   size?: 'sm' | 'lg';
   /** Rendered next to the "+" menu (e.g. the selected example category). */
   toolbarExtra?: ReactNode;
+  /** Compact public-tool chrome; all controller behavior stays unchanged. */
+  presentation?: 'default' | 'tool';
+  inputModeLabels?: {
+    prompt: string;
+    reference: string;
+  };
   textareaRef?: RefObject<HTMLTextAreaElement | null>;
   className?: string;
 }
@@ -124,6 +132,8 @@ export function ChatComposer({
   modelLocked = false,
   size = 'lg',
   toolbarExtra,
+  presentation = 'default',
+  inputModeLabels,
   textareaRef,
   className,
 }: ChatComposerProps) {
@@ -147,9 +157,47 @@ export function ChatComposer({
       }}
       className={cn(
         'border-border bg-card rounded-3xl border shadow-sm transition-shadow focus-within:shadow-md',
+        presentation === 'tool' && 'overflow-hidden',
         className
       )}
     >
+      {presentation === 'tool' && inputModeLabels && (
+        <div className="border-border bg-muted/50 flex min-h-10 items-end gap-1 border-b px-2 pt-2">
+          <button
+            type="button"
+            aria-pressed={attachments.length === 0}
+            onClick={(event) =>
+              event.currentTarget.form?.querySelector('textarea')?.focus()
+            }
+            disabled={disabled}
+            className={cn(
+              'flex h-8 items-center gap-1.5 rounded-t-[10px] px-3 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50',
+              attachments.length === 0
+                ? 'bg-card text-foreground font-medium'
+                : 'text-muted-foreground hover:text-foreground'
+            )}
+          >
+            <Type aria-hidden="true" className="size-3.5" />
+            {inputModeLabels.prompt}
+          </button>
+          <button
+            type="button"
+            aria-pressed={attachments.length > 0}
+            onClick={() => fileInputRef.current?.click()}
+            disabled={disabled || uploading}
+            className={cn(
+              'flex h-8 items-center gap-1.5 rounded-t-[10px] px-3 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50',
+              attachments.length > 0
+                ? 'bg-card text-foreground font-medium'
+                : 'text-muted-foreground hover:text-foreground'
+            )}
+          >
+            <ImagePlus aria-hidden="true" className="size-3.5" />
+            {inputModeLabels.reference}
+          </button>
+        </div>
+      )}
+
       {attachments.length > 0 && (
         <div className="flex flex-wrap gap-2 px-3 pt-3">
           {attachments.map((item) => {
@@ -291,22 +339,32 @@ export function ChatComposer({
               event.currentTarget.value = '';
             }}
           />
-          <ComposerModeSelector
-            settings={settings}
-            onChange={onSettingsChange}
-            disabled={disabled || modeLocked}
-          />
+          {!(presentation === 'tool' && modeLocked) && (
+            <ComposerModeSelector
+              settings={settings}
+              onChange={onSettingsChange}
+              disabled={disabled || modeLocked}
+            />
+          )}
           {toolbarExtra}
         </div>
         {/* Mobile translations can make this control group wider than the
             composer. Give it a full wrapping row, then keep the compact
             single-row treatment once the viewport has room. */}
-        <div className="ml-auto flex w-full min-w-0 flex-wrap items-center justify-end gap-1.5 sm:w-auto sm:flex-nowrap">
+        <div
+          className={cn(
+            'ml-auto flex min-w-0 items-center justify-end gap-1.5',
+            presentation === 'tool'
+              ? 'flex-1 flex-nowrap'
+              : 'w-full flex-wrap sm:w-auto sm:flex-nowrap'
+          )}
+        >
           {onSkillNameChange && (
             <ComposerSkillSelect
               skillName={skillName}
               onChange={onSkillNameChange}
               disabled={disabled}
+              compact={presentation === 'tool'}
             />
           )}
           {settings.mediaMode === 'image' ? (
@@ -320,6 +378,7 @@ export function ChatComposer({
                 settings={settings}
                 onChange={onSettingsChange}
                 disabled={disabled}
+                compact={presentation === 'tool'}
               />
             </>
           ) : (

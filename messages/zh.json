@@ -72,6 +72,8 @@
   "tools.workbench.provider_unconfigured": "需要先配置 AI Provider，才能运行这个工具。",
   "tools.workbench.model_unavailable": "当前部署没有可用的图片模型路由。",
   "tools.workbench.storage_unconfigured": "需要先配置对象存储，才能交付生成文件。",
+  "tools.workbench.text_prompt": "文生图",
+  "tools.workbench.reference_image": "图生图",
   "tools.workbench.save_default": "保存为我的默认设置",
   "tools.workbench.default_saved": "图片设置已保存为默认值。",
   "common.sign.invite_code_placeholder": "请输入邀请码",

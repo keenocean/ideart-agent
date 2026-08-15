@@ -154,10 +154,12 @@ export function ComposerSkillSelect({
   skillName,
   onChange,
   disabled,
+  compact = false,
 }: {
   skillName?: string;
   onChange: (skillName: string | undefined) => void;
   disabled?: boolean;
+  compact?: boolean;
 }) {
   const skillsQuery = useQuery({
     queryKey: ['agent-skills'],
@@ -169,6 +171,8 @@ export function ComposerSkillSelect({
     skillsQuery.data?.items ?? []
   );
   const selected = skills.find((skill) => skill.name === skillName);
+  const triggerLabel =
+    selected?.label ?? skillName ?? m['agent.composer.skill_none']();
 
   useEffect(() => {
     if (!skillName || !skillsQuery.isSuccess) return;
@@ -184,15 +188,23 @@ export function ComposerSkillSelect({
             variant="ghost"
             size="sm"
             disabled={disabled}
-            className="bg-muted/70 text-foreground hover:bg-muted h-9 max-w-[180px] gap-1.5 rounded-md px-3 text-xs"
+            aria-label={compact ? triggerLabel : undefined}
+            title={compact ? triggerLabel : undefined}
+            className={
+              compact
+                ? 'bg-muted/70 text-foreground hover:bg-muted size-9 shrink-0 rounded-md p-0'
+                : 'bg-muted/70 text-foreground hover:bg-muted h-9 max-w-[180px] gap-1.5 rounded-md px-3 text-xs'
+            }
           />
         }
       >
         <Sparkles className="text-muted-foreground size-3.5 shrink-0" />
-        <span className="truncate">
-          {selected?.label ?? skillName ?? m['agent.composer.skill_none']()}
-        </span>
-        <ChevronDown className="text-muted-foreground size-3.5" />
+        {!compact && (
+          <>
+            <span className="truncate">{triggerLabel}</span>
+            <ChevronDown className="text-muted-foreground size-3.5" />
+          </>
+        )}
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="end"
