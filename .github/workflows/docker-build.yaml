@@ -48,11 +48,11 @@ jobs:
       - name: Run tests
         run: pnpm test
 
-      - name: Typecheck
-        run: pnpm exec tsc --noEmit
-
       - name: Build application
         run: pnpm build
+
+      - name: Typecheck
+        run: pnpm exec tsc --noEmit
 
       - name: Check marketing assets
         run: pnpm marketing:check-assets
