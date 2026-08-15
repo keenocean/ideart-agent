@@ -419,14 +419,14 @@ export function CatalogMediaCarousel({
   return (
     <section
       id="prompt-examples"
-      className="bg-foreground text-background w-full scroll-mt-20 py-20 sm:py-28"
+      className="bg-muted/35 border-border text-foreground w-full scroll-mt-20 border-y py-20 sm:py-28"
     >
       <div className="mx-auto max-w-5xl px-6 text-center">
-        <h2 className="font-serif text-4xl leading-[1.08] font-normal tracking-[-0.02em] text-balance sm:text-5xl">
+        <h2 className="text-foreground font-serif text-4xl leading-[1.08] font-normal tracking-[-0.02em] text-balance sm:text-5xl">
           {title}
         </h2>
         {description && (
-          <p className="text-background/65 mx-auto mt-4 max-w-2xl text-base leading-relaxed sm:text-lg">
+          <p className="text-muted-foreground mx-auto mt-4 max-w-2xl text-base leading-relaxed sm:text-lg">
             {description}
           </p>
         )}
@@ -443,7 +443,7 @@ export function CatalogMediaCarousel({
               data-carousel-card
               onClick={() => setPreviewIndex(index)}
               aria-label={item.title}
-              className="border-background/15 bg-background/8 group focus-visible:ring-background relative w-[85vw] max-w-[60rem] shrink-0 snap-start overflow-hidden rounded-3xl border text-left shadow-[0_18px_55px_rgba(0,0,0,0.24)] focus-visible:ring-2 focus-visible:outline-none"
+              className="border-border bg-card text-card-foreground group focus-visible:ring-ring relative w-[85vw] max-w-[60rem] shrink-0 snap-start overflow-hidden rounded-3xl border text-left shadow-sm focus-visible:ring-2 focus-visible:outline-none"
             >
               <span className="bg-muted relative block aspect-video overflow-hidden">
                 <CatalogMedia
@@ -451,30 +451,30 @@ export function CatalogMediaCarousel({
                   className="transition-transform duration-500 ease-out group-hover:scale-[1.03] motion-reduce:transition-none"
                 />
                 {item.media.kind === 'video' && (
-                  <span className="absolute top-1/2 left-1/2 flex size-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/30 bg-black/45 text-white opacity-0 backdrop-blur-md transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
+                  <span className="border-primary-foreground/30 bg-primary/90 text-primary-foreground absolute top-1/2 left-1/2 flex size-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border opacity-0 shadow-lg backdrop-blur-md transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
                     <Play
                       aria-hidden="true"
                       className="ml-0.5 size-4 fill-current"
                     />
                   </span>
                 )}
-                <span className="absolute inset-x-0 bottom-0 hidden bg-gradient-to-t from-black/80 to-transparent px-6 pt-20 pb-5 text-sm font-medium text-white transition-opacity duration-300 group-hover:opacity-0 group-focus-visible:opacity-0 sm:block">
+                <span className="from-card/95 text-card-foreground absolute inset-x-0 bottom-0 hidden bg-gradient-to-t to-transparent px-6 pt-20 pb-5 text-sm font-medium transition-opacity duration-300 group-hover:opacity-0 group-focus-visible:opacity-0 sm:block">
                   {item.title}
                 </span>
-                <span className="absolute inset-0 hidden flex-col justify-end bg-gradient-to-t from-black/90 via-black/45 to-transparent p-6 text-white opacity-0 transition-opacity duration-300 group-hover:opacity-100 group-focus-visible:opacity-100 sm:flex">
+                <span className="from-card/95 via-card/60 text-card-foreground absolute inset-0 hidden flex-col justify-end bg-gradient-to-t to-transparent p-6 opacity-0 transition-opacity duration-300 group-hover:opacity-100 group-focus-visible:opacity-100 sm:flex">
                   <strong className="text-lg leading-tight font-semibold">
                     {item.title}
                   </strong>
-                  <span className="mt-2 line-clamp-4 text-sm leading-6 text-white/80">
+                  <span className="text-muted-foreground mt-2 line-clamp-4 text-sm leading-6">
                     {item.prompt}
                   </span>
                 </span>
               </span>
               <span className="block min-h-40 p-5 sm:hidden">
-                <strong className="text-background block text-lg leading-tight font-semibold">
+                <strong className="text-card-foreground block text-lg leading-tight font-semibold">
                   {item.title}
                 </strong>
-                <span className="text-background/65 mt-2 [display:-webkit-box] block overflow-hidden text-sm leading-[1.6] [-webkit-box-orient:vertical] [-webkit-line-clamp:4]">
+                <span className="text-muted-foreground mt-2 [display:-webkit-box] block overflow-hidden text-sm leading-[1.6] [-webkit-box-orient:vertical] [-webkit-line-clamp:4]">
                   {item.description ?? item.prompt}
                 </span>
               </span>
@@ -488,7 +488,7 @@ export function CatalogMediaCarousel({
               type="button"
               onClick={() => scrollRail(-1)}
               aria-label={labels.previous}
-              className="border-background/20 bg-foreground/90 text-background focus-visible:ring-background hover:bg-foreground absolute top-[calc(1rem+min(23.90625vw,17rem))] left-2 flex size-11 -translate-y-1/2 items-center justify-center rounded-full border shadow-lg backdrop-blur-md transition-colors focus-visible:ring-2 focus-visible:outline-none"
+              className="border-border bg-background/90 text-foreground focus-visible:ring-ring hover:bg-muted absolute top-[calc(1rem+min(23.90625vw,17rem))] left-2 flex size-11 -translate-y-1/2 items-center justify-center rounded-full border shadow-lg backdrop-blur-md transition-colors focus-visible:ring-2 focus-visible:outline-none"
             >
               <ChevronLeft aria-hidden="true" className="size-5" />
             </button>
@@ -496,7 +496,7 @@ export function CatalogMediaCarousel({
               type="button"
               onClick={() => scrollRail(1)}
               aria-label={labels.next}
-              className="border-background/20 bg-foreground/90 text-background focus-visible:ring-background hover:bg-foreground absolute top-[calc(1rem+min(23.90625vw,17rem))] right-2 flex size-11 -translate-y-1/2 items-center justify-center rounded-full border shadow-lg backdrop-blur-md transition-colors focus-visible:ring-2 focus-visible:outline-none"
+              className="border-border bg-background/90 text-foreground focus-visible:ring-ring hover:bg-muted absolute top-[calc(1rem+min(23.90625vw,17rem))] right-2 flex size-11 -translate-y-1/2 items-center justify-center rounded-full border shadow-lg backdrop-blur-md transition-colors focus-visible:ring-2 focus-visible:outline-none"
             >
               <ChevronRight aria-hidden="true" className="size-5" />
             </button>

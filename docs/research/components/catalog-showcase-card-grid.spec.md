@@ -1,5 +1,7 @@
 # Catalog showcase card grid specification
 
+Reuse entry point: [Catalog marketing component reuse guide](./README.md).
+
 ## Purpose
 
 Reusable, pure-props card groups for the compact “tools” and “models” sections on catalog detail pages. The component copies the geometry and interaction hierarchy of the image-generator reference while inheriting this product's theme tokens and only exposing real runtime capabilities.

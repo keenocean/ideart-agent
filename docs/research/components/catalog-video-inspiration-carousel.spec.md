@@ -1,5 +1,7 @@
 # Catalog video inspiration carousel specification
 
+Reuse entry point: [Catalog marketing component reuse guide](./README.md).
+
 ## Purpose
 
 Reusable horizontal inspiration rail for video-capable marketing pages. It matches the `Get Inspired by AI-Generated Videos` reference behavior while reusing the catalog's typed media, viewport-aware playback, and full-screen preview dialog.

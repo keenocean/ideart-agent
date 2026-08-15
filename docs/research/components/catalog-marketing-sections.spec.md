@@ -1,5 +1,7 @@
 # Supporting catalog marketing components
 
+Reuse entry point: [Catalog marketing component reuse guide](./README.md).
+
 ## CatalogSectionHeading
 
 Centered serif title, optional centered description, semantic foreground/muted colors, maximum text width of 672px. Compact variant uses 30–36px titles; editorial variant may scale to 48–56px for future video pages.
