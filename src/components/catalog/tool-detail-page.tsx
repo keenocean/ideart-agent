@@ -219,7 +219,6 @@ export function ToolDetailPage({
         title={content.features.title}
         description={content.features.description}
         items={featureItems}
-        className="bg-muted/35 border-border border-y"
       />
 
       <CatalogMediaFeatureList

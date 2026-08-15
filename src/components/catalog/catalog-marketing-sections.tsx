@@ -216,7 +216,7 @@ export function CatalogLimitations({
   items: readonly string[];
 }) {
   return (
-    <section className="bg-muted/35 border-border border-y px-4 py-16 sm:px-6">
+    <section className="px-4 py-16 sm:px-6">
       <div className="mx-auto grid max-w-6xl gap-10 lg:grid-cols-[0.8fr_1.2fr]">
         <CatalogSectionHeading
           title={title}
@@ -419,7 +419,7 @@ export function CatalogMediaCarousel({
   return (
     <section
       id="prompt-examples"
-      className="bg-muted/35 border-border text-foreground w-full scroll-mt-20 border-y py-20 sm:py-28"
+      className="text-foreground w-full scroll-mt-20 py-20 sm:py-28"
     >
       <div className="mx-auto max-w-5xl px-6 text-center">
         <h2 className="text-foreground font-serif text-4xl leading-[1.08] font-normal tracking-[-0.02em] text-balance sm:text-5xl">

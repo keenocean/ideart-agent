@@ -37,3 +37,5 @@ Native `details/summary` disclosures in a 1024px container. Clear focus, no Java
 ## Visual token rule
 
 Every component uses `background`, `card`, `muted`, `foreground`, `muted-foreground`, `border`, `primary`, and related system classes. No copied reference-page hex or RGB colors are allowed.
+
+Top-level tool-page sections inherit the page `background`. Use `card` and `muted` only for contained surfaces so adjacent sections do not flip between different page-level tones.

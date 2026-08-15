@@ -34,4 +34,5 @@ Reusable horizontal inspiration rail for video-capable marketing pages. It match
 ## Theme and media rules
 
 - Geometry follows the reference; color follows system tokens. No copied reference-site hex values are allowed.
+- The section inherits the page background. Cards, overlays, and controls create hierarchy without an inverted or tinted full-width band.
 - All media URLs must come through the typed R2 asset registry. Reference-site assets are evidence only and are never rendered directly.
