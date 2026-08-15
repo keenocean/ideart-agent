@@ -1,12 +1,19 @@
 import { createFileRoute } from '@tanstack/react-router';
 
 import { envConfigs } from '@/config';
-import { locales, localizeUrl } from '@/paraglide/runtime.js';
+import { buildAbsoluteSeoUrl } from '@/lib/seo';
+import { baseLocale, locales, localizeUrl } from '@/paraglide/runtime.js';
 
 export const Route = createFileRoute('/robots.txt')({
   server: {
     handlers: {
       GET: () => {
+        const privatePaths = ['/admin', '/settings', '/chat'].flatMap((path) =>
+          locales.map(
+            (locale) =>
+              localizeUrl(`${envConfigs.app_url}${path}`, { locale }).pathname
+          )
+        );
         const body = [
           'User-Agent: *',
           'Allow: /',
@@ -16,11 +23,10 @@ export const Route = createFileRoute('/robots.txt')({
             }).pathname;
             return `Allow: ${blogPath}?*`;
           }),
-          'Disallow: /admin',
-          'Disallow: /settings',
+          ...[...new Set(privatePaths)].map((path) => `Disallow: ${path}`),
           'Disallow: /api/',
           '',
-          `Sitemap: ${envConfigs.app_url}/sitemap.xml`,
+          `Sitemap: ${buildAbsoluteSeoUrl({ locale: baseLocale, path: '/sitemap.xml' })}`,
           '',
         ].join('\n');
         return new Response(body, {

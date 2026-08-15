@@ -1,6 +1,7 @@
 import handler from '@tanstack/react-start/server-entry';
 
 import { getCookieFromHeader } from './lib/cookie';
+import { deLocalizeUrl } from './paraglide/runtime.js';
 import { paraglideMiddleware } from './paraglide/server.js';
 
 // On Cloudflare Workers, stash the binding env (D1, ASSETS, …) on globalThis
@@ -24,6 +25,21 @@ function ensureCloudflareEnv(): Promise<void> {
   return cfEnvPromise;
 }
 
+function normalizeBlogFailure(req: Request, response: Response): Response {
+  if (response.status !== 500) return response;
+  const pathname = deLocalizeUrl(new URL(req.url)).pathname;
+  if (pathname !== '/blog' && !pathname.startsWith('/blog/')) return response;
+
+  const headers = new Headers(response.headers);
+  headers.set('Cache-Control', 'no-store');
+  headers.set('Retry-After', '60');
+  return new Response(response.body, {
+    status: 503,
+    statusText: 'Service Unavailable',
+    headers,
+  });
+}
+
 // Custom server entry — wraps every request in Paraglide's middleware so
 // getLocale() resolves per-request (AsyncLocalStorage) during SSR.
 export default {
@@ -44,6 +60,6 @@ export default {
         );
       }
     }
-    return response;
+    return normalizeBlogFailure(req, response);
   },
 };

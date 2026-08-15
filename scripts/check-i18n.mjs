@@ -3,7 +3,23 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const root = process.cwd();
-const locales = ['en', 'zh'];
+const { baseLocale, locales } = JSON.parse(
+  await fs.readFile(path.join(root, 'project.inlang', 'settings.json'), 'utf8')
+);
+if (
+  typeof baseLocale !== 'string' ||
+  !Array.isArray(locales) ||
+  locales.length === 0 ||
+  locales.some(
+    (locale) =>
+      typeof locale !== 'string' ||
+      !/^[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*$/.test(locale)
+  ) ||
+  new Set(locales).size !== locales.length ||
+  !locales.includes(baseLocale)
+) {
+  throw new Error('Invalid locales in project.inlang/settings.json');
+}
 const catalogs = Object.fromEntries(
   await Promise.all(
     locales.map(async (locale) => [
@@ -19,13 +35,13 @@ const messageKeys = (catalog) =>
   Object.keys(catalog)
     .filter((key) => !key.startsWith('$'))
     .sort();
-const baseKeys = messageKeys(catalogs.en);
+const baseKeys = messageKeys(catalogs[baseLocale]);
 const failures = [];
 
 for (const locale of locales.slice(1)) {
   const localeKeys = messageKeys(catalogs[locale]);
   const missing = baseKeys.filter((key) => !(key in catalogs[locale]));
-  const extra = localeKeys.filter((key) => !(key in catalogs.en));
+  const extra = localeKeys.filter((key) => !(key in catalogs[baseLocale]));
 
   for (const key of missing)
     failures.push(`${locale}: missing source key ${key}`);

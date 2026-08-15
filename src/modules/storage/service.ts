@@ -1,4 +1,8 @@
-import { R2Provider, StorageManager } from '@/core/storage';
+import {
+  normalizeMarketingPublicDomain,
+  R2Provider,
+  StorageManager,
+} from '@/core/storage';
 import { getAllConfigs, type ConfigMap } from '@/modules/config/service';
 
 /**
@@ -12,7 +16,10 @@ function isConfigured(configs: ConfigMap): boolean {
   );
 }
 
-function buildManager(configs: ConfigMap): StorageManager {
+function buildManager(
+  configs: ConfigMap,
+  publicDomain = configs.r2_domain
+): StorageManager {
   const manager = new StorageManager();
   manager.addProvider(
     new R2Provider({
@@ -23,7 +30,7 @@ function buildManager(configs: ConfigMap): StorageManager {
       uploadPath: configs.r2_upload_path,
       region: 'auto',
       endpoint: configs.r2_endpoint, // optional custom endpoint
-      publicDomain: configs.r2_domain,
+      publicDomain,
     }),
     true
   );
@@ -42,4 +49,23 @@ export async function getStorage(): Promise<StorageManager | null> {
   const configs = await getAllConfigs();
   if (!isConfigured(configs)) return null;
   return buildManager(configs);
+}
+
+export async function getMarketingStorage(): Promise<{
+  storage: StorageManager;
+  publicDomain: string;
+}> {
+  const configs = await getAllConfigs();
+  if (!isConfigured(configs)) {
+    throw new Error('R2 is not configured for marketing asset publication');
+  }
+  if (!configs.r2_account_id && !configs.r2_endpoint) {
+    throw new Error(
+      'R2 account id or endpoint is required for marketing asset publication'
+    );
+  }
+  const publicDomain = normalizeMarketingPublicDomain(
+    configs.r2_domain?.trim() || ''
+  );
+  return { storage: buildManager(configs, publicDomain), publicDomain };
 }

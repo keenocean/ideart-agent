@@ -3,18 +3,15 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 import { Link } from '@/core/i18n/navigation';
 import { envConfigs } from '@/config';
+import type { AppLocale } from '@/config/locale';
+import { buildSeoHead } from '@/lib/seo';
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
-import {
-  baseLocale,
-  getLocale,
-  locales,
-  localizeUrl,
-} from '@/paraglide/runtime.js';
+import { baseLocale, getLocale } from '@/paraglide/runtime.js';
 import { Footer } from '@/blocks/footer';
 import { Header } from '@/blocks/header';
 import { BlogCard } from '@/components/blog-card';
-import { formatPostDate } from '@/content/posts';
+import { formatPostDate, isIndexableBlogListing } from '@/content/posts';
 import { getBlogPageFn } from '@/content/posts/server';
 
 const PAGE_SIZE = 9;
@@ -55,7 +52,12 @@ export const Route = createFileRoute('/blog/')({
         pageSize: PAGE_SIZE,
       },
     });
-    return { locale, category: deps.category, listing };
+    return {
+      locale,
+      category: deps.category,
+      requestedPage: deps.page,
+      listing,
+    };
   },
   head: ({ loaderData }) => {
     const locale = loaderData?.locale ?? baseLocale;
@@ -63,44 +65,47 @@ export const Route = createFileRoute('/blog/')({
       (item) => item.slug === loaderData.category
     );
     const page = loaderData?.listing.page ?? 1;
+    const categorySlug = loaderData?.category;
+    const indexable = loaderData
+      ? isIndexableBlogListing({
+          total: loaderData.listing.total,
+          category: categorySlug,
+          page: loaderData.requestedPage,
+        })
+      : false;
+    const availableLocales = loaderData?.listing.availableLocales ?? [];
     const baseTitle = m['blog.title']({}, { locale: locale as any });
     const titleParts = [category?.title, baseTitle];
     if (page > 1) titleParts.push(String(page));
     const title = `${titleParts.filter(Boolean).join(' · ')} | ${envConfigs.app_name}`;
     const description = m['blog.description']({}, { locale: locale as any });
-    const urlFor = (loc: string) => {
-      const base = localizeUrl(`${envConfigs.app_url}/blog`, {
-        locale: loc as any,
-      }).href;
-      const query = blogHref({ category: category?.slug, page }).split('?')[1];
-      return query ? `${base}?${query}` : base;
-    };
-    return {
-      meta: [
-        { title },
-        { name: 'description', content: description },
-        ...(category ? [{ name: 'robots', content: 'noindex,follow' }] : []),
-        { property: 'og:type', content: 'website' },
-        { property: 'og:title', content: title },
-        { property: 'og:description', content: description },
-        { property: 'og:url', content: urlFor(locale) },
-        { name: 'twitter:title', content: title },
-        { name: 'twitter:description', content: description },
-      ],
-      links: [
-        { rel: 'canonical', href: urlFor(locale) },
-        ...locales.map((loc) => ({
-          rel: 'alternate',
-          hrefLang: loc,
-          href: urlFor(loc),
-        })),
-        {
-          rel: 'alternate',
-          hrefLang: 'x-default',
-          href: urlFor(baseLocale),
-        },
-      ],
-    };
+    const searchParameters = [
+      ...(categorySlug ? [{ name: 'category', value: categorySlug }] : []),
+      ...(loaderData && loaderData.requestedPage > 1
+        ? [{ name: 'page', value: String(loaderData.requestedPage) }]
+        : []),
+    ];
+    return buildSeoHead({
+      kind: 'website',
+      title,
+      description,
+      canonical: { locale, path: '/blog' },
+      ...(searchParameters.length
+        ? {
+            canonicalSearch: {
+              allowedNames: ['category', 'page'],
+              parameters: searchParameters,
+            },
+          }
+        : {}),
+      alternates: indexable
+        ? availableLocales.map((targetLocale) => ({
+            locale: targetLocale as AppLocale,
+            path: '/blog',
+          }))
+        : [],
+      indexing: indexable ? 'index' : 'noindex',
+    });
   },
   component: BlogPage,
 });

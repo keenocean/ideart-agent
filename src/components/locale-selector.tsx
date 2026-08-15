@@ -1,8 +1,17 @@
 import { Check, ChevronDown, Globe, Languages } from 'lucide-react';
 
-import { localeNames } from '@/config/locale';
+import {
+  getLocaleSwitchDestination,
+  useLocaleSwitchPolicy,
+} from '@/core/i18n/locale-switch';
+import { localeNames, type AppLocale } from '@/config/locale';
 import { cn } from '@/lib/utils';
-import { getLocale, locales, setLocale } from '@/paraglide/runtime.js';
+import {
+  getLocale,
+  locales,
+  localizeHref,
+  setLocale,
+} from '@/paraglide/runtime.js';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,10 +27,23 @@ export function LocaleSelector({
   className?: string;
 }) {
   const locale = getLocale();
+  const switchPolicy = useLocaleSwitchPolicy();
 
   function handleSwitch(newLocale: string) {
-    // Writes the locale cookie and reloads on the localized URL.
-    setLocale(newLocale as typeof locale);
+    if (newLocale === locale) return;
+
+    const destination = getLocaleSwitchDestination(newLocale, switchPolicy);
+    if (!destination) {
+      // Writes the locale cookie and reloads on the localized current URL.
+      setLocale(newLocale as AppLocale);
+      return;
+    }
+
+    // A content detail without this translation falls back to the target
+    // locale's directory instead of manufacturing a known 404.
+    const href = localizeHref(destination, { locale: newLocale as AppLocale });
+    const update = setLocale(newLocale as AppLocale, { reload: false });
+    void Promise.resolve(update).then(() => window.location.assign(href));
   }
 
   return (

@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { authClient, signIn, useSession } from '@/core/auth/client';
 import { Link, useRouter } from '@/core/i18n/navigation';
 import { envConfigs } from '@/config';
+import { sanitizeAuthCallback } from '@/lib/auth-callback';
 import { m } from '@/paraglide/messages.js';
 import { localizeHref } from '@/paraglide/runtime.js';
 import { usePublicConfig } from '@/hooks/use-public-config';
@@ -52,14 +53,7 @@ function SignInPage() {
     }
   }, [sessionPending, session?.user, router]);
 
-  // Allow only same-site relative paths, and never an auth page (would loop).
-  const safeCallbackUrl =
-    callbackUrl &&
-    callbackUrl.startsWith('/') &&
-    !callbackUrl.startsWith('//') &&
-    !/^\/(sign-in|sign-up|verify-email)(\/|\?|$)/.test(callbackUrl)
-      ? callbackUrl
-      : null;
+  const safeCallbackUrl = sanitizeAuthCallback(callbackUrl);
 
   const afterLoginUrl = safeCallbackUrl || '/chat';
 

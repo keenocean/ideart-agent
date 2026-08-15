@@ -238,10 +238,66 @@ export interface ChatHistoryData {
 
 export interface InitialTurnPayload {
   prompt?: string;
-  settings?: AgentComposerSettings;
+  settings?: Partial<AgentComposerSettings>;
   skillName?: string;
   /** Media already uploaded or selected by the landing composer. */
   attachments?: PendingAttachment[];
+}
+
+export function initialTurnStorageKey(sessionId: string): string {
+  return `agent:initial-turn:${sessionId}`;
+}
+
+export function serializeInitialTurnHandoff(
+  payload: InitialTurnPayload
+): string {
+  return JSON.stringify({
+    prompt: payload.prompt ?? '',
+    ...(payload.settings ? { settings: payload.settings } : {}),
+    ...(payload.skillName !== undefined
+      ? { skillName: payload.skillName }
+      : {}),
+    attachments: (payload.attachments ?? [])
+      .filter((item) => item.status === 'uploaded' && !!item.url)
+      .map((item) => ({ ...item, preview: item.url })),
+  });
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+export function parseInitialTurnHandoff(
+  raw: string
+): InitialTurnPayload | null {
+  let value: unknown;
+  try {
+    value = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (!isRecord(value)) return null;
+  const attachments = Array.isArray(value.attachments)
+    ? value.attachments.filter(
+        (item): item is PendingAttachment =>
+          isRecord(item) &&
+          typeof item.id === 'string' &&
+          typeof item.name === 'string' &&
+          typeof item.preview === 'string' &&
+          typeof item.url === 'string' &&
+          item.status === 'uploaded'
+      )
+    : [];
+  return {
+    prompt: typeof value.prompt === 'string' ? value.prompt : '',
+    ...(isRecord(value.settings)
+      ? { settings: value.settings as Partial<AgentComposerSettings> }
+      : {}),
+    ...(typeof value.skillName === 'string'
+      ? { skillName: value.skillName }
+      : {}),
+    attachments,
+  };
 }
 
 // Reconstruct UI Messages from persisted chat_message rows. The rules match

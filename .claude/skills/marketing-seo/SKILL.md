@@ -106,8 +106,8 @@ The SEO map is an operational decision record, not a keyword-stuffing brief. A r
 - Make core H1, explanatory copy, limitations, evidence, and internal links available in SSR HTML. Lazy-load heavy Workbench/gallery panels when appropriate.
 - Use one typed content source for visible FAQ and FAQ JSON-LD, visible breadcrumbs and `BreadcrumbList`, and social metadata inputs.
 - Route all page metadata through the shared SEO helper when it exists. If project guidance calls for one but it is absent, implement it once rather than proliferating route-local copies.
-- Add both locales, but only add an alternate when that locale has substantive, indexable content and an accurate canonical path.
-- Keep OG/Twitter assets public, absolute in rendered metadata, accessible, dimensioned, and truthful.
+- Update every affected locale, but do not register or synthesize a missing locale merely for parity. Add an alternate only when that locale has substantive, indexable content and an accurate canonical path.
+- Follow the adapter's media-host and local-asset allowlist for page images, videos, posters, and OG/Twitter assets. Keep rendered URLs public, absolute, stable, accessible, dimensioned, and truthful; upload/verify external objects before merging their page references.
 
 ### 6. Apply the release gate
 
@@ -126,16 +126,17 @@ Discover and run the repository's formatter/linter, tests, type/static checks, a
 For changed routes verify, as applicable:
 
 - status code and redirect behavior;
+- zero unexpected 404s in the site's published/discovered URL inventory, while negative route fixtures return their deliberate 404/410 status;
 - one title, description, robots directive, and canonical;
 - canonical/current-locale URL and `og:url` equality;
 - reciprocal hreflang only between indexable real translations;
-- `x-default` only when a real base-locale page exists;
+- `x-default` only when a real, indexable base-locale page exists;
 - sitemap membership and honest `lastmod`;
 - robots crawlability for noindex pages;
 - parseable, safely serialized, visible-content-backed JSON-LD;
-- public 200 OG/Twitter assets with alt and dimensions;
+- every changed page-media URL uses the adapter-approved origin and has public 200 evidence; images/OG assets have alt and dimensions, while videos have a poster and valid range behavior;
 - SSR H1, core content, limitations, and crawlable internal links;
-- no localhost, missing asset, console error, or unexplained client-JS/performance regression.
+- no localhost, expiring asset URL, missing asset, forbidden local-media reference, console error, or unexplained client-JS/performance regression.
 
 Use Rich Results Test or Schema Validator for representative production-capable pages. A passing result proves validation eligibility, not that a rich result will appear.
 
@@ -147,6 +148,7 @@ When authorized:
 
 - submit or refresh the sitemap;
 - inspect representative URLs and Google-selected canonicals;
+- triage Search Console 404s by discovery source and lifecycle instead of treating the raw count as a zero-target KPI;
 - record the production-day, day-7, and day-30 checks;
 - compare Search Console impressions/clicks/queries/pages with analytics organic landing-page conversions and real-user Core Web Vitals.
 

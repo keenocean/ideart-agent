@@ -18,28 +18,55 @@ Current code and newer decisions override stale examples in either document.
 ## Boundaries
 
 - Routes own loader, head, status/redirect behavior, and page composition.
-- Blocks own localized project content, assets, Catalog wiring, and project-specific variants.
+- Blocks own localized project content, R2 asset refs, Catalog wiring, and project-specific variants.
 - Components are durable pure-props UI and do not read translations.
 - Runtime/server sources own capabilities, limits, model/provider mapping, billing, permissions, and execution.
-- `messages/{en,zh}.json` contains flat localized messages; known keys use static Paraglide message access.
+- `messages/{en,zh}.json` contains short UI/metadata messages; known keys use static Paraglide access. Public marketing graphs must not use `tDynamic` or runtime-built message keys. Keep long bodies in messages only when the bundle report proves route-local tree-shaking; otherwise lazy-load typed content by `slug + locale`.
 - Do not import server-only modules into components.
 
 ## Marketing registry and execution
 
-- The planned canonical registry is `src/config/marketing/*`, with named selectors for homepage, directory, related pages, indexable URLs, and llms discovery.
-- Lifecycle fields are `publication`, `availability`, and `indexing`. Map `listed + index`, `listed + noindex`, `unlisted`, `hidden`, and coming-soon states to the generic release matrix.
+- The planned canonical registry is `src/config/catalog/*`, with named selectors for homepage, directory, related pages, indexable URLs, and llms discovery.
+- Public project blocks stay flat under `src/blocks/*` and use domain-prefixed filenames such as `tool-*` and `model-*`; do not add a redundant `src/blocks/marketing/*` layer.
+- Catalog-specific durable components live under `src/components/catalog/*`. Extract broader section primitives only after real reuse exists.
+- Lifecycle fields are entity-level `publication`/`availability` plus per-locale route/indexing data. Map each concrete locale URL—not the entity as a whole—to `listed + index`, `listed + noindex`, `unlisted`, `hidden`, and coming-soon release states. A missing locale route does not exist and must not be mechanically generated.
 - A model page derives modality-specific Runtime keys and specifications from `src/lib/agent-settings.ts`.
 - A tool may use `agent-preset` only when the existing Agent path truthfully executes it. A `dedicated-api` operation must exist and be server-validated before registration.
 - Page `inputPolicy` may narrow Runtime limits but not expand them.
+- Client Catalog/preset data is not authoritative. The chat API resolves a stable `entryContext` against the server Catalog, validates the locale route and attachments, overlays locked media/model after normalization, and propagates the policy to Agent tool context so explicit tool parameters cannot bypass it.
+- Do not claim arbitrary locked image-model support until `imageModelOption` is carried through composer state, normalization, handoff, API validation, runtime settings, and Agent tool context.
 - Deployment readiness controls the Workbench; stable publication/indexing state controls discovery.
 
 ## Locale and metadata
 
-- Routes remain locale-free. Paraglide/router rewriting keeps base English paths locale-free and prefixes Chinese with `/zh` under the current configuration.
+- Routes, Catalog paths, links, canonical inputs, and redirect targets remain locale-free. Reuse the existing `vite.config.ts` Paraglide `urlPatterns`, `src/server.ts` middleware, and `src/router.tsx` `deLocalizeUrl/localizeUrl` rewrite; do not add `$locale` routes, store `/zh`, or hand-build locale prefixes. `vite.config.ts` derives patterns from `project.inlang/settings.json`: the base locale is unprefixed and every non-base locale uses `/<locale>`.
+- Register `slug` and content explicitly per locale. Resolve dynamic routes by `(kind, current locale, current slug)`; missing locale content, hidden entries, and unknown slugs throw 404 before metadata is generated. Never return another language as a fallback 200.
+- Blog records follow the same explicit-locale rule using the database `(slug, locale)` key. Translations share one slug; create/edit accepts only a locale from the generated Paraglide `locales` list. Empty or unsupported locales are excluded from public lists, detail resolution, hreflang, sitemap, and llms discovery. Do not add language-neutral Blog fallback, translation-group infrastructure, or speculative redirects for a new project without confirmed historical URLs.
+- A locale Blog directory is indexable and discoverable only after that locale has at least one published article. An empty locale directory remains `200 + noindex` with no hreflang or sitemap entry; category filters and page 2+ follow the same noindex/no-hreflang rule. On an article, the language selector keeps the slug only for published translations and otherwise navigates to the target locale Blog directory; direct missing-translation URLs still return 404.
+- Treat Blog list/detail and sitemap database failures as temporary availability failures: return 503 (with `Retry-After` where possible), never an empty indexable 200, article 404, or static-only sitemap 200. The optional homepage Blog teaser may degrade to no items without taking down the homepage.
+- Register homepage, Pricing, static pages, and directory routes per locale in `src/config/seo/public-routes.ts`; validate that every locale-free path is accepted by a real file route. Keep these fixed routes outside the tool/model Catalog, while Blog URLs continue to come from published database records.
 - The planned shared metadata builder is `src/lib/seo.ts`. If implementation has not reached that stage, follow the approved plan rather than assuming the file exists.
-- Only substantive, indexable translations participate in reciprocal hreflang. Each alternate supplies its accurate locale-free canonical path; `x-default` points to the real base-locale version.
+- Feed the metadata builder route-backed locale-free references. Only substantive, indexable translations participate in self-including reciprocal hreflang; `x-default` appears only when a real indexable base-locale route exists. A noindex page emits no hreflang.
 - Discovery endpoints are `src/routes/sitemap[.]xml.ts`, `src/routes/robots[.]txt.ts`, `src/routes/llms[.]txt.ts`, and `src/routes/llms-full[.]txt.ts`.
-- llms endpoints are experimental and do not replace conventional SEO.
+- Sitemap validates, deduplicates, and merges explicit indexable fixed-route locale states, concrete Catalog URLs from `selectIndexableUrls()`, and published Blog locale URLs. Do not drop homepage/Pricing/static/Blog URLs when adding Catalog discovery. Use real `lastmod` or omit it, and do not emit `priority`/`changefreq`. Public noindex pages remain crawlable so robots can be read; private routes rely on auth/noindex, with any extra Disallow covering actual locale prefixes.
+- Register published URL changes in `src/config/catalog/legacy-routes.ts` by `{ kind, locale, fromSlug }`. Require single-hop 301 to a 200 canonical, integration-tested 410 for permanent removal, and 404 for unknown/hidden paths. Legacy sources never enter discovery surfaces.
+- llms endpoints are experimental and do not replace conventional SEO. Keep them crawlable, return HTTP `X-Robots-Tag: noindex`, and only include resolver-backed allowed locale URLs.
+
+## 404 release boundary
+
+- Build a **published URL inventory** from fixed public routes, Catalog locale routes, Header/Footer, directories, Related, canonical/hreflang, sitemap/llms, and legacy redirect targets. Every URL in this set must return its non-404 release-matrix status; unexpected 404 count is zero.
+- Keep **negative route fixtures** separate: unknown slugs, hidden entries, unregistered locales, missing locale content, and malformed paths must return real 404s and must not appear in the published inventory.
+- A real, useful but not-yet-indexable page is `200 + noindex`; an absent page is 404. Do not return thin/fallback `200`, redirect missing Chinese URLs to English or the homepage, or use robots.txt to hide the report.
+- Search Console's total 404 count is diagnostic, not a release KPI. Fix self-linked, sitemap-submitted, hreflang/canonical, redirect-target, and historically valuable URLs; record guessed/typo URLs that correctly remain 404 without creating fake redirects.
+
+## Marketing media delivery
+
+- For every new or materially changed public marketing component, store page images, videos, video posters, Blog covers, and OG/Twitter images in Cloudflare R2. Render the stable absolute URL under the configured HTTPS `r2_domain`; do not add or copy `/images/*`, `/videos/*`, `/imgs/*`, or other content media into `public/`.
+- Existing untouched local media is legacy, not precedent. If a new component reuses it or its current page is materially changed, upload that object to R2 and replace the reference in the same change. `public/` exceptions are limited to browser shell assets such as favicon/manifest icons and non-marketing functional icons; a logo used in page content, Blog metadata, or social metadata is not exempt.
+- The existing `R2Provider` falls back to the S3 API endpoint when `r2_domain` is absent. That fallback is not an approved public marketing origin. Reject localhost, `*.r2.cloudflarestorage.com`, authenticated URLs, and expiring signed URLs for page/social media.
+- Components receive media props and never read storage configuration or concatenate the domain. Keep absolute URL/kind/MIME/dimensions/bytes/poster in typed content or Catalog asset refs; keep localized alt/caption in the locale content source. Never put R2 credentials in Catalog, client bundles, or committed manifests.
+- Use immutable version/content-hash keys such as `marketing/<surface>/<slug>/<hash>.<ext>`, upload a new key for content changes, and serve the correct MIME, inline disposition, and immutable cache headers. Images need intrinsic dimensions; videos need an optimized R2 poster and verified range responses.
+- Publish in dependency order: upload assets, verify every public URL, then merge/deploy references. Offline checks enforce origin/metadata and prevent new local marketing media; release checks perform `HEAD`/minimal `GET` for 200, MIME, cache, size, and video range behavior. Never silently fall back to `public/` when R2 is unavailable.
 
 ## UI reuse
 
@@ -57,6 +84,8 @@ pnpm build
 ```
 
 Run `seo:*` commands only if they actually exist. For Cloudflare launch work, also use the repository's documented build/dry-run checks. Preserve unrelated dirty-worktree changes.
+
+For marketing-route releases, also run repository-provided `bundle:report-routes`, `marketing:check-assets`, and Cloudflare budget checks when present. `marketing:check-assets` must reject new local page media outside the shell allowlist and validate every R2 asset ref; its online/release mode must fetch the complete R2 inventory. Fetch every published URL and assert its release-matrix status. Separately cover `/tools/missing`, `/zh/tools/missing`, `/models/missing`, and `/zh/models/missing` as negative fixtures that must return 404. Representative sampling is not enough to prevent phantom localized URLs or missing media.
 
 ## Workflow boundaries
 

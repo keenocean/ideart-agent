@@ -13,6 +13,10 @@ import {
   uploadChatMedia,
   type PendingAttachment,
 } from '@/lib/agent';
+import {
+  initialTurnStorageKey,
+  serializeInitialTurnHandoff,
+} from '@/lib/agent-chat';
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
 import { useComposerSettings } from '@/hooks/use-composer-settings';
@@ -367,14 +371,12 @@ export function PromptLauncher({ className }: { className?: string }) {
     // uploaded attachments survive the hop — the blob previews don't.
     try {
       sessionStorage.setItem(
-        `agent:initial-turn:${sessionId}`,
-        JSON.stringify({
+        initialTurnStorageKey(sessionId),
+        serializeInitialTurnHandoff({
           prompt,
           settings: composerSettings,
           skillName,
-          attachments: attachments
-            .filter((item) => item.status === 'uploaded' && item.url)
-            .map((item) => ({ ...item, preview: item.url })),
+          attachments,
         })
       );
     } catch {

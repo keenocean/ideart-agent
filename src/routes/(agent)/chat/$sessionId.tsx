@@ -20,10 +20,11 @@ import {
   type PendingAttachment,
 } from '@/lib/agent';
 import {
+  initialTurnStorageKey,
+  parseInitialTurnHandoff,
   splitAttachedImages,
   storedToMessages,
   type ChatHistoryData,
-  type InitialTurnPayload,
 } from '@/lib/agent-chat';
 import {
   dropRun,
@@ -362,30 +363,33 @@ function ChatSessionPage() {
     initialPromptHandled.current = true;
     try {
       const key = `agent:initial-prompt:${sessionId}`;
-      const turnKey = `agent:initial-turn:${sessionId}`;
+      const turnKey = initialTurnStorageKey(sessionId);
       const rawTurn = sessionStorage.getItem(turnKey);
       if (rawTurn) {
-        const payload = JSON.parse(rawTurn) as InitialTurnPayload;
-        const initialSettings = normalizeComposerSettings(payload.settings);
-        if (payload.settings) setComposerSettings(initialSettings);
-        if (payload.skillName !== undefined) setSkillName(payload.skillName);
-        const initialAttachments = (payload.attachments ?? []).filter(
-          (item) => item.status === 'uploaded' && item.url
-        );
-        if (payload.prompt || initialAttachments.length > 0) {
-          // The stash is only dropped once the server has the turn. If this
-          // page re-mounts before that (dev HMR, a stray re-render), the
-          // handoff survives and the turn is retried instead of vanishing.
-          send(
-            payload.prompt ?? '',
-            initialAttachments,
-            resolveGenerationSettings(initialSettings),
-            payload.skillName,
-            () => sessionStorage.removeItem(turnKey)
+        const payload = parseInitialTurnHandoff(rawTurn);
+        if (!payload) sessionStorage.removeItem(turnKey);
+        if (payload) {
+          const initialSettings = normalizeComposerSettings(payload.settings);
+          if (payload.settings) setComposerSettings(initialSettings);
+          if (payload.skillName !== undefined) setSkillName(payload.skillName);
+          const initialAttachments = (payload.attachments ?? []).filter(
+            (item) => item.status === 'uploaded' && item.url
           );
-          return;
+          if (payload.prompt || initialAttachments.length > 0) {
+            // The stash is only dropped once the server has the turn. If this
+            // page re-mounts before that (dev HMR, a stray re-render), the
+            // handoff survives and the turn is retried instead of vanishing.
+            send(
+              payload.prompt ?? '',
+              initialAttachments,
+              resolveGenerationSettings(initialSettings),
+              payload.skillName,
+              () => sessionStorage.removeItem(turnKey)
+            );
+            return;
+          }
+          sessionStorage.removeItem(turnKey);
         }
-        sessionStorage.removeItem(turnKey);
       }
       const stashed = sessionStorage.getItem(key);
       if (stashed) {

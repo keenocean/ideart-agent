@@ -1,9 +1,14 @@
 import type { ComponentType } from 'react';
 import { notFound, useLoaderData } from '@tanstack/react-router';
 
-import { envConfigs } from '@/config';
+import {
+  getFixedLocalePage,
+  getFixedRouteAlternates,
+  type FixedRouteId,
+} from '@/config/seo/public-routes';
+import { buildSeoHead } from '@/lib/seo';
 import { m } from '@/paraglide/messages.js';
-import { baseLocale, getLocale, localizeUrl } from '@/paraglide/runtime.js';
+import { getLocale } from '@/paraglide/runtime.js';
 
 type PageMeta = {
   title: string;
@@ -23,11 +28,7 @@ const pages = import.meta.glob<PageModule>('/src/content/pages/*.mdx', {
 });
 
 function loadPage(slug: string, locale: string): PageModule | null {
-  return (
-    pages[`/src/content/pages/${slug}.${locale}.mdx`] ??
-    pages[`/src/content/pages/${slug}.${baseLocale}.mdx`] ??
-    null
-  );
+  return pages[`/src/content/pages/${slug}.${locale}.mdx`] ?? null;
 }
 
 type LoaderData = { meta: PageMeta; slug: string; locale: string };
@@ -47,16 +48,26 @@ export function staticPageRouteOptions(slug: string) {
     head: ({ loaderData }: { loaderData?: LoaderData }) => {
       if (!loaderData) return {};
       const { meta, locale } = loaderData;
-      const canonical = localizeUrl(`${envConfigs.app_url}/${slug}`, {
-        locale: locale as ReturnType<typeof getLocale>,
-      }).href;
-      return {
-        meta: [
-          { title: meta.title },
-          { name: 'description', content: meta.description },
-        ],
-        links: [{ rel: 'canonical', href: canonical }],
-      };
+      const routeId = slug as FixedRouteId;
+      const localePage = getFixedLocalePage(
+        routeId,
+        locale as ReturnType<typeof getLocale>
+      );
+      if (!localePage) return {};
+      return buildSeoHead({
+        kind: 'website',
+        title: meta.title,
+        description: meta.description,
+        canonical: {
+          locale: locale as ReturnType<typeof getLocale>,
+          path: localePage.path,
+        },
+        alternates: getFixedRouteAlternates(
+          routeId,
+          locale as ReturnType<typeof getLocale>
+        ),
+        indexing: localePage.indexing,
+      });
     },
     component: StaticPage,
   };

@@ -1,0 +1,37 @@
+{
+  "routeBundle": {
+    "representativeRouteIds": [
+      "__root__",
+      "/",
+      "/pricing",
+      "/(pages)",
+      "/blog/",
+      "/blog/$slug"
+    ],
+    "explainIncreaseAboveGzipBytes": 102400
+  },
+  "publicAssets": {
+    "baselineFileCount": 48,
+    "baselineBytes": 52951151,
+    "shellAllowlist": ["favicon.ico", "imgs/icons/creem.png"],
+    "baselineManifest": "config/marketing-public-assets-baseline.json"
+  },
+  "importGraph": {
+    "roots": [
+      "src/blocks",
+      "src/components/catalog",
+      "src/config/catalog",
+      "src/routes/index.tsx",
+      "src/routes/pricing.tsx",
+      "src/routes/blog",
+      "src/routes/(pages)"
+    ],
+    "eagerGlobAllowlist": ["src/routes/(pages)/-static-page.tsx"]
+  },
+  "cloudflare": {
+    "plan": "free",
+    "workerGzipBudgetBytes": 2516582,
+    "paidWorkerGzipBudgetBytes": 8388608,
+    "singleStaticAssetMaxBytes": 26214400
+  }
+}
