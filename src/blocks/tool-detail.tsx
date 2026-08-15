@@ -1,8 +1,8 @@
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 import { CircleAlert, CircleCheck, Save } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { getMarketingImageAsset } from '@/config/catalog/assets';
+import { getMarketingAsset } from '@/config/catalog/assets';
 import { generationPresetFor } from '@/config/catalog/generation';
 import { toolCatalog } from '@/config/catalog/tools';
 import type { DeploymentReadiness } from '@/config/catalog/types';
@@ -56,6 +56,7 @@ export function ToolDetail({
     throw new Error(`Tool definition missing: ${page.entityId}`);
   }
   const preset = useMemo(() => generationPresetFor(definition), [definition]);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const entry = useGenerationEntry({
     entryContext: {
       kind: 'tool',
@@ -72,11 +73,11 @@ export function ToolDetail({
     ...page.content,
     examples: {
       ...page.content.examples,
-      items: page.content.examples.items.map((item) => ({
+      items: page.content.examples.items.map(({ media, ...item }) => ({
         ...item,
-        image: {
-          ...getMarketingImageAsset(item.image.assetId),
-          alt: item.image.alt,
+        media: {
+          ...getMarketingAsset(media.assetId),
+          alt: media.alt,
         },
       })),
     },
@@ -91,10 +92,26 @@ export function ToolDetail({
       breadcrumbToolsLabel={m['tools.breadcrumb.tools']()}
       relatedTitle={m['tools.related.title']()}
       relatedItems={related}
+      onUsePrompt={(prompt) => {
+        entry.setValue(prompt);
+        requestAnimationFrame(() => {
+          const textarea = textareaRef.current;
+          if (!textarea) return;
+          textarea.focus();
+          textarea.setSelectionRange(prompt.length, prompt.length);
+          textarea.scrollIntoView({
+            behavior: window.matchMedia('(prefers-reduced-motion: reduce)')
+              .matches
+              ? 'auto'
+              : 'smooth',
+            block: 'center',
+          });
+        });
+      }}
       workbench={
         <section
           aria-labelledby="tool-workbench-title"
-          className="border-border bg-card mx-auto max-w-4xl rounded-[2rem] border p-4 shadow-sm sm:p-6"
+          className="border-border bg-card mx-auto rounded-3xl border p-4 shadow-sm sm:p-5"
         >
           <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
@@ -122,6 +139,7 @@ export function ToolDetail({
           </div>
 
           <GenerationWorkbench
+            textareaRef={textareaRef}
             locks={preset.locks}
             value={entry.value}
             onValueChange={entry.setValue}

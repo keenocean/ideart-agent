@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  getMarketingImageAsset,
-  marketingAssets,
-} from '@/config/catalog/assets';
+import { getMarketingAsset, marketingAssets } from '@/config/catalog/assets';
 import { catalogRouteSegment } from '@/config/catalog/paths';
 import { hasLocalePage } from '@/config/catalog/selectors';
 import { toolCatalog } from '@/config/catalog/tools';
@@ -157,18 +154,22 @@ describe('tool route content gate', () => {
         alternates: [],
       });
       const examples = detail?.content.examples.items ?? [];
-      expect(examples).toHaveLength(3);
+      expect(examples).toHaveLength(27);
       const exampleAssetIds = new Set(
-        examples.map((example) => example.image.assetId)
+        examples.map((example) => example.media.assetId)
       );
       expect(exampleAssetIds.size).toBe(examples.length);
       for (const example of examples) {
-        expect(example.image.alt.trim().length).toBeGreaterThan(0);
-        expect(getMarketingImageAsset(example.image.assetId)).toMatchObject({
-          id: example.image.assetId,
-          kind: 'image',
+        expect(example.media.alt.trim().length).toBeGreaterThan(0);
+        expect(getMarketingAsset(example.media.assetId)).toMatchObject({
+          id: example.media.assetId,
         });
       }
+      expect(
+        examples.filter(
+          (example) => getMarketingAsset(example.media.assetId).kind === 'video'
+        )
+      ).toHaveLength(12);
       expect(
         marketingAssets.filter((asset) => exampleAssetIds.has(asset.id))
       ).toHaveLength(examples.length);

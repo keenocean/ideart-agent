@@ -1,19 +1,32 @@
 import type { ReactNode } from 'react';
 import {
   ArrowRight,
-  CheckCircle2,
-  ChevronRight,
   Lightbulb,
+  PanelsTopLeft,
+  Route,
+  Sparkles,
 } from 'lucide-react';
 
 import { Link } from '@/core/i18n/navigation';
-import type { MarketingImageAsset } from '@/config/catalog/types';
-import { cn } from '@/lib/utils';
-import { buttonVariants } from '@/components/ui/button';
+import type { MarketingAsset } from '@/config/catalog/types';
+import {
+  CatalogExploreSection,
+  CatalogFaq,
+  CatalogFeatureGrid,
+  CatalogFinalCta,
+  CatalogLimitations,
+  ToolQuickStarts,
+} from '@/components/catalog/catalog-marketing-sections';
+import {
+  CatalogMasonryGallery,
+  type CatalogGalleryItem,
+} from '@/components/catalog/catalog-masonry-gallery';
+import { CatalogMediaFeatureList } from '@/components/catalog/catalog-media-feature-list';
+import { CatalogSectionHeading } from '@/components/catalog/catalog-section-heading';
 import type { ToolPageContent, ToolPromptExample } from '@/content/tools/types';
 
-type ToolDetailPromptExample = Omit<ToolPromptExample, 'image'> & {
-  image: MarketingImageAsset & { alt: string };
+type ToolDetailPromptExample = Omit<ToolPromptExample, 'media'> & {
+  media: MarketingAsset & { alt: string };
 };
 
 type ToolDetailPageContent = Omit<ToolPageContent, 'examples'> & {
@@ -38,6 +51,7 @@ export function ToolDetailPage({
   relatedTitle,
   relatedItems,
   workbench,
+  onUsePrompt,
 }: {
   content: ToolDetailPageContent;
   availabilityLabel: string;
@@ -46,136 +60,148 @@ export function ToolDetailPage({
   relatedTitle: string;
   relatedItems: readonly ToolDetailRelatedItem[];
   workbench: ReactNode;
+  onUsePrompt: (prompt: string) => void;
 }) {
+  const galleryItems: CatalogGalleryItem[] = content.examples.items.map(
+    (item, index) => ({
+      id: `${index}-${item.title}`,
+      title: item.title,
+      description: item.description,
+      prompt: item.prompt,
+      media: item.media,
+    })
+  );
+  const quickStartItems = galleryItems
+    .filter((item) => item.media.kind === 'image')
+    .slice(0, 4);
+  const featureItems = [
+    ...content.features.items.map((item) => ({
+      ...item,
+      icon: <Sparkles aria-hidden="true" className="text-primary size-5" />,
+    })),
+    ...content.promptGuide.items.map((item) => ({
+      ...item,
+      icon: <Lightbulb aria-hidden="true" className="text-primary size-5" />,
+    })),
+  ];
+  const useCaseItems = content.useCases.items.flatMap((item, index) => {
+    const example = galleryItems[index % galleryItems.length];
+    return example
+      ? [
+          {
+            id: `${index}-${item.title}`,
+            title: item.title,
+            description: item.description,
+            media: example.media,
+            mediaPosition:
+              index % 2 === 0 ? ('left' as const) : ('right' as const),
+          },
+        ]
+      : [];
+  });
+  const galleryLabels = {
+    ...content.examples.labels,
+    usePrompt: content.examples.labels.usePrompt,
+  };
+
+  function usePrompt(item: CatalogGalleryItem) {
+    onUsePrompt(item.prompt);
+  }
+
   return (
     <article>
-      <section className="px-4 pt-10 pb-16 sm:px-6 sm:pt-14 sm:pb-20">
-        <div className="mx-auto max-w-6xl">
-          <nav
-            aria-label="Breadcrumb"
-            className="text-muted-foreground flex min-w-0 items-center gap-1.5 text-sm"
-          >
-            <Link href="/" className="hover:text-foreground transition-colors">
-              {breadcrumbHomeLabel}
-            </Link>
-            <ChevronRight aria-hidden="true" className="size-3.5 shrink-0" />
-            <Link
-              href="/tools"
-              className="hover:text-foreground transition-colors"
-            >
-              {breadcrumbToolsLabel}
-            </Link>
-            <ChevronRight aria-hidden="true" className="size-3.5 shrink-0" />
-            <span aria-current="page" className="truncate">
-              {content.directory.title}
-            </span>
+      <section
+        id="generator"
+        className="scroll-mt-20 px-4 pt-12 pb-16 sm:px-6 sm:pt-16"
+      >
+        <div className="mx-auto w-full max-w-3xl">
+          <nav aria-label="Breadcrumb" className="sr-only">
+            <Link href="/">{breadcrumbHomeLabel}</Link>
+            <Link href="/tools">{breadcrumbToolsLabel}</Link>
+            <span aria-current="page">{content.directory.title}</span>
           </nav>
-
-          <header className="mx-auto mt-12 max-w-4xl text-center">
-            <div className="flex flex-wrap items-center justify-center gap-2">
-              <span className="text-primary text-sm font-semibold tracking-[0.14em] uppercase">
-                {content.hero.eyebrow}
-              </span>
-              <span className="border-border text-muted-foreground rounded-full border px-2.5 py-1 text-xs font-medium">
-                {availabilityLabel}
-              </span>
-            </div>
-            <h1 className="mt-5 font-serif text-4xl font-normal tracking-tight sm:text-5xl lg:text-6xl">
-              {content.hero.title}
-            </h1>
-            <p className="text-muted-foreground mx-auto mt-6 max-w-3xl text-base leading-7 sm:text-lg">
-              {content.hero.description}
-            </p>
-          </header>
-
-          <div id="generator" className="scroll-mt-24 pt-12">
-            {workbench}
-          </div>
+          <p className="sr-only">
+            {content.hero.eyebrow} · {availabilityLabel}
+          </p>
+          <h1 className="text-foreground text-center font-serif text-3xl font-normal tracking-[-0.01em] sm:text-4xl">
+            {content.hero.title}
+          </h1>
+          <p className="text-muted-foreground mx-auto mt-4 max-w-2xl text-center text-sm leading-relaxed sm:text-base">
+            {content.hero.description}
+          </p>
+          <div className="mt-8">{workbench}</div>
+          <ToolQuickStarts
+            label={content.examples.labels.quickStart}
+            items={quickStartItems}
+            onSelect={usePrompt}
+          />
         </div>
       </section>
 
-      <CopyGridSection
-        className="bg-muted/40 border-y"
-        content={content.inputOutput}
+      <CatalogExploreSection
+        groups={[
+          {
+            ...content.inputOutput,
+            items: content.inputOutput.items.map((item) => ({
+              ...item,
+              icon: (
+                <PanelsTopLeft
+                  aria-hidden="true"
+                  className="text-primary size-5"
+                />
+              ),
+            })),
+          },
+          {
+            ...content.workflow,
+            items: content.workflow.items.map((item) => ({
+              ...item,
+              icon: (
+                <Route aria-hidden="true" className="text-primary size-5" />
+              ),
+            })),
+          },
+        ]}
       />
 
-      <section className="px-4 py-16 sm:px-6 sm:py-24">
-        <div className="mx-auto max-w-6xl">
-          <SectionHeader
+      <section id="showcase" className="scroll-mt-20 px-4 py-16 sm:px-6">
+        <div className="mx-auto w-full max-w-6xl">
+          <CatalogSectionHeading
             title={content.examples.title}
             description={content.examples.description}
           />
-          <div className="mt-10 grid gap-5 lg:grid-cols-3">
-            {content.examples.items.map((item) => (
-              <article
-                key={item.title}
-                className="border-border bg-card flex flex-col rounded-3xl border p-6"
-              >
-                <div className="bg-muted/60 border-border flex aspect-[3/2] items-center justify-center overflow-hidden rounded-2xl border">
-                  <img
-                    src={item.image.url}
-                    alt={item.image.alt}
-                    width={item.image.width}
-                    height={item.image.height}
-                    loading="lazy"
-                    decoding="async"
-                    className="size-full object-contain"
-                  />
-                </div>
-                <h3 className="mt-5 font-semibold">{item.title}</h3>
-                <p className="text-muted-foreground mt-2 text-sm leading-6">
-                  {item.description}
-                </p>
-                <div className="bg-muted mt-5 flex-1 rounded-2xl p-4">
-                  <p className="text-sm leading-6">{item.prompt}</p>
-                </div>
-              </article>
-            ))}
+          <div className="mt-10">
+            <CatalogMasonryGallery
+              items={galleryItems}
+              labels={galleryLabels}
+              collapsedHeight={galleryItems.length > 12 ? 1120 : undefined}
+              onUsePrompt={usePrompt}
+            />
           </div>
         </div>
       </section>
 
-      <CopyGridSection
-        className="bg-card border-y"
-        content={content.workflow}
+      <CatalogFeatureGrid
+        id="features"
+        title={content.features.title}
+        description={content.features.description}
+        items={featureItems}
+        className="bg-muted/35 border-border border-y"
       />
-      <CopyGridSection content={content.features} />
-      <CopyGridSection
-        className="bg-muted/40 border-y"
-        content={content.promptGuide}
-        icon="idea"
-      />
-      <CopyGridSection content={content.useCases} />
 
-      <section className="bg-card border-y px-4 py-16 sm:px-6 sm:py-24">
-        <div className="mx-auto grid max-w-6xl gap-10 lg:grid-cols-[0.8fr_1.2fr]">
-          <SectionHeader
-            title={content.limitations.title}
-            description={content.limitations.description}
-          />
-          <ul className="space-y-4">
-            {content.limitations.items.map((item) => (
-              <li
-                key={item}
-                className="border-border bg-background flex gap-3 rounded-2xl border p-4 text-sm leading-6"
-              >
-                <CheckCircle2
-                  aria-hidden="true"
-                  className="text-primary mt-0.5 size-4 shrink-0"
-                />
-                <span>{item}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </section>
+      <CatalogMediaFeatureList
+        id="use-cases"
+        title={content.useCases.title}
+        description={content.useCases.description}
+        items={useCaseItems}
+      />
+
+      <CatalogLimitations {...content.limitations} />
 
       {relatedItems.length > 0 && (
-        <section className="px-4 py-16 sm:px-6 sm:py-24">
+        <section className="px-4 py-16 sm:px-6">
           <div className="mx-auto max-w-6xl">
-            <h2 className="font-serif text-3xl font-normal tracking-tight sm:text-4xl">
-              {relatedTitle}
-            </h2>
+            <CatalogSectionHeading title={relatedTitle} />
             <div className="mt-8 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
               {relatedItems.map((item) => (
                 <Link
@@ -198,113 +224,8 @@ export function ToolDetailPage({
         </section>
       )}
 
-      <section className="px-4 py-16 sm:px-6 sm:py-24">
-        <div className="mx-auto max-w-4xl">
-          <h2 className="text-center font-serif text-3xl font-normal tracking-tight sm:text-4xl">
-            {content.faq.title}
-          </h2>
-          <div className="mt-10 space-y-3">
-            {content.faq.items.map((item) => (
-              <details
-                key={item.question}
-                className="border-border bg-card group rounded-2xl border p-5"
-              >
-                <summary className="cursor-pointer list-none font-semibold">
-                  {item.question}
-                </summary>
-                <p className="text-muted-foreground mt-3 text-sm leading-6">
-                  {item.answer}
-                </p>
-              </details>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="bg-neutral-950 px-4 py-16 text-neutral-100 sm:px-6 sm:py-20">
-        <div className="mx-auto max-w-4xl text-center">
-          <h2 className="font-serif text-3xl font-normal tracking-tight sm:text-4xl">
-            {content.cta.title}
-          </h2>
-          <p className="mx-auto mt-4 max-w-2xl text-neutral-400">
-            {content.cta.description}
-          </p>
-          <div className="mt-8 flex flex-wrap justify-center gap-3">
-            <a href="#generator" className={cn(buttonVariants(), 'gap-2')}>
-              {content.cta.primaryLabel}
-              <ArrowRight aria-hidden="true" className="size-4" />
-            </a>
-            <Link
-              href="/pricing"
-              className={cn(
-                buttonVariants({ variant: 'outline' }),
-                'border-neutral-700 bg-transparent text-neutral-100 hover:bg-white/10 hover:text-white'
-              )}
-            >
-              {content.cta.secondaryLabel}
-            </Link>
-          </div>
-        </div>
-      </section>
+      <CatalogFaq title={content.faq.title} items={content.faq.items} />
+      <CatalogFinalCta {...content.cta} />
     </article>
-  );
-}
-
-function SectionHeader({
-  title,
-  description,
-}: {
-  title: string;
-  description: string;
-}) {
-  return (
-    <header className="max-w-2xl">
-      <h2 className="font-serif text-3xl font-normal tracking-tight sm:text-4xl">
-        {title}
-      </h2>
-      <p className="text-muted-foreground mt-4 leading-7">{description}</p>
-    </header>
-  );
-}
-
-function CopyGridSection({
-  content,
-  className,
-  icon = 'check',
-}: {
-  content: {
-    title: string;
-    description: string;
-    items: readonly { title: string; description: string }[];
-  };
-  className?: string;
-  icon?: 'check' | 'idea';
-}) {
-  const Icon = icon === 'idea' ? Lightbulb : CheckCircle2;
-  return (
-    <section
-      className={cn('border-border px-4 py-16 sm:px-6 sm:py-24', className)}
-    >
-      <div className="mx-auto max-w-6xl">
-        <SectionHeader
-          title={content.title}
-          description={content.description}
-        />
-        <div className="mt-10 grid gap-5 md:grid-cols-3">
-          {content.items.map((item) => (
-            <article
-              key={item.title}
-              className="border-border bg-background rounded-2xl border p-5"
-            >
-              <Icon aria-hidden="true" className="text-primary size-5" />
-              <h3 className="mt-5 font-semibold">{item.title}</h3>
-              <p className="text-muted-foreground mt-2 text-sm leading-6">
-                {item.description}
-              </p>
-            </article>
-          ))}
-        </div>
-      </div>
-    </section>
   );
 }

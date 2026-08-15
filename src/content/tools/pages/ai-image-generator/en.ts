@@ -49,9 +49,21 @@ export const content = {
     ],
   },
   examples: {
-    title: 'Prompt examples to adapt',
+    title: 'Image examples and motion component previews',
     description:
-      'These examples show how to make the request concrete. They are prompts, not claims that every run will produce an identical result.',
+      'The stills show prompts you can adapt. The motion clips temporarily verify the shared video gallery for future video tool pages; they are not output claims for this image generator.',
+    labels: {
+      quickStart: 'Quick start',
+      image: 'Image',
+      video: 'Video',
+      prompt: 'Prompt',
+      download: 'Download original',
+      previous: 'Previous example',
+      next: 'Next example',
+      close: 'Close preview',
+      usePrompt: 'Use this prompt',
+      expand: 'View all examples',
+    },
     items: [
       {
         title: 'Product campaign concept',
@@ -59,7 +71,7 @@ export const content = {
           'Useful when you need a clear subject, controlled materials, and a commercial lighting direction.',
         prompt:
           'A premium skincare serum bottle on a shallow mirror of water, cool silver palette, soft diffused studio light, close product crop, clean luxury campaign photography, no extra objects.',
-        image: {
+        media: {
           assetId: 'tools-ai-image-generator-0241fe76c3058fcd',
           alt: 'Unbranded glass serum bottle standing in shallow water under cool silver studio light',
         },
@@ -70,7 +82,7 @@ export const content = {
           'Combines a recognizable scene with a restrained visual language and a defined page composition.',
         prompt:
           'An editorial illustration about remote collaboration across time zones, three connected desks floating above a night city, limited navy and coral palette, geometric shapes, generous negative space for a headline.',
-        image: {
+        media: {
           assetId: 'tools-ai-image-generator-5d01838c8320ab5f',
           alt: 'Three illuminated desks connected above a night city in a navy and coral editorial illustration',
         },
@@ -81,9 +93,273 @@ export const content = {
           'Specifies the platform shape, focal object, motion cue, and space reserved for later layout work.',
         prompt:
           'Vertical 9:16 launch visual for a running shoe, shoe suspended above a red track with a sharp burst of chalk dust, energetic side light, bold modern sports photography, clear space at the top for copy.',
-        image: {
+        media: {
           assetId: 'tools-ai-image-generator-eee9f320ac365d1e',
           alt: 'Unbranded black running shoe suspended above a red track with a burst of white chalk dust',
+        },
+      },
+      {
+        title: 'Moonlit monster bakery',
+        description:
+          'Defines a character, an expressive action, a warm focal light, and a contrasting night palette.',
+        prompt:
+          'A small orange horned creature startled by a floating loaf in an enchanted bakery, moonlit window, warm copper oven glow, flour suspended in the air, cinematic family-animation detail, wide story frame.',
+        media: {
+          assetId: 'tools-ai-image-generator-c59b7a4f2cbfdc3b',
+          alt: 'Orange horned creature watching a loaf float above a glowing oven in a moonlit bakery',
+        },
+      },
+      {
+        title: 'Gentle creature on the subway',
+        description:
+          'Combines an unusual central subject with documentary framing and restrained commuter reactions.',
+        prompt:
+          'A gentle moss-green furry creature carrying a tiny leather briefcase on a crowded subway at dawn, commuters seated around it, natural window light, cinematic documentary composition, realistic textures.',
+        media: {
+          assetId: 'tools-ai-image-generator-39da1e8785d8efb2',
+          alt: 'Large gentle green creature holding a briefcase between commuters inside a subway carriage',
+        },
+      },
+      {
+        title: 'Fireflies in a night conservatory',
+        description:
+          'Uses a panoramic environment, one color accent, reflections, and atmospheric light to establish scale.',
+        prompt:
+          'An abandoned glass conservatory flooded after rain at midnight, a lone visitor in a yellow raincoat, hundreds of blue fireflies over the water, moon reflections, panoramic cinematic realism.',
+        media: {
+          assetId: 'tools-ai-image-generator-f2570c70c73667db',
+          alt: 'Visitor in a yellow raincoat facing blue fireflies reflected in a flooded moonlit conservatory',
+        },
+      },
+      {
+        title: 'Porcelain koi train',
+        description:
+          'Directs a surreal editorial scene through material, movement, weather, and symmetrical framing.',
+        prompt:
+          'A ballet dancer moving through an empty vintage train carriage while porcelain koi float around her, rain on the windows, deep blue night, warm table lamp, symmetrical cinematic composition.',
+        media: {
+          assetId: 'tools-ai-image-generator-4465b33d8cac5a5f',
+          alt: 'Ballet dancer and floating porcelain koi inside a rain-darkened vintage train carriage',
+        },
+      },
+      {
+        title: 'Motion preview: floating loaf',
+        description:
+          'Temporary R2 motion clip for validating lazy video playback, poster loading, and the shared preview dialog.',
+        prompt:
+          'Animate the loaf rising from the oven as flour drifts through warm light and the orange creature reacts with surprise.',
+        media: {
+          assetId: 'tools-ai-image-generator-8c2cfa5620e683cc',
+          alt: 'Short motion preview of a floating loaf and an orange creature in a glowing bakery',
+        },
+      },
+      {
+        title: 'Motion preview: morning commute',
+        description:
+          'Temporary R2 motion clip used to verify mixed image/video masonry behavior without claiming video generation here.',
+        prompt:
+          'Animate subtle subway movement, passing window light, and small reactions around the gentle green commuter.',
+        media: {
+          assetId: 'tools-ai-image-generator-96a88f4a9d15525b',
+          alt: 'Short motion preview of a green creature riding a subway with morning commuters',
+        },
+      },
+      {
+        title: 'Motion preview: blue fireflies',
+        description:
+          'Temporary wide-format clip for testing responsive video sizing and range-based R2 delivery.',
+        prompt:
+          'Animate blue fireflies drifting over reflected water while moonlight moves softly across the conservatory glass.',
+        media: {
+          assetId: 'tools-ai-image-generator-c72381045001af4e',
+          alt: 'Wide motion preview of blue fireflies moving through a flooded night conservatory',
+        },
+      },
+      {
+        title: 'Motion preview: porcelain koi',
+        description:
+          'Temporary R2 motion clip for verifying video cards and the full-screen media controls planned for video tools.',
+        prompt:
+          'Animate the dancer turning slowly as porcelain koi glide through the carriage and rain trails down the windows.',
+        media: {
+          assetId: 'tools-ai-image-generator-7da3695ed4c4a534',
+          alt: 'Short motion preview of a dancer and floating porcelain koi in a vintage train',
+        },
+      },
+      {
+        title: 'Volcanic asteroid field',
+        description:
+          'Builds a high-contrast science-fiction scene from material, scale, color, and depth cues.',
+        prompt:
+          'A dense asteroid field in deep space, fractured charcoal rocks glowing with electric blue crystal and orange magma, layered depth, dramatic rim light, cinematic science-fiction realism.',
+        media: {
+          assetId: 'tools-ai-image-generator-db46761ada6e3d50',
+          alt: 'Dark asteroids split by electric blue crystal and orange magma in deep space',
+        },
+      },
+      {
+        title: 'Poppies waking in the desert',
+        description:
+          'Uses a restrained landscape and one emerging color accent to direct a gradual visual change.',
+        prompt:
+          'A quiet sandy desert plain after rare rain, small red poppies emerging between dry grass, distant dunes, clear pale-blue morning sky, low natural camera angle, poetic cinematic realism.',
+        media: {
+          assetId: 'tools-ai-image-generator-f9c7a08a07b871e0',
+          alt: 'Small red poppies emerging among dry grass on a bright desert plain',
+        },
+      },
+      {
+        title: 'Glacier titan',
+        description:
+          'Combines a monumental subject with aerial scale, fractured ice, and cold environmental light.',
+        prompt:
+          'A colossal stone form pushing upward through a fractured glacier, aerial wide shot, fresh snow and blue crevasses, overcast polar light, immense environmental scale, photoreal cinematic detail.',
+        media: {
+          assetId: 'tools-ai-image-generator-3c275d1ea7d9223d',
+          alt: 'Colossal rounded stone form breaking through a cracked snow-covered glacier',
+        },
+      },
+      {
+        title: 'Mirror sphere on a rainy street',
+        description:
+          'Directs a surreal urban focal object through reflection, weather, traffic color, and street-level framing.',
+        prompt:
+          'A seamless mirrored sphere floating above a rain-darkened London street, red buses reflected across its curved surface, pedestrians and shop lights in soft focus, street-level cinematic photography.',
+        media: {
+          assetId: 'tools-ai-image-generator-126e53051fa7c68f',
+          alt: 'Floating mirrored sphere reflecting red buses on a wet city street',
+        },
+      },
+      {
+        title: 'Paper storybook landscape',
+        description:
+          'Specifies a handcrafted material language, simple shapes, and warm directional light.',
+        prompt:
+          'An open handmade paper storybook becoming a layered pastel landscape, colored pencils scattered around it, warm afternoon window light, tactile cut-paper textures, playful stop-motion art direction.',
+        media: {
+          assetId: 'tools-ai-image-generator-fb51d0665ffb5fbf',
+          alt: 'Open paper storybook forming a pastel landscape on a desk with colored pencils',
+        },
+      },
+      {
+        title: 'Night market inside a puddle',
+        description:
+          'Creates an impossible reveal using a mundane foreground, miniature scale, and warm/cool contrast.',
+        prompt:
+          'A rain puddle on an empty city street revealing a bustling miniature night market beneath the surface, warm lantern tents, wet asphalt reflections, low macro viewpoint, magical cinematic realism.',
+        media: {
+          assetId: 'tools-ai-image-generator-5664a0dee41494f4',
+          alt: 'A glowing miniature night market appearing beneath a puddle on a dark wet street',
+        },
+      },
+      {
+        title: 'Sailcloth laundromat',
+        description:
+          'Uses a familiar symmetrical room and one surreal material transformation for a clear concept frame.',
+        prompt:
+          'An empty fluorescent laundromat at night where long white sailcloth streams from open machines, ocean visible beyond the windows, centered symmetrical frame, cool surreal cinematic lighting.',
+        media: {
+          assetId: 'tools-ai-image-generator-02b0b7a8d6d66167',
+          alt: 'White sailcloth flowing between washing machines in a cool-lit night laundromat',
+        },
+      },
+      {
+        title: 'Tidal library',
+        description:
+          'Balances an orderly interior with slow environmental intrusion and quiet practical lighting.',
+        prompt:
+          'A historic reading room slowly filling with clear seawater, bookshelves and two wooden desks untouched, warm table lamps, cold daylight through the center window, calm symmetrical cinematic composition.',
+        media: {
+          assetId: 'tools-ai-image-generator-bf2655c56961d96f',
+          alt: 'Seawater covering the floor of a symmetrical old library lit by two table lamps',
+        },
+      },
+      {
+        title: 'Motion preview: volcanic asteroids',
+        description:
+          'Temporary R2 clip extending the shared video gallery with a high-motion space scene.',
+        prompt:
+          'Animate the asteroid field drifting past camera as blue crystal and orange magma pulse beneath fractured rock.',
+        media: {
+          assetId: 'tools-ai-image-generator-da9cec431f963fbc',
+          alt: 'Motion preview of glowing volcanic asteroids drifting through deep space',
+        },
+      },
+      {
+        title: 'Motion preview: desert poppies',
+        description:
+          'Temporary R2 clip for validating subtle natural motion and continuous waterfall playback.',
+        prompt:
+          'Animate red poppies opening between dry desert grass while a light breeze crosses the sand.',
+        media: {
+          assetId: 'tools-ai-image-generator-dc695c6c59eedafa',
+          alt: 'Motion preview of red poppies emerging across a bright desert plain',
+        },
+      },
+      {
+        title: 'Motion preview: glacier titan',
+        description:
+          'Temporary R2 clip adding a bright landscape test to the reusable video card set.',
+        prompt:
+          'Animate the stone titan rising through the glacier as ice plates fracture and snow falls into blue crevasses.',
+        media: {
+          assetId: 'tools-ai-image-generator-28464f03f575b12e',
+          alt: 'Motion preview of a colossal stone form breaking through a glacier',
+        },
+      },
+      {
+        title: 'Motion preview: mirror sphere',
+        description:
+          'Temporary R2 clip for checking reflections, street movement, and video controls.',
+        prompt:
+          'Animate the mirrored sphere gliding along the wet street as red buses and shop lights move across its surface.',
+        media: {
+          assetId: 'tools-ai-image-generator-ef56dc352549bc2b',
+          alt: 'Motion preview of a mirrored sphere floating between red buses on a rainy street',
+        },
+      },
+      {
+        title: 'Motion preview: paper storybook',
+        description:
+          'Temporary R2 clip testing a bright handcrafted scene within the mixed-media gallery.',
+        prompt:
+          'Animate the paper storybook unfolding into a layered pastel landscape while cut-paper shapes rise from each page.',
+        media: {
+          assetId: 'tools-ai-image-generator-cd6a1545d0bb900d',
+          alt: 'Motion preview of a handmade paper storybook unfolding on a desk',
+        },
+      },
+      {
+        title: 'Motion preview: puddle market',
+        description:
+          'Temporary R2 clip for verifying dark-scene poster quality and lazy playback.',
+        prompt:
+          'Animate lanterns and tiny shoppers beneath the puddle while raindrops ripple the street reflection above.',
+        media: {
+          assetId: 'tools-ai-image-generator-0c6193822673c248',
+          alt: 'Motion preview of a miniature lantern market visible beneath a rain puddle',
+        },
+      },
+      {
+        title: 'Motion preview: sailcloth laundromat',
+        description:
+          'Temporary R2 clip adding long fabric motion and a cool interior scene to the component test set.',
+        prompt:
+          'Animate white sailcloth flowing from the washing machines as mist rises under fluorescent light.',
+        media: {
+          assetId: 'tools-ai-image-generator-e89f518697d042d0',
+          alt: 'Motion preview of white sailcloth moving through a night laundromat',
+        },
+      },
+      {
+        title: 'Motion preview: tidal library',
+        description:
+          'Temporary R2 clip completing the expanded waterfall with reflective water and a quiet interior.',
+        prompt:
+          'Animate a gentle tide moving across the library floor while lamp reflections shimmer between the desks.',
+        media: {
+          assetId: 'tools-ai-image-generator-f657512a8700976c',
+          alt: 'Motion preview of seawater moving through a lamplit old library',
         },
       },
     ],

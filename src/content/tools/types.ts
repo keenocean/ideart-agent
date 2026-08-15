@@ -8,7 +8,7 @@ export type ToolCopyItem = {
 
 export type ToolPromptExample = ToolCopyItem & {
   prompt: string;
-  image: {
+  media: {
     assetId: MarketingAssetId;
     alt: string;
   };
@@ -52,6 +52,18 @@ export type ToolPageContent = {
   examples: {
     title: string;
     description: string;
+    labels: {
+      quickStart: string;
+      image: string;
+      video: string;
+      prompt: string;
+      download: string;
+      previous: string;
+      next: string;
+      close: string;
+      usePrompt: string;
+      expand: string;
+    };
     items: readonly ToolPromptExample[];
   };
   workflow: {

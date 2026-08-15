@@ -18,11 +18,12 @@ server rebuilds a Catalog policy, attachment reuse is owner/chat scoped, and
 sitemap/llms projections preserve source-backed locale content and dates. This
 does not constitute a production SEO release, so no tool URL moves to `index`.
 
-The phase 3 baseline was deployed to Cloudflare on 2026-08-15. The three gallery
-objects added afterward were published to the configured R2 origin and passed
-public response verification before their page references were added. Repeat
-the representative page fetch after the gallery code is deployed, then review
-Search Console on 2026-08-22 (day 7) and 2026-09-14 (day 30).
+The phase 3 baseline was deployed to Cloudflare on 2026-08-15. Its initial three
+gallery images and the later four image/four video additions were published to
+the configured R2 origin and passed public response verification before their
+page references were added. Repeat the representative page fetch after the
+mixed-media gallery code is deployed, then review Search Console on 2026-08-22
+(day 7) and 2026-09-14 (day 30).
 
 Search-result review showed distinct task language for text-to-image, editing,
 background work, text/image/reference-to-video, and model evaluation in both
@@ -51,8 +52,8 @@ Shared fields for the entries below:
 - Structured data: visible `BreadcrumbList`; `FAQPage` only if the same FAQ is
   rendered on the page. No Product/ratings/reviews schema.
 - Actual content updated at: unknown unless an entry below records a date.
-- Repository checks: phase 2.5 closure plus the gallery update passed 51 test files/309 tests, type, format, online asset, route-bundle, production build, and Cloudflare budget gates on 2026-08-15. Worker gzip was 2,208,297 / 2,516,582 bytes; static assets were 235 / 250. The detail-route gzip delta was +901 bytes.
-- External verification: the phase 3 page baseline and the three immutable R2 image responses were verified in production; the gallery HTML requires a follow-up fetch after its Worker deployment.
+- Repository checks: the expanded mixed-media gallery passed 52 test files/312 tests, TypeScript, format, online asset, route-bundle, production build, and Cloudflare build/dry-run/budget gates on 2026-08-15. Worker gzip was 2,222,591 / 2,516,582 bytes; static assets were 235 / 250. The detail-route gzip delta was +7,325 bytes.
+- External verification: all 27 immutable R2 objects were verified against the public CDN; images returned 200 and videos returned range 206 with matching MIME, bytes, inline disposition, and immutable cache. The updated gallery HTML requires a follow-up fetch after its Worker deployment.
 
 ## tools-directory · en
 
@@ -107,16 +108,16 @@ Shared fields for the entries below:
 - Canonical path: `/tools/ai-image-generator`; indexable alternates: none while noindex
 - Adjacent pages: future `/models/gpt-image-2`, `/tools/ai-image-editor`
 - Cannibalization boundary: completes a general text-to-image task; it does not evaluate GPT Image 2 or promise reference-image editing as the primary workflow
-- Required visible evidence: three adaptable prompt examples with verified R2 result images, workflow, output controls, prompt guidance, use cases, runtime-backed limitations, visible FAQ
+- Required visible evidence: seven adaptable image examples backed by verified R2 images, four clearly labelled temporary motion-component previews backed by verified R2 video/poster pairs, workflow, output controls, prompt guidance, use cases, runtime-backed limitations, visible FAQ
 - Claim sources: `AGENT_IMAGE_MODEL_OPTIONS`, `DEFAULT_IMAGE_MODEL`, server cost normalization, `generate_image`, Catalog entry policy
 - Inbound links: `/tools` → “AI Image Generator”; homepage intentionally deferred to phase 5/7
 - Outbound/related links: breadcrumb to `/tools`, CTA to `/pricing`; unopened Catalog relations are filtered out rather than linked to 404s
 - OG asset: none pending immutable R2 upload; summary card only
 - Structured data: visible `BreadcrumbList` and `FAQPage` from the same typed content
 - Actual content updated at: 2026-08-15; reviewed at: 2026-08-15
-- Repository checks: passed 51 test files/309 tests, type, format, production build, online asset, route-bundle, and Cloudflare budget gates on 2026-08-15
-- External verification: three gallery image URLs passed production `HEAD` checks for status, MIME, byte size, inline disposition, and immutable caching; local en SSR and desktop Chrome rendering passed with all three images; updated production page fetch pending Worker deployment; Search Console not authorized
-- Notes/risks: the gallery shows three Codex-generated examples tied to the visible prompts, while the copy continues to state that generated results vary
+- Repository checks: passed 52 test files/312 tests, format, production build, online asset, route-bundle, and Cloudflare build/dry-run/budget gates on 2026-08-15
+- External verification: seven gallery images and four video/poster pairs passed production CDN checks, including video Range 206; local en desktop 3-column and mobile single-column rendering, viewport video playback, video controls, poster loading, quick-start fill, media preview, and zero horizontal overflow passed; updated production page fetch pending Worker deployment; Search Console not authorized
+- Notes/risks: the four motion clips are explicitly presented as temporary component previews and not as outputs of the image tool; the first real video page should move or replace them with capability-backed video examples while reusing the same typed R2 contract
 
 ## ai-image-generator · zh
 
@@ -129,16 +130,16 @@ Shared fields for the entries below:
 - Canonical path: `/tools/ai-image-generator`; indexable alternates: noindex 期间为空
 - Adjacent pages: 未来 `/models/gpt-image-2`、`/tools/ai-image-editor`
 - Cannibalization boundary: 完成通用文生图任务；不承担 GPT Image 2 模型评估，也不把参考图编辑作为主要意图
-- Required visible evidence: 三组带已验证 R2 结果图的可改写中文提示词、工作流、输出控制、提示词指导、使用场景、运行时限制和可见 FAQ
+- Required visible evidence: 十五组带已验证 R2 图片的可改写中文案例、十二组明确标记为临时组件预览的 R2 视频/poster、工作流、输出控制、提示词指导、使用场景、运行时限制和可见 FAQ
 - Claim sources: `AGENT_IMAGE_MODEL_OPTIONS`、`DEFAULT_IMAGE_MODEL`、服务端价格重算、`generate_image`、Catalog entry policy
 - Inbound links: 中文 `/tools` →“AI 图片生成器”；首页内链留到阶段 5/7
 - Outbound/related links: 面包屑返回 `/tools`，CTA 到 `/pricing`；未开放的 Catalog 关联页会被过滤，不产生 404 内链
 - OG asset: 等待不可变 R2 分享图；当前只输出 summary card
 - Structured data: 与页面同源的 `BreadcrumbList` 与 `FAQPage`
 - Actual content updated at: 2026-08-15; reviewed at: 2026-08-15
-- Repository checks: 2026-08-15 已通过 51 个测试文件/309 项测试、类型、格式、生产构建、在线资源、route bundle 与 Cloudflare 预算门禁
-- External verification: 三张 gallery 图片已通过生产公网 `HEAD` 状态、MIME、字节数、inline disposition 与 immutable cache 检查；本地中文 SSR 和移动端 Chrome 渲染已加载全部三张图片；更新后的生产页面等待 Worker 部署后抓取；Search Console 未授权
-- Notes/risks: gallery 展示与可见提示词对应的三张 Codex 生成案例，同时继续明确生成结果具有随机性
+- Repository checks: 2026-08-15 已通过 52 个测试文件/312 项测试、格式、生产构建、在线资源、route bundle 与 Cloudflare build/dry-run/预算门禁
+- External verification: 十五张 gallery 图片与十二组视频/poster 已通过生产 CDN 校验，视频额外验证 Range 206；本地中英文 1440px/390px 动态瀑布流、折叠展开、视口视频播放、poster、视频弹窗与无横向溢出通过；更新后的生产页面等待 Worker 部署后抓取；Search Console 未授权
+- Notes/risks: 十二个视频明确标记为临时组件预览，不作为图片工具输出能力；首个真实视频页应以能力一致的视频案例替换或迁移它们，并复用同一 typed R2 契约
 
 ## ai-image-editor · en
 

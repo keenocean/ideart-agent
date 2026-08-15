@@ -298,8 +298,10 @@ export function ChatComposer({
           />
           {toolbarExtra}
         </div>
-        {/* ml-auto keeps this group right-aligned after the row wraps. */}
-        <div className="ml-auto flex shrink-0 items-center gap-1.5">
+        {/* Mobile translations can make this control group wider than the
+            composer. Give it a full wrapping row, then keep the compact
+            single-row treatment once the viewport has room. */}
+        <div className="ml-auto flex w-full min-w-0 flex-wrap items-center justify-end gap-1.5 sm:w-auto sm:flex-nowrap">
           {onSkillNameChange && (
             <ComposerSkillSelect
               skillName={skillName}

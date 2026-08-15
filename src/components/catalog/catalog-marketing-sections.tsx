@@ -1,0 +1,451 @@
+import { useState, type ReactNode } from 'react';
+import { ArrowRight, CheckCircle2, Play, WandSparkles } from 'lucide-react';
+
+import { Link } from '@/core/i18n/navigation';
+import { cn } from '@/lib/utils';
+import type { CatalogGalleryItem } from '@/components/catalog/catalog-masonry-gallery';
+import {
+  CatalogMedia,
+  type CatalogMediaAsset,
+} from '@/components/catalog/catalog-media';
+import {
+  CatalogMediaPreviewDialog,
+  type CatalogMediaPreviewLabels,
+} from '@/components/catalog/catalog-media-preview-dialog';
+import { CatalogSectionHeading } from '@/components/catalog/catalog-section-heading';
+import { buttonVariants } from '@/components/ui/button';
+
+export type CatalogCopyItem = {
+  title: string;
+  description: string;
+  icon?: ReactNode;
+};
+
+export function CatalogFeatureGrid({
+  title,
+  description,
+  items,
+  id,
+  className,
+}: {
+  title: string;
+  description?: string;
+  items: readonly CatalogCopyItem[];
+  id?: string;
+  className?: string;
+}) {
+  return (
+    <section
+      id={id}
+      className={cn('scroll-mt-20 px-4 py-16 sm:px-6', className)}
+    >
+      <div className="mx-auto w-full max-w-5xl">
+        <CatalogSectionHeading title={title} description={description} />
+        <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {items.map((item) => (
+            <article
+              key={item.title}
+              className="border-border bg-card rounded-2xl border p-5"
+            >
+              {item.icon}
+              <h3 className="text-foreground mt-3 text-sm font-medium">
+                {item.title}
+              </h3>
+              <p className="text-muted-foreground mt-1.5 text-sm leading-relaxed">
+                {item.description}
+              </p>
+            </article>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+export function CatalogExploreSection({
+  groups,
+}: {
+  groups: readonly {
+    title: string;
+    description?: string;
+    items: readonly CatalogCopyItem[];
+  }[];
+}) {
+  return (
+    <section id="explore" className="scroll-mt-20 px-4 py-16 sm:px-6">
+      <div className="mx-auto w-full max-w-6xl space-y-16">
+        {groups.map((group) => (
+          <div key={group.title}>
+            <CatalogSectionHeading
+              title={group.title}
+              description={group.description}
+            />
+            <div
+              className={cn(
+                'mt-8 grid gap-5 sm:grid-cols-2',
+                group.items.length >= 4 ? 'lg:grid-cols-4' : 'lg:grid-cols-3'
+              )}
+            >
+              {group.items.map((item) => (
+                <article
+                  key={item.title}
+                  className="border-border bg-card rounded-2xl border p-5"
+                >
+                  {item.icon}
+                  <h3 className="text-foreground mt-4 font-medium">
+                    {item.title}
+                  </h3>
+                  <p className="text-muted-foreground mt-2 text-sm leading-6">
+                    {item.description}
+                  </p>
+                </article>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+export function CatalogSteps({
+  title,
+  description,
+  items,
+  id,
+}: {
+  title: string;
+  description?: string;
+  items: readonly { title: string; description: string }[];
+  id?: string;
+}) {
+  return (
+    <section
+      id={id}
+      className="bg-muted/35 border-border scroll-mt-20 border-y px-4 py-16 sm:px-6"
+    >
+      <div className="mx-auto max-w-6xl">
+        <CatalogSectionHeading title={title} description={description} />
+        <div
+          className={cn(
+            'mt-10 grid grid-cols-1 gap-4 md:grid-cols-2',
+            items.length >= 4 ? 'lg:grid-cols-4' : 'lg:grid-cols-3'
+          )}
+        >
+          {items.map((item, index) => (
+            <article
+              key={item.title}
+              className="border-border bg-card grid h-full grid-rows-[auto_auto_1fr] rounded-[1.375rem] border p-6 sm:p-7"
+            >
+              <span className="border-primary/30 bg-primary/10 text-primary flex size-9 items-center justify-center rounded-full border text-sm font-semibold">
+                {index + 1}
+              </span>
+              <h3 className="text-foreground mt-4 text-base leading-6 font-medium">
+                {item.title}
+              </h3>
+              <p className="text-muted-foreground mt-3 text-sm leading-6">
+                {item.description}
+              </p>
+            </article>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+export function ToolQuickStarts({
+  label,
+  items,
+  onSelect,
+}: {
+  label: string;
+  items: readonly CatalogGalleryItem[];
+  onSelect: (item: CatalogGalleryItem) => void;
+}) {
+  const columns =
+    items.length <= 1
+      ? 'grid-cols-1'
+      : items.length === 2
+        ? 'grid-cols-2'
+        : items.length === 3
+          ? 'grid-cols-2 sm:grid-cols-3'
+          : 'grid-cols-2 sm:grid-cols-4';
+
+  return (
+    <div className="mt-6">
+      <p className="text-foreground mb-3 text-sm font-medium">{label}</p>
+      <div className={cn('grid gap-3', columns)}>
+        {items.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() => onSelect(item)}
+            className="group focus-visible:ring-ring min-w-0 text-left focus-visible:ring-2 focus-visible:outline-none"
+          >
+            <span className="border-border bg-muted block aspect-[4/3] overflow-hidden rounded-xl border">
+              <CatalogMedia
+                asset={item.media}
+                className="transition-transform duration-300 group-hover:scale-[1.025] motion-reduce:transition-none"
+              />
+            </span>
+            <span className="text-muted-foreground group-hover:text-foreground mt-2 block truncate text-xs transition-colors">
+              {item.title}
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export function CatalogLimitations({
+  title,
+  description,
+  items,
+}: {
+  title: string;
+  description?: string;
+  items: readonly string[];
+}) {
+  return (
+    <section className="bg-muted/35 border-border border-y px-4 py-16 sm:px-6">
+      <div className="mx-auto grid max-w-6xl gap-10 lg:grid-cols-[0.8fr_1.2fr]">
+        <CatalogSectionHeading
+          title={title}
+          description={description}
+          align="left"
+        />
+        <ul className="grid gap-4 sm:grid-cols-2">
+          {items.map((item) => (
+            <li
+              key={item}
+              className="border-border bg-card flex gap-3 rounded-2xl border p-4 text-sm leading-6"
+            >
+              <CheckCircle2
+                aria-hidden="true"
+                className="text-primary mt-0.5 size-4 shrink-0"
+              />
+              <span>{item}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </section>
+  );
+}
+
+export function CatalogFaq({
+  title,
+  description,
+  items,
+}: {
+  title: string;
+  description?: string;
+  items: readonly { question: string; answer: string }[];
+}) {
+  return (
+    <section id="faq" className="scroll-mt-20 px-4 py-16 sm:px-6">
+      <div className="mx-auto w-full max-w-5xl">
+        <CatalogSectionHeading title={title} description={description} />
+        <div className="mt-10 space-y-3">
+          {items.map((item) => (
+            <details
+              key={item.question}
+              className="border-border bg-card group rounded-2xl border px-5 py-4"
+            >
+              <summary className="focus-visible:ring-ring cursor-pointer list-none rounded-md font-medium focus-visible:ring-2 focus-visible:outline-none">
+                {item.question}
+              </summary>
+              <p className="text-muted-foreground mt-3 max-w-3xl text-sm leading-6">
+                {item.answer}
+              </p>
+            </details>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+export function CatalogFinalCta({
+  title,
+  description,
+  primaryLabel,
+  secondaryLabel,
+  primaryHref = '#generator',
+  secondaryHref = '/pricing',
+  wide = false,
+}: {
+  title: string;
+  description: string;
+  primaryLabel: string;
+  secondaryLabel: string;
+  primaryHref?: string;
+  secondaryHref?: string;
+  wide?: boolean;
+}) {
+  return (
+    <section className="px-4 py-16 sm:px-6">
+      <div
+        className={cn(
+          'border-border bg-card mx-auto w-full rounded-[2rem] border px-6 py-12 text-center shadow-sm sm:py-14',
+          wide ? 'max-w-7xl' : 'max-w-5xl'
+        )}
+      >
+        <h2 className="text-foreground font-serif text-3xl font-normal tracking-[-0.01em] sm:text-4xl">
+          {title}
+        </h2>
+        <p className="text-muted-foreground mx-auto mt-4 max-w-xl text-sm leading-relaxed sm:text-base">
+          {description}
+        </p>
+        <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+          <a href={primaryHref} className={cn(buttonVariants(), 'gap-2')}>
+            {primaryLabel}
+            <ArrowRight aria-hidden="true" className="size-4" />
+          </a>
+          <Link
+            href={secondaryHref}
+            className={buttonVariants({ variant: 'outline' })}
+          >
+            {secondaryLabel}
+          </Link>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+export function CatalogMediaExplainer({
+  title,
+  description,
+  eyebrow,
+  copy,
+  footnote,
+  media,
+}: {
+  title: string;
+  description?: string;
+  eyebrow?: string;
+  copy: string;
+  footnote?: string;
+  media: CatalogMediaAsset;
+}) {
+  return (
+    <section className="bg-muted/35 border-border border-y px-4 py-20 sm:px-6 sm:py-28">
+      <div className="mx-auto max-w-7xl">
+        <CatalogSectionHeading
+          title={title}
+          description={description}
+          size="editorial"
+        />
+        <div className="border-border bg-card mt-14 grid overflow-hidden rounded-[1.75rem] border sm:grid-cols-[minmax(0,0.78fr)_minmax(0,1.22fr)]">
+          <div className="bg-muted/55 flex min-h-80 flex-col p-6 sm:p-10 lg:min-h-[28rem] lg:p-12">
+            {eyebrow && (
+              <p className="text-primary text-xs font-semibold tracking-[0.14em] uppercase">
+                {eyebrow}
+              </p>
+            )}
+            <p className="text-foreground mt-8 text-lg leading-8">{copy}</p>
+            {footnote && (
+              <p className="text-muted-foreground mt-auto pt-10 text-xs leading-5">
+                {footnote}
+              </p>
+            )}
+          </div>
+          <div className="bg-muted relative min-h-80 lg:min-h-[28rem]">
+            <CatalogMedia asset={media} />
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+export function CatalogMediaCarousel({
+  title,
+  description,
+  items,
+  labels,
+  onUsePrompt,
+}: {
+  title: string;
+  description?: string;
+  items: readonly CatalogGalleryItem[];
+  labels: CatalogMediaPreviewLabels & { usePrompt: string };
+  onUsePrompt?: (item: CatalogGalleryItem) => void;
+}) {
+  const [previewIndex, setPreviewIndex] = useState<number | null>(null);
+  const preview = previewIndex === null ? null : (items[previewIndex] ?? null);
+
+  function navigate(offset: number) {
+    setPreviewIndex((current) => {
+      if (current === null || items.length === 0) return null;
+      return (current + offset + items.length) % items.length;
+    });
+  }
+
+  return (
+    <section className="bg-muted/35 border-border w-full border-y py-20 sm:py-28">
+      <div className="mx-auto max-w-5xl px-6 text-center">
+        <CatalogSectionHeading
+          title={title}
+          description={description}
+          size="editorial"
+        />
+      </div>
+      <div className="mt-10 flex w-full snap-x snap-mandatory [scroll-padding:0_1.5rem] gap-5 overflow-x-auto px-6 py-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {items.map((item, index) => (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() => setPreviewIndex(index)}
+            className="border-border bg-card group focus-visible:ring-ring relative aspect-video w-[85vw] max-w-[60rem] shrink-0 snap-start overflow-hidden rounded-3xl border text-left shadow-sm focus-visible:ring-2 focus-visible:outline-none"
+          >
+            <CatalogMedia
+              asset={item.media}
+              className="transition-transform duration-500 ease-out group-hover:scale-[1.03] motion-reduce:transition-none"
+            />
+            {item.media.kind === 'video' && (
+              <span className="absolute top-1/2 left-1/2 flex size-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/30 bg-black/45 text-white opacity-0 backdrop-blur-md transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
+                <Play
+                  aria-hidden="true"
+                  className="ml-0.5 size-4 fill-current"
+                />
+              </span>
+            )}
+            <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 to-transparent px-6 pt-16 pb-5 text-sm font-medium text-white">
+              {item.title}
+            </span>
+          </button>
+        ))}
+      </div>
+
+      <CatalogMediaPreviewDialog
+        open={preview !== null}
+        item={preview}
+        index={previewIndex ?? -1}
+        total={items.length}
+        labels={labels}
+        onClose={() => setPreviewIndex(null)}
+        onNavigate={navigate}
+        actions={
+          preview && onUsePrompt ? (
+            <button
+              type="button"
+              onClick={() => {
+                const selected = preview;
+                setPreviewIndex(null);
+                onUsePrompt(selected);
+              }}
+              className="bg-primary text-primary-foreground focus-visible:ring-ring flex h-11 w-full items-center justify-center gap-2 rounded-xl px-4 text-sm font-medium hover:opacity-90 focus-visible:ring-2 focus-visible:outline-none"
+            >
+              <WandSparkles aria-hidden="true" className="size-4" />
+              {labels.usePrompt}
+            </button>
+          ) : null
+        }
+      />
+    </section>
+  );
+}

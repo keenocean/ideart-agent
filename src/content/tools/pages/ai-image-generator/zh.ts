@@ -49,16 +49,28 @@ export const content = {
     ],
   },
   examples: {
-    title: '可以直接改写的提示词示例',
+    title: '图片案例与视频组件预览',
     description:
-      '下面展示如何把需求写具体。这些是提示词范例，不代表每次生成都会得到完全相同的结果。',
+      '静态图片展示可改写的提示词；视频暂时用于验证未来视频工具页会复用的媒体瀑布流，不代表这个图片生成器能够输出视频。',
+    labels: {
+      quickStart: '快速开始',
+      image: '图片',
+      video: '视频',
+      prompt: '提示词',
+      download: '下载原文件',
+      previous: '上一个案例',
+      next: '下一个案例',
+      close: '关闭预览',
+      usePrompt: '使用这个提示词',
+      expand: '查看全部案例',
+    },
     items: [
       {
         title: '产品广告概念',
         description: '适合明确主体、材质、灯光和商业画面方向。',
         prompt:
           '一瓶高端护肤精华放在浅水镜面上，冷银色调，柔和漫射棚拍光，近景产品构图，干净克制的奢华广告摄影，不出现其他物体。',
-        image: {
+        media: {
           assetId: 'tools-ai-image-generator-0241fe76c3058fcd',
           alt: '无品牌玻璃精华瓶立在浅水中，冷银色棚拍光照亮瓶身',
         },
@@ -68,7 +80,7 @@ export const content = {
         description: '用可识别的场景、有限色板和版面要求表达抽象主题。',
         prompt:
           '一幅关于跨时区远程协作的编辑插画，三张相连的办公桌漂浮在夜晚城市上空，深蓝与珊瑚红限定配色，几何造型，为标题保留大面积留白。',
-        image: {
+        media: {
           assetId: 'tools-ai-image-generator-5d01838c8320ab5f',
           alt: '三张亮着灯的办公桌连接在夜晚城市上空，采用深蓝与珊瑚红编辑插画风格',
         },
@@ -78,9 +90,244 @@ export const content = {
         description: '同时说明画幅、焦点物体、动势和后续排版空间。',
         prompt:
           '9:16 竖版跑鞋新品发布视觉，一只跑鞋悬浮在红色跑道上方，白色粉尘锐利爆开，强烈侧光，现代运动摄影风格，顶部留出清晰文案区域。',
-        image: {
+        media: {
           assetId: 'tools-ai-image-generator-eee9f320ac365d1e',
           alt: '无品牌黑色跑鞋悬浮在红色跑道上方，身后扬起白色粉尘',
+        },
+      },
+      {
+        title: '月夜怪兽面包房',
+        description: '同时明确角色、动作、暖色焦点光和冷色夜景环境。',
+        prompt:
+          '一只橙色小角怪兽惊讶地看着面包从魔法烤箱中漂浮起来，月光窗户，铜色炉火，面粉悬浮在空气里，电影级家庭动画质感，宽幅故事构图。',
+        media: {
+          assetId: 'tools-ai-image-generator-c59b7a4f2cbfdc3b',
+          alt: '橙色小角怪兽在月夜面包房里看着面包漂浮到发光烤箱上方',
+        },
+      },
+      {
+        title: '乘地铁的温柔怪兽',
+        description: '把醒目的中心角色、纪实构图和通勤者的克制反应组合起来。',
+        prompt:
+          '清晨拥挤的地铁里，一只温柔的苔绿色毛绒怪兽拎着小皮质公文包，通勤者坐在两侧，自然窗光，电影纪录片构图，写实材质。',
+        media: {
+          assetId: 'tools-ai-image-generator-39da1e8785d8efb2',
+          alt: '高大的绿色温柔怪兽拎着公文包站在地铁通勤者之间',
+        },
+      },
+      {
+        title: '夜间温室里的蓝色萤火虫',
+        description: '用全景环境、单一强调色、倒影和氛围光建立画面尺度。',
+        prompt:
+          '午夜雨后的废弃玻璃温室被积水淹没，一位穿黄色雨衣的访客独自站立，数百只蓝色萤火虫飞过水面，月光倒影，全景电影写实风格。',
+        media: {
+          assetId: 'tools-ai-image-generator-f2570c70c73667db',
+          alt: '黄色雨衣访客面对倒映在月夜积水温室里的蓝色萤火虫',
+        },
+      },
+      {
+        title: '瓷鲤列车',
+        description: '通过材质、动作、天气和对称构图控制超现实编辑场景。',
+        prompt:
+          '一位芭蕾舞者在空荡的复古列车车厢中起舞，瓷器质感的锦鲤漂浮在她周围，窗外落雨，深蓝夜色，暖色台灯，对称电影构图。',
+        media: {
+          assetId: 'tools-ai-image-generator-4465b33d8cac5a5f',
+          alt: '芭蕾舞者和漂浮的瓷器锦鲤出现在雨夜复古列车车厢中',
+        },
+      },
+      {
+        title: '视频预览：漂浮的面包',
+        description:
+          '临时 R2 视频，用于验证懒加载播放、poster 和通用媒体预览弹窗。',
+        prompt:
+          '让面包从烤箱中缓慢升起，面粉在暖光中飘散，橙色怪兽露出惊讶反应。',
+        media: {
+          assetId: 'tools-ai-image-generator-8c2cfa5620e683cc',
+          alt: '发光面包房里橙色怪兽看着漂浮面包的短视频预览',
+        },
+      },
+      {
+        title: '视频预览：清晨通勤',
+        description:
+          '临时 R2 视频，用于验证图文混合瀑布流，不代表当前页面提供视频生成。',
+        prompt:
+          '加入轻微的地铁晃动、掠过车窗的晨光，以及乘客面对绿色怪兽时的细小反应。',
+        media: {
+          assetId: 'tools-ai-image-generator-96a88f4a9d15525b',
+          alt: '绿色怪兽与清晨通勤者一起乘坐地铁的短视频预览',
+        },
+      },
+      {
+        title: '视频预览：蓝色萤火虫',
+        description: '临时宽幅视频，用于验证响应式比例和 R2 Range 分段传输。',
+        prompt: '让蓝色萤火虫缓慢掠过倒影水面，月光在温室玻璃上轻微移动。',
+        media: {
+          assetId: 'tools-ai-image-generator-c72381045001af4e',
+          alt: '蓝色萤火虫飞过夜间积水温室的宽幅短视频预览',
+        },
+      },
+      {
+        title: '视频预览：瓷器锦鲤',
+        description:
+          '临时 R2 视频，用于验证视频卡片和未来视频工具页的全屏媒体控制。',
+        prompt: '让舞者缓慢旋转，瓷器锦鲤穿过车厢，雨水沿着列车窗户滑落。',
+        media: {
+          assetId: 'tools-ai-image-generator-7da3695ed4c4a534',
+          alt: '舞者与漂浮瓷器锦鲤出现在复古列车里的短视频预览',
+        },
+      },
+      {
+        title: '火山小行星带',
+        description: '通过材质、尺度、色彩和空间层次建立高对比科幻场景。',
+        prompt:
+          '深空中的密集小行星带，炭黑岩石裂缝中发出电蓝晶体和橙色岩浆光，多层景深，戏剧性轮廓光，电影级科幻写实风格。',
+        media: {
+          assetId: 'tools-ai-image-generator-db46761ada6e3d50',
+          alt: '深空中被电蓝晶体与橙色岩浆裂开的黑色小行星',
+        },
+      },
+      {
+        title: '沙漠中苏醒的虞美人',
+        description: '用克制的荒漠环境和逐渐出现的单一强调色表现变化。',
+        prompt:
+          '罕见降雨后的安静沙漠平原，小朵红色虞美人从枯草间长出，远处沙丘，淡蓝色清晨天空，低机位自然视角，诗意电影写实风格。',
+        media: {
+          assetId: 'tools-ai-image-generator-f9c7a08a07b871e0',
+          alt: '明亮沙漠平原上红色小花从枯草之间长出',
+        },
+      },
+      {
+        title: '冰川巨物',
+        description: '以航拍尺度、破裂冰面和冷色环境光表现巨大主体。',
+        prompt:
+          '一个巨大的石质形体从破裂冰川中向上隆起，航拍广角，积雪与蓝色冰隙，阴天极地光线，宏大的环境尺度，电影级照片写实细节。',
+        media: {
+          assetId: 'tools-ai-image-generator-3c275d1ea7d9223d',
+          alt: '巨大的圆形石质形体冲破布满裂缝和积雪的冰川',
+        },
+      },
+      {
+        title: '雨街镜面球',
+        description: '通过反射、雨天、交通色彩和街道低机位控制超现实城市焦点。',
+        prompt:
+          '一个无缝镜面球悬浮在雨后的伦敦街道上方，红色巴士映在弧形表面，行人与店铺灯光轻微虚化，街道低机位电影摄影。',
+        media: {
+          assetId: 'tools-ai-image-generator-126e53051fa7c68f',
+          alt: '悬浮镜面球映出湿润城市街道上的红色巴士',
+        },
+      },
+      {
+        title: '纸艺故事书景观',
+        description: '明确手工材质、简单造型和温暖的方向光。',
+        prompt:
+          '一本打开的手工纸艺故事书变成层叠的粉彩风景，周围散落彩色铅笔，温暖午后窗光，可触摸的剪纸质感，轻快定格动画美术方向。',
+        media: {
+          assetId: 'tools-ai-image-generator-fb51d0665ffb5fbf',
+          alt: '桌面上的纸艺故事书展开成粉彩风景，周围放着彩色铅笔',
+        },
+      },
+      {
+        title: '水洼里的夜市',
+        description: '用普通前景、微缩尺度和冷暖对比揭示不可能的隐藏场景。',
+        prompt:
+          '空荡城市街道上的雨水洼，水面下显现热闹的微缩夜市，暖色灯笼帐篷，湿润沥青倒影，低位微距视角，魔幻电影写实风格。',
+        media: {
+          assetId: 'tools-ai-image-generator-5664a0dee41494f4',
+          alt: '黑暗湿润街道的水洼下显现发光的微缩夜市',
+        },
+      },
+      {
+        title: '帆布洗衣房',
+        description: '用熟悉的对称空间和单一超现实材质变化形成明确概念画面。',
+        prompt:
+          '夜间空荡的荧光灯洗衣房，长条白色帆布从打开的洗衣机中流出，窗外能看到海洋，居中对称构图，冷色超现实电影灯光。',
+        media: {
+          assetId: 'tools-ai-image-generator-02b0b7a8d6d66167',
+          alt: '冷色夜间洗衣房里白色帆布在洗衣机之间流动',
+        },
+      },
+      {
+        title: '潮汐图书馆',
+        description: '让有秩序的室内空间、缓慢侵入的环境和安静实用光形成平衡。',
+        prompt:
+          '一间历史阅读室逐渐被清澈海水淹没，书架和两张木桌保持原样，暖色台灯，冷色日光从中央窗户进入，平静对称的电影构图。',
+        media: {
+          assetId: 'tools-ai-image-generator-bf2655c56961d96f',
+          alt: '海水覆盖对称老图书馆的地板，两盏台灯仍然亮着',
+        },
+      },
+      {
+        title: '视频预览：火山小行星',
+        description: '临时 R2 视频，用高速太空画面补充通用视频瀑布流。',
+        prompt:
+          '让小行星群从镜头旁漂过，岩石裂缝下的蓝色晶体和橙色岩浆有节奏地闪动。',
+        media: {
+          assetId: 'tools-ai-image-generator-da9cec431f963fbc',
+          alt: '发光火山小行星在深空中漂移的视频预览',
+        },
+      },
+      {
+        title: '视频预览：沙漠花开',
+        description: '临时 R2 视频，用于验证轻微自然运动和连续瀑布流播放。',
+        prompt: '让红色虞美人在枯草间逐渐开放，微风轻轻掠过沙地。',
+        media: {
+          assetId: 'tools-ai-image-generator-dc695c6c59eedafa',
+          alt: '红色小花在明亮沙漠平原上生长的视频预览',
+        },
+      },
+      {
+        title: '视频预览：冰川巨物',
+        description: '临时 R2 视频，为可复用视频卡片补充明亮雪景测试。',
+        prompt: '让石质巨物从冰川中升起，冰层破裂，积雪落入蓝色冰隙。',
+        media: {
+          assetId: 'tools-ai-image-generator-28464f03f575b12e',
+          alt: '巨大石质形体冲破冰川的视频预览',
+        },
+      },
+      {
+        title: '视频预览：镜面球',
+        description: '临时 R2 视频，用于检查反射、街道运动和视频控制。',
+        prompt: '让镜面球沿湿润街道滑行，红色巴士和商店灯光不断掠过球面。',
+        media: {
+          assetId: 'tools-ai-image-generator-ef56dc352549bc2b',
+          alt: '镜面球在雨街红色巴士之间漂浮的视频预览',
+        },
+      },
+      {
+        title: '视频预览：纸艺故事书',
+        description: '临时 R2 视频，用明亮手工场景验证混合媒体瀑布流。',
+        prompt: '让纸艺故事书展开成层叠的粉彩景观，剪纸形状从每一页立起。',
+        media: {
+          assetId: 'tools-ai-image-generator-cd6a1545d0bb900d',
+          alt: '手工纸艺故事书在桌面上展开的视频预览',
+        },
+      },
+      {
+        title: '视频预览：水洼夜市',
+        description: '临时 R2 视频，用于验证暗场 poster 清晰度和懒加载播放。',
+        prompt:
+          '让水洼下的灯笼和微缩行人活动起来，雨滴在上方街道倒影中荡开涟漪。',
+        media: {
+          assetId: 'tools-ai-image-generator-0c6193822673c248',
+          alt: '雨水洼下显现微缩灯笼夜市的视频预览',
+        },
+      },
+      {
+        title: '视频预览：帆布洗衣房',
+        description: '临时 R2 视频，为组件测试补充长布料运动和冷色室内画面。',
+        prompt: '让白色帆布从洗衣机中持续流出，雾气在荧光灯下缓慢升起。',
+        media: {
+          assetId: 'tools-ai-image-generator-e89f518697d042d0',
+          alt: '白色帆布在夜间洗衣房中流动的视频预览',
+        },
+      },
+      {
+        title: '视频预览：潮汐图书馆',
+        description: '临时 R2 视频，以水面倒影和安静室内画面填充扩展瀑布流。',
+        prompt: '让轻柔潮水流过图书馆地板，台灯倒影在两张书桌之间轻微摇动。',
+        media: {
+          assetId: 'tools-ai-image-generator-f657512a8700976c',
+          alt: '海水流过亮着台灯的老图书馆的视频预览',
         },
       },
     ],

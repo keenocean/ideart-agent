@@ -119,8 +119,13 @@ const publicDomain = requestedDomain || marketingAssetPublicDomain;
 
 const assets = new Map<string, MarketingAsset>();
 function registerAsset(asset: MarketingAsset): void {
-  if (assets.has(asset.id))
-    failures.push(`duplicate marketing asset id: ${asset.id}`);
+  const existing = assets.get(asset.id);
+  if (existing) {
+    if (existing !== asset) {
+      failures.push(`duplicate marketing asset id: ${asset.id}`);
+    }
+    return;
+  }
   assets.set(asset.id, asset);
   if (asset.bytes <= 0 || asset.width <= 0 || asset.height <= 0) {
     failures.push(`invalid marketing asset metadata: ${asset.id}`);
