@@ -9,7 +9,6 @@ import { createFileRoute } from '@tanstack/react-router';
 import { Eye, MoreHorizontal, Pencil, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { tDynamic } from '@/core/i18n/dynamic';
 import { Link } from '@/core/i18n/navigation';
 import { ApiError, apiGet, apiPost, type PageResult } from '@/lib/api-client';
 import { cn } from '@/lib/utils';
@@ -62,6 +61,16 @@ const TABS = [
   'canceled',
 ] as const;
 type Tab = (typeof TABS)[number];
+
+const TAB_LABELS: Record<Tab, () => string> = {
+  all: m['settings.billing.tab_all'],
+  active: m['settings.billing.tab_active'],
+  trialing: m['settings.billing.tab_trialing'],
+  paused: m['settings.billing.tab_paused'],
+  expired: m['settings.billing.tab_expired'],
+  pending_cancel: m['settings.billing.tab_pending_cancel'],
+  canceled: m['settings.billing.tab_canceled'],
+};
 
 const PAGE_SIZE = 20;
 
@@ -336,7 +345,7 @@ function BillingPage() {
                 : 'text-muted-foreground hover:text-foreground border-transparent'
             )}
           >
-            {tDynamic(`settings.billing.tab_${tb}`)}
+            {TAB_LABELS[tb]()}
           </button>
         ))}
       </div>

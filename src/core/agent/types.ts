@@ -3,7 +3,17 @@ import type {
   ToolDefinition,
 } from '@keenocean/open-agent-sdk';
 
-import type { AgentGenerationSettings } from '@/lib/agent-settings';
+import type {
+  AgentGenerationSettings,
+  VideoGenerationKind,
+} from '@/lib/agent-settings';
+
+export type AgentMediaType = 'image' | 'audio' | 'video';
+
+export interface AgentVerifiedMedia {
+  mediaType: AgentMediaType;
+  url: string;
+}
 
 export interface AgentDefinition {
   id: string;
@@ -26,6 +36,12 @@ export interface AgentTurnMetadataV1 {
   skillReleaseId: string | null;
   toolNames: string[];
   longRunningToolNames: string[];
+  /** Stable marketing/chat entry identity for audit only. */
+  generationEntrySource?: string;
+  /** Semantic video operation enforced by a public tool entry. */
+  generationVideoOperation?: VideoGenerationKind;
+  /** Server-verified reference media accepted for this user turn. */
+  media?: AgentVerifiedMedia[];
 }
 
 export interface AgentAssistantMessageMetadataV1 {

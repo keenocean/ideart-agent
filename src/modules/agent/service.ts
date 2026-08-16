@@ -5,6 +5,7 @@ import { promptByteLength } from '@/core/agent/prompt-config';
 import type { PreparedAgentTurn } from '@/core/agent/types';
 import { envConfigs } from '@/config';
 import { DEFAULT_AGENT_SYSTEM_PROMPT } from '@/config/agent';
+import type { ChatWithMessages } from '@/modules/chats/service';
 import { getAllConfigs } from '@/modules/config/service';
 import type { AgentGenerationSettings } from '@/lib/agent-settings';
 import {
@@ -12,6 +13,7 @@ import {
   normalizeOpenAIBaseUrl,
 } from '@/lib/llm-base-url';
 
+import type { EffectiveGenerationPolicy } from './entry-policy';
 import { loadAgentHistory, LONG_RUNNING_MEDIA_TOOL_NAMES } from './history';
 import { resolveAgentProfile } from './profile';
 import { buildSkillSystemPrompt, type PromptSkill } from './skills';
@@ -48,6 +50,7 @@ export interface RunAgentTurnParams {
   settings?: AgentGenerationSettings;
   signal?: AbortSignal;
   prepared?: PreparedAgentTurn;
+  policy?: EffectiveGenerationPolicy;
 }
 
 type LlmProvider = 'openai' | 'anthropic';
@@ -69,6 +72,8 @@ export interface PrepareAgentTurnParams {
   skill?: PromptSkill | null;
   settings?: AgentGenerationSettings;
   leaseOwner?: PreparedAgentTurn['leaseOwner'];
+  policy?: EffectiveGenerationPolicy;
+  preloadedChat?: ChatWithMessages;
 }
 
 export async function prepareAgentTurn(
@@ -81,6 +86,7 @@ export async function prepareAgentTurn(
     skill: params.skill,
     turnId: params.turnId,
     requireTurnLease: Boolean(params.leaseOwner),
+    policy: params.policy,
   });
   const toolNames = tools.map((tool) => tool.name);
   if (new Set(toolNames).size !== toolNames.length) {
@@ -97,7 +103,8 @@ export async function prepareAgentTurn(
       params.sessionId,
       params.userId,
       params.persistedUserMessageId,
-      toolNames
+      toolNames,
+      params.preloadedChat
     ),
   ]);
   const llm = resolveLlm(configs);
@@ -157,6 +164,18 @@ export async function prepareAgentTurn(
       skillReleaseId: params.skill?.releaseId ?? null,
       toolNames,
       longRunningToolNames,
+      ...(params.policy ? { generationEntrySource: params.policy.source } : {}),
+      ...(params.policy?.lockedVideoOperation
+        ? { generationVideoOperation: params.policy.lockedVideoOperation }
+        : {}),
+      ...(params.policy?.requestAttachments?.length
+        ? {
+            media: params.policy.requestAttachments.map((attachment) => ({
+              mediaType: attachment.mediaType,
+              url: attachment.url,
+            })),
+          }
+        : {}),
     },
   };
 }
@@ -238,6 +257,7 @@ export async function* runAgentTurn(
         persistedUserMessageId,
         skill,
         settings,
+        policy: params.policy,
       }));
   } catch (error: any) {
     yield {
@@ -375,7 +395,7 @@ export function withGenerationSettings(
     settings.mediaMode === 'image'
       ? '- Image output is selected. If the user explicitly requests an image result, call generate_image; otherwise answer without calling a tool.'
       : settings.mediaMode === 'video'
-        ? '- The user explicitly selected video output. You must call generate_video or animate_image; do not produce a still image.'
+        ? '- The user explicitly selected video output. Call animate_image for literal image frames; otherwise call generate_video with the matching supported operation. Do not produce a still image.'
         : '- Output mode is Auto. Infer whether the user wants a still image or a video from their request.',
     // The tools resolve this name to whatever id the active provider uses —
     // the agent should pass the name through, not invent a provider id.
@@ -383,7 +403,7 @@ export function withGenerationSettings(
       ? `- The user picked the "${settings.modelName}" video model. Leave the \`model\` argument of generate_video/animate_image empty so it is used, unless the user explicitly asks for a different model.`
       : '',
     settings.mediaMode !== 'image' && settings.aspectRatio
-      ? `- Use aspect_ratio "${settings.aspectRatio}" when calling generate_video or animate_image unless the user explicitly asks for a different aspect ratio.`
+      ? `- Use aspect_ratio "${settings.aspectRatio}" when the selected video operation accepts an aspect ratio, unless the user explicitly asks for a different ratio.`
       : '',
     settings.mediaMode !== 'image' && settings.duration
       ? `- Generate ${settings.duration}-second clips unless the user explicitly asks for a different length.`
@@ -418,7 +438,7 @@ function mediaModeInstruction(settings: AgentGenerationSettings | undefined) {
     return 'Composer output mode: IMAGE. Only generate_image is available. Selecting Image mode alone is not a request to generate.';
   }
   if (settings?.mediaMode === 'video') {
-    return 'Composer output mode: VIDEO. Only video tools are available. Use animate_image for a supplied opening frame when appropriate; otherwise use generate_video.';
+    return 'Composer output mode: VIDEO. Use animate_image for literal opening/ending frames; otherwise use generate_video and select its supported operation from the user intent.';
   }
   return 'Composer output mode: AUTO. Infer the intended medium and select the matching available tool.';
 }

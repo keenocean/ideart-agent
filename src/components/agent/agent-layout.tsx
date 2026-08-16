@@ -3,6 +3,7 @@ import { Clapperboard, Pencil } from 'lucide-react';
 
 import { useSession } from '@/core/auth/client';
 import { usePathname, useRouter } from '@/core/i18n/navigation';
+import { sanitizeAuthCallback } from '@/lib/auth-callback';
 import { m } from '@/paraglide/messages.js';
 import {
   AgentHeaderProvider,
@@ -38,8 +39,12 @@ export function AgentLayout({ children }: { children: React.ReactNode }) {
     }
     if (signInRedirected.current) return;
     signInRedirected.current = true;
-    router.push('/sign-in');
-  }, [isPending, userId, router]);
+    const search = typeof window !== 'undefined' ? window.location.search : '';
+    const callbackUrl = sanitizeAuthCallback(`${pathname}${search}`, '/chat');
+    router.push(
+      `/sign-in?callbackUrl=${encodeURIComponent(callbackUrl ?? '/chat')}`
+    );
+  }, [isPending, userId, router, pathname]);
 
   if (isPending || !userId) {
     return (

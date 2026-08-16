@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { isValidPostSlug, normalizePostSlug } from './service';
+import {
+  isValidPostSlug,
+  normalizePostLocale,
+  normalizePostSlug,
+} from './service';
 
 describe('post slug validation', () => {
   it('normalizes URL-safe slugs', () => {
@@ -15,4 +19,15 @@ describe('post slug validation', () => {
       expect(() => normalizePostSlug(slug)).toThrow('Invalid slug');
     }
   );
+});
+
+describe('post locale validation', () => {
+  it('requires an explicit stored locale', () => {
+    expect(normalizePostLocale(' en ')).toBe('en');
+    expect(() => normalizePostLocale('')).toThrow('Locale is required');
+    expect(() => normalizePostLocale('   ')).toThrow('Locale is required');
+    expect(() => normalizePostLocale('not-registered')).toThrow(
+      'Unsupported locale'
+    );
+  });
 });

@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
 
-import { tDynamic } from '@/core/i18n/dynamic';
 import { apiGet, type PageResult } from '@/lib/api-client';
 import { formatDateTime } from '@/lib/time';
 import { cn } from '@/lib/utils';
@@ -29,6 +28,12 @@ const PAGE_SIZE = 20;
 
 const TABS = ['all', 'grant', 'consume'] as const;
 type Tab = (typeof TABS)[number];
+
+const TAB_LABELS: Record<Tab, () => string> = {
+  all: m['admin.credits.tab_all'],
+  grant: m['admin.credits.tab_grant'],
+  consume: m['admin.credits.tab_consume'],
+};
 
 function CreditsPage() {
   const [page, setPage] = useState(1);
@@ -143,7 +148,7 @@ function CreditsPage() {
                 : 'text-muted-foreground hover:text-foreground border-transparent'
             )}
           >
-            {tDynamic(`admin.credits.tab_${tb}`)}
+            {TAB_LABELS[tb]()}
           </button>
         ))}
       </div>

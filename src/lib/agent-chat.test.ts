@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
 import { mediaTypeForAttachment, type PendingAttachment } from '@/lib/agent';
-import { buildAgentMessage, splitAttachedImages } from '@/lib/agent-chat';
+import {
+  buildAgentMessage,
+  initialTurnStorageKey,
+  parseInitialTurnHandoff,
+  serializeInitialTurnHandoff,
+  splitAttachedImages,
+} from '@/lib/agent-chat';
 
 function attachment(
   id: string,
@@ -25,6 +31,57 @@ describe('composer reference media', () => {
       'create or edit one still image'
     );
     expect(buildAgentMessage('', [image], 'video')).toContain('create a video');
+  });
+
+  it('preserves only uploaded media in the initial-turn handoff', () => {
+    const uploaded = {
+      ...attachment('ready.png', 'image'),
+      receipt: 'signed-media-receipt',
+    };
+    const raw = serializeInitialTurnHandoff({
+      prompt: 'Create this',
+      skillName: 'storyboard',
+      entryContext: {
+        kind: 'tool',
+        entityId: 'image-to-video',
+        locale: 'en',
+      },
+      attachments: [
+        uploaded,
+        {
+          ...attachment('pending.png', 'image'),
+          status: 'uploading',
+          url: undefined,
+        },
+      ],
+    });
+    expect(initialTurnStorageKey('s-123')).toBe('agent:initial-turn:s-123');
+    expect(parseInitialTurnHandoff(raw)).toMatchObject({
+      prompt: 'Create this',
+      skillName: 'storyboard',
+      entryContext: {
+        kind: 'tool',
+        entityId: 'image-to-video',
+        locale: 'en',
+      },
+      attachments: [{ ...uploaded, preview: uploaded.url }],
+    });
+    expect(parseInitialTurnHandoff('{broken')).toBeNull();
+  });
+
+  it('rejects malformed entry context instead of downgrading it to home', () => {
+    const parsed = parseInitialTurnHandoff(
+      JSON.stringify({
+        prompt: 'Create this',
+        entryContext: {
+          kind: 'model',
+          entityId: '../forged',
+          locale: 'en',
+          settings: { creditCost: 0 },
+        },
+      })
+    );
+    expect(parsed).toBeNull();
   });
 
   it('keeps generic image material in order and hides its plumbing', () => {

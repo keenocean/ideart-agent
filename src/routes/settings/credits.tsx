@@ -3,7 +3,6 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
 import { Coins } from 'lucide-react';
 
-import { tDynamic } from '@/core/i18n/dynamic';
 import { Link } from '@/core/i18n/navigation';
 import { apiGet, type PageResult } from '@/lib/api-client';
 import { cn } from '@/lib/utils';
@@ -29,6 +28,12 @@ type CreditRow = {
 
 const TABS = ['all', 'grant', 'consume'] as const;
 type Tab = (typeof TABS)[number];
+
+const TAB_LABELS: Record<Tab, () => string> = {
+  all: m['settings.credits.tab_all'],
+  grant: m['settings.credits.tab_grant'],
+  consume: m['settings.credits.tab_consume'],
+};
 
 const PAGE_SIZE = 20;
 
@@ -208,7 +213,7 @@ function CreditsPage() {
                 : 'text-muted-foreground hover:text-foreground border-transparent'
             )}
           >
-            {tDynamic(`settings.credits.tab_${tb}`)}
+            {TAB_LABELS[tb]()}
           </button>
         ))}
       </div>

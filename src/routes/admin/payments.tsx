@@ -10,7 +10,6 @@ import { createFileRoute } from '@tanstack/react-router';
 import { Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { tDynamic } from '@/core/i18n/dynamic';
 import { apiGet, apiPatch, type PageResult } from '@/lib/api-client';
 import { formatDateTime } from '@/lib/time';
 import { cn } from '@/lib/utils';
@@ -44,6 +43,15 @@ const ORDER_STATUSES = [
   'failed',
   'deleted',
 ] as const;
+type OrderStatus = (typeof ORDER_STATUSES)[number];
+
+const ORDER_STATUS_LABELS: Record<OrderStatus, () => string> = {
+  pending: m['admin.payments.status_pending'],
+  created: m['admin.payments.status_created'],
+  paid: m['admin.payments.status_paid'],
+  failed: m['admin.payments.status_failed'],
+  deleted: m['admin.payments.status_deleted'],
+};
 
 interface Order {
   id: string;
@@ -66,6 +74,33 @@ const PAGE_SIZE = 20;
 
 const TABS = ['all', 'subscription', 'one_time'] as const;
 type Tab = (typeof TABS)[number];
+
+const TAB_LABELS: Record<Tab, () => string> = {
+  all: m['admin.payments.tab_all'],
+  subscription: m['admin.payments.tab_subscription'],
+  one_time: m['admin.payments.tab_one_time'],
+};
+
+const EDITABLE_PRODUCT_FIELDS = [
+  'productId',
+  'productName',
+  'description',
+] as const;
+type EditableProductField = (typeof EDITABLE_PRODUCT_FIELDS)[number];
+
+const EDITABLE_PRODUCT_FIELD_LABELS: Record<
+  EditableProductField,
+  () => string
+> = {
+  productId: m['admin.payments.product_id_label'],
+  productName: m['admin.payments.product_name_label'],
+  description: m['admin.payments.product_description_label'],
+};
+
+function orderStatusLabel(status: string): string {
+  const label = ORDER_STATUS_LABELS[status as OrderStatus];
+  return label ? label() : `admin.payments.status_${status}`;
+}
 
 function PaymentsPage() {
   const queryClient = useQueryClient();
@@ -179,7 +214,7 @@ function PaymentsPage() {
       header: m['admin.payments.status'](),
       cell: (o) => (
         <Badge variant={statusVariant(o.status)}>
-          {tDynamic(`admin.payments.status_${o.status}`)}
+          {orderStatusLabel(o.status)}
         </Badge>
       ),
     },
@@ -236,7 +271,7 @@ function PaymentsPage() {
                 : 'text-muted-foreground hover:text-foreground border-transparent'
             )}
           >
-            {tDynamic(`admin.payments.tab_${tb}`)}
+            {TAB_LABELS[tb]()}
           </button>
         ))}
       </div>
@@ -269,7 +304,7 @@ function PaymentsPage() {
                   </SelectItem>
                   {ORDER_STATUSES.map((status) => (
                     <SelectItem key={status} value={status}>
-                      {tDynamic(`admin.payments.status_${status}`)}
+                      {ORDER_STATUS_LABELS[status]()}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -320,7 +355,7 @@ function PaymentsPage() {
                       <SelectContent>
                         {ORDER_STATUSES.map((status) => (
                           <SelectItem key={status} value={status}>
-                            {tDynamic(`admin.payments.status_${status}`)}
+                            {ORDER_STATUS_LABELS[status]()}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -328,33 +363,21 @@ function PaymentsPage() {
                   </div>
                 )}
               </editForm.Field>
-              {(['productId', 'productName', 'description'] as const).map(
-                (name) => (
-                  <editForm.Field key={name} name={name}>
-                    {(field) => (
-                      <div className="space-y-1.5">
-                        <Label>
-                          {m[
-                            `admin.payments.${
-                              name === 'productId'
-                                ? 'product_id_label'
-                                : name === 'productName'
-                                  ? 'product_name_label'
-                                  : 'product_description_label'
-                            }`
-                          ]()}
-                        </Label>
-                        <Input
-                          value={field.state.value}
-                          onChange={(event) =>
-                            field.handleChange(event.target.value)
-                          }
-                        />
-                      </div>
-                    )}
-                  </editForm.Field>
-                )
-              )}
+              {EDITABLE_PRODUCT_FIELDS.map((name) => (
+                <editForm.Field key={name} name={name}>
+                  {(field) => (
+                    <div className="space-y-1.5">
+                      <Label>{EDITABLE_PRODUCT_FIELD_LABELS[name]()}</Label>
+                      <Input
+                        value={field.state.value}
+                        onChange={(event) =>
+                          field.handleChange(event.target.value)
+                        }
+                      />
+                    </div>
+                  )}
+                </editForm.Field>
+              ))}
             </div>
             <DialogFooter>
               <Button

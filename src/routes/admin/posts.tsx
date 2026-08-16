@@ -11,7 +11,6 @@ import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { z } from 'zod';
 
-import { tDynamic } from '@/core/i18n/dynamic';
 import { localeNames } from '@/config/locale';
 import {
   apiDelete,
@@ -21,10 +20,24 @@ import {
   pageQuery,
   type PageResult,
 } from '@/lib/api-client';
+import {
+  BLOG_IMAGE_ALT_MAX_LENGTH,
+  BLOG_IMAGE_CAPTION_MAX_LENGTH,
+  type BlogImageRef,
+} from '@/lib/blog-images';
+import {
+  BLOG_IMAGE_MAX_BYTES,
+  BLOG_IMAGE_MAX_EDGE,
+  BLOG_IMAGE_MAX_PIXELS,
+} from '@/lib/image-metadata';
 import { formatDateTime } from '@/lib/time';
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
 import { baseLocale, locales } from '@/paraglide/runtime.js';
+import {
+  BlogCoverImageField,
+  type BlogImageLabels,
+} from '@/components/blog-image-dialog';
 import { DataTable, type Column } from '@/components/data-table';
 import { TextField } from '@/components/form-field';
 import { RichTextEditor } from '@/components/rich-text-editor';
@@ -56,7 +69,7 @@ interface Post {
   type: string;
   title: string;
   description: string | null;
-  image: string | null;
+  image: BlogImageRef | null;
   categories: string | null;
   authorName: string | null;
   status: string;
@@ -71,16 +84,32 @@ interface CategoryOption {
 }
 
 const PAGE_SIZE = 20;
-const ALL_LOCALES_VALUE = '__all_locales__';
 const TABS = ['all', 'published', 'draft'] as const;
 type Tab = (typeof TABS)[number];
+
+const TAB_LABELS: Record<Tab, () => string> = {
+  all: m['admin.posts.tab_all'],
+  published: m['admin.posts.tab_published'],
+  draft: m['admin.posts.tab_draft'],
+};
 
 const postSchema = z.object({
   slug: z.string().min(1),
   locale: z.string().min(1),
   title: z.string().min(1),
   description: z.string(),
-  image: z.string(),
+  image: z
+    .object({
+      url: z.string().url(),
+      mimeType: z.enum(['image/jpeg', 'image/png', 'image/webp']),
+      width: z.number().int().positive().max(BLOG_IMAGE_MAX_EDGE),
+      height: z.number().int().positive().max(BLOG_IMAGE_MAX_EDGE),
+      bytes: z.number().int().positive().max(BLOG_IMAGE_MAX_BYTES),
+      alt: z.string().trim().min(1).max(BLOG_IMAGE_ALT_MAX_LENGTH),
+      caption: z.string().max(BLOG_IMAGE_CAPTION_MAX_LENGTH).optional(),
+    })
+    .refine((image) => image.width * image.height <= BLOG_IMAGE_MAX_PIXELS)
+    .nullable(),
   content: z.string(),
   categories: z.string(),
   authorName: z.string(),
@@ -88,19 +117,12 @@ const postSchema = z.object({
 });
 type PostForm = z.infer<typeof postSchema>;
 
-function serializePostForm(value: PostForm) {
-  return {
-    ...value,
-    locale: value.locale === ALL_LOCALES_VALUE ? '' : value.locale,
-  };
-}
-
 const emptyForm: PostForm = {
   slug: '',
   locale: baseLocale,
   title: '',
   description: '',
-  image: '',
+  image: null,
   content: '',
   categories: '',
   authorName: '',
@@ -118,6 +140,25 @@ function PostsPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [editingPost, setEditingPost] = useState<Post | null>(null);
   const [deletingPost, setDeletingPost] = useState<Post | null>(null);
+  const imageLabels: BlogImageLabels = {
+    add: m['admin.posts.image_add'](),
+    replace: m['admin.posts.image_replace'](),
+    edit: m['admin.posts.image_edit'](),
+    remove: m['admin.posts.image_remove'](),
+    dialogTitle: m['admin.posts.image_dialog_title'](),
+    dialogDescription: m['admin.posts.image_dialog_description'](),
+    file: m['admin.posts.image_file'](),
+    alt: m['admin.posts.image_alt'](),
+    altPlaceholder: m['admin.posts.image_alt_placeholder'](),
+    caption: m['admin.posts.image_caption'](),
+    captionPlaceholder: m['admin.posts.image_caption_placeholder'](),
+    cancel: m['admin.posts.cancel'](),
+    save: m['admin.posts.save'](),
+    uploading: m['admin.posts.image_uploading'](),
+    slugRequired: m['admin.posts.image_slug_required'](),
+    fileRequired: m['admin.posts.image_file_required'](),
+    altRequired: m['admin.posts.image_alt_required'](),
+  };
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search), 300);
@@ -169,8 +210,7 @@ function PostsPage() {
   });
 
   const createMutation = useMutation({
-    mutationFn: (value: PostForm) =>
-      apiPost('/api/admin/posts', serializePostForm(value)),
+    mutationFn: (value: PostForm) => apiPost('/api/admin/posts', value),
     onSuccess: () => {
       toast.success(m['admin.posts.created']());
       setCreateOpen(false);
@@ -181,11 +221,8 @@ function PostsPage() {
   });
 
   const editMutation = useMutation({
-    mutationFn: (body: Record<string, unknown>) => {
-      const locale =
-        body.locale === ALL_LOCALES_VALUE ? '' : (body.locale as string);
-      return apiPut('/api/admin/posts', { ...body, locale });
-    },
+    mutationFn: (body: Record<string, unknown>) =>
+      apiPut('/api/admin/posts', body),
     onSuccess: () => {
       toast.success(m['admin.posts.updated']());
       setEditingPost(null);
@@ -208,10 +245,10 @@ function PostsPage() {
   function openEdit(p: Post) {
     editForm.reset({
       slug: p.slug,
-      locale: p.locale || ALL_LOCALES_VALUE,
+      locale: p.locale || baseLocale,
       title: p.title,
       description: p.description || '',
-      image: p.image || '',
+      image: p.image,
       content: '',
       categories: p.categories || '',
       authorName: p.authorName || '',
@@ -243,7 +280,7 @@ function PostsPage() {
       header: m['admin.posts.locale_col'](),
       cell: (p) => (
         <Badge variant="outline">
-          {localeNames[p.locale] || p.locale || m['admin.posts.locale_all']()}
+          {localeNames[p.locale] || p.locale || localeNames[baseLocale]}
         </Badge>
       ),
     },
@@ -294,28 +331,19 @@ function PostsPage() {
             <div className="space-y-2">
               <Label>{m['admin.posts.locale_field']()}</Label>
               <Select
-                items={[
-                  {
-                    label: m['admin.posts.locale_all'](),
-                    value: ALL_LOCALES_VALUE,
-                  },
-                  ...locales.map((locale) => ({
-                    label: localeNames[locale] || locale,
-                    value: locale,
-                  })),
-                ]}
-                value={field.state.value || ALL_LOCALES_VALUE}
+                items={locales.map((locale) => ({
+                  label: localeNames[locale] || locale,
+                  value: locale,
+                }))}
+                value={field.state.value || baseLocale}
                 onValueChange={(value) =>
-                  field.handleChange(value || ALL_LOCALES_VALUE)
+                  field.handleChange(value || baseLocale)
                 }
               >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={ALL_LOCALES_VALUE}>
-                    {m['admin.posts.locale_all']()}
-                  </SelectItem>
                   {locales.map((locale) => (
                     <SelectItem key={locale} value={locale}>
                       {localeNames[locale] || locale}
@@ -353,15 +381,23 @@ function PostsPage() {
             />
           )}
         </form.Field>
-        <form.Field name="image">
-          {(field) => (
-            <TextField
-              field={field}
-              label={m['admin.posts.image_field']()}
-              placeholder={m['admin.posts.image_placeholder']()}
-            />
+        <form.Subscribe selector={(state) => state.values.slug}>
+          {(slug) => (
+            <form.Field name="image">
+              {(field) => (
+                <div className="space-y-2">
+                  <Label>{m['admin.posts.image_field']()}</Label>
+                  <BlogCoverImageField
+                    value={field.state.value}
+                    onChange={(image) => field.handleChange(image)}
+                    assetSlug={slug}
+                    labels={imageLabels}
+                  />
+                </div>
+              )}
+            </form.Field>
           )}
-        </form.Field>
+        </form.Subscribe>
         <form.Field name="authorName">
           {(field) => (
             <TextField
@@ -429,18 +465,24 @@ function PostsPage() {
             </div>
           )}
         </form.Field>
-        <form.Field name="content">
-          {(field) => (
-            <div className="space-y-2">
-              <Label>{m['admin.posts.content_field']()}</Label>
-              <RichTextEditor
-                value={field.state.value}
-                onChange={(content) => field.handleChange(content)}
-                placeholder={m['admin.posts.content_placeholder']()}
-              />
-            </div>
+        <form.Subscribe selector={(state) => state.values.slug}>
+          {(slug) => (
+            <form.Field name="content">
+              {(field) => (
+                <div className="space-y-2">
+                  <Label>{m['admin.posts.content_field']()}</Label>
+                  <RichTextEditor
+                    value={field.state.value}
+                    onChange={(content) => field.handleChange(content)}
+                    placeholder={m['admin.posts.content_placeholder']()}
+                    assetSlug={slug}
+                    imageLabels={imageLabels}
+                  />
+                </div>
+              )}
+            </form.Field>
           )}
-        </form.Field>
+        </form.Subscribe>
       </div>
     );
   }
@@ -504,7 +546,7 @@ function PostsPage() {
                   : 'text-muted-foreground hover:text-foreground border-transparent'
               )}
             >
-              {tDynamic(`admin.posts.tab_${tb}`)}
+              {TAB_LABELS[tb]()}
             </button>
           ))}
         </div>

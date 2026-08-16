@@ -14,6 +14,10 @@ import type { StorageManager } from '@/core/storage';
 import { envConfigs } from '@/config';
 import type { AiTask } from '@/config/db/schema';
 import {
+  validateToolPolicyAttachments,
+  type EffectiveGenerationPolicy,
+} from '@/modules/agent/entry-policy';
+import {
   createTask,
   AITaskStatus as DbTaskStatus,
   findTask,
@@ -32,8 +36,12 @@ import {
   modelOptionFor,
   normalizeDurationForModel,
   providerModelFor,
+  videoOperationInputLimits,
+  videoOperationSupported,
   type AgentGenerationSettings,
   type AgentModelOptionValue,
+  type VideoAttachmentType,
+  type VideoGenerationKind,
   type VideoProviderName,
 } from '@/lib/agent-settings';
 
@@ -45,7 +53,7 @@ import { assertTurnLeaseOwnership, getActiveTurnLease } from './turn-lease';
 
 export { resolveReferenceImage } from './media';
 
-// Media generation tools plus the selected Skill's read-only release-backed
+// Media generation tools plus the selected skill's read-only release-backed
 // reference reader are the ONLY tools the agent gets: no filesystem/bash base
 // tools, so the Worker cannot execute arbitrary code.
 
@@ -56,6 +64,8 @@ export interface AgentToolContext {
   requireTurnLease?: boolean;
   settings?: AgentGenerationSettings;
   skill?: PromptSkill | null;
+  /** Server-resolved page constraints; never accept this object from clients. */
+  policy?: EffectiveGenerationPolicy;
 }
 
 function isFailedGenerationResult(
@@ -315,7 +325,7 @@ async function runVideoGeneration(params: {
   prompt: string;
   /** Picker key (`minimax-h3`) — mapped to the active provider's id. */
   modelKey: AgentModelOptionValue;
-  kind: 'generate' | 'animate';
+  kind: VideoGenerationKind;
   options: Record<string, unknown>;
   signal?: AbortSignal;
 }): Promise<string> {
@@ -328,7 +338,7 @@ async function runVideoGeneration(params: {
       ''
   );
 
-  let selectedProvider = pickVideoProvider(
+  const selectedProvider = pickVideoProvider(
     configs,
     modelKey,
     kind,
@@ -338,30 +348,8 @@ async function runVideoGeneration(params: {
   if (!selectedProvider) {
     return JSON.stringify({
       status: 'error',
-      message:
-        'No configured video provider supports this model. Ask the site admin to configure EvoLink, gRouter, Fal, or Replicate in Admin Settings.',
+      message: `No configured video provider supports the ${kind} operation for this model. Ask the site admin to configure a compatible provider in Admin Settings.`,
     });
-  }
-
-  const hasReferenceMedia = [
-    options.reference_image_urls,
-    options.reference_audio_urls,
-    options.reference_video_urls,
-  ].some((value) => Array.isArray(value) && value.length > 0);
-  if (hasReferenceMedia && selectedProvider !== 'grouter') {
-    if (
-      configs.grouter_api_key &&
-      configs.grouter_base_url &&
-      providerModelFor(modelKey, 'grouter', kind, selectedResolution)
-    ) {
-      selectedProvider = 'grouter';
-    } else {
-      return JSON.stringify({
-        status: 'error',
-        message:
-          'Reference-to-video requires gRouter. Ask the site admin to configure gRouter or remove the reference media.',
-      });
-    }
   }
 
   // Fail before paying the upstream provider. A successful render without a
@@ -394,26 +382,20 @@ async function runVideoGeneration(params: {
   // Priced from the model catalog and the requested length, never from the
   // request body — the composer sends `creditCost` for display, but trusting
   // it would let a crafted request buy a long high-resolution clip for less.
-  const providerOptions = normalizeGenerationOptions(modelKey, options);
+  const generationOptions = normalizeGenerationOptions(modelKey, kind, options);
   const duration = durationSeconds(
-    providerOptions.duration,
+    generationOptions.duration,
     ctx.settings?.duration,
     modelKey
   );
-  providerOptions.duration = duration;
+  generationOptions.duration = duration;
   const prompt = params.prompt;
   const costCredits = creditsForGeneration(
     modelKey,
     duration,
-    String(providerOptions.resolution ?? selectedResolution)
+    String(generationOptions.resolution ?? selectedResolution),
+    kind
   );
-  const upstreamOptions = providerOptionsFor({
-    provider: selectedProvider,
-    modelKey,
-    kind,
-    options: providerOptions,
-  });
-
   // createTask consumes credits atomically and stores the credit id so a
   // failed generation can be refunded via updateTask(FAILED).
   let task: { id: string };
@@ -430,7 +412,8 @@ async function runVideoGeneration(params: {
       // for support questions — and leaves the door open to serving the
       // library from this table instead.
       options: {
-        ...providerOptions,
+        ...generationOptions,
+        operation: kind,
         providerModel: model,
         sessionId: ctx.sessionId,
         ...(ctx.turnId ? { turnId: ctx.turnId } : {}),
@@ -461,7 +444,7 @@ async function runVideoGeneration(params: {
         mediaType: AIMediaType.VIDEO,
         model,
         prompt,
-        options: upstreamOptions,
+        options: generationOptions,
       },
     });
     providerTaskId = created.taskId;
@@ -517,7 +500,7 @@ async function runVideoGeneration(params: {
     const completedTask = await updateTask({
       taskId: task.id,
       status: DbTaskStatus.SUCCESS,
-      taskResult: { files, model, storage: saved.storage },
+      taskResult: { files, model, operation: kind, storage: saved.storage },
     });
     if (completedTask.status === DbTaskStatus.CANCELED) {
       throw new Error('generation canceled');
@@ -529,6 +512,7 @@ async function runVideoGeneration(params: {
       storage: saved.storage,
       provider: selectedProvider,
       model,
+      operation: kind,
       duration,
       note:
         'The chat already shows the clip to the user with a player. Reference it in your reply as a markdown link, e.g. [clip](' +
@@ -600,6 +584,7 @@ export function durationSeconds(
 
 function normalizeGenerationOptions(
   modelKey: AgentModelOptionValue,
+  kind: VideoGenerationKind,
   options: Record<string, unknown>
 ): Record<string, unknown> {
   const model = modelOptionFor(modelKey)!;
@@ -617,151 +602,23 @@ function normalizeGenerationOptions(
     ? resolution
     : model.defaultResolution;
   normalized.generate_audio = model.audio;
-  if (Array.isArray(normalized.image_input)) {
-    normalized.image_input = normalized.image_input.slice(0, model.maxImages);
-  }
-  for (const key of [
-    'reference_image_urls',
-    'reference_audio_urls',
-    'reference_video_urls',
-  ]) {
+  const limits = videoOperationInputLimits(modelKey, kind);
+  for (const [key, mediaType] of [
+    ['image_input', 'image'],
+    ['video_input', 'video'],
+    ['audio_input', 'audio'],
+    ['reference_image_urls', 'image'],
+    ['reference_audio_urls', 'audio'],
+    ['reference_video_urls', 'video'],
+  ] as const) {
     if (Array.isArray(normalized[key])) {
-      normalized[key] = normalized[key].slice(0, 4);
+      normalized[key] = normalized[key].slice(
+        0,
+        limits?.maximumByType[mediaType] ?? 0
+      );
     }
   }
   return normalized;
-}
-
-/** Convert normalized Agent options to the same upstream contract as lite. */
-export function providerOptionsFor({
-  provider,
-  modelKey,
-  kind,
-  options,
-}: {
-  provider: VideoProviderName;
-  modelKey: AgentModelOptionValue;
-  kind: 'generate' | 'animate';
-  options: Record<string, unknown>;
-}): Record<string, unknown> {
-  const requestedAspectRatio = String(
-    options.aspect_ratio ?? modelOptionFor(modelKey)?.defaultAspectRatio ?? ''
-  );
-  const aspectRatio = normalizeProviderAspectRatio(
-    modelKey,
-    requestedAspectRatio
-  );
-  const resolution = String(
-    options.resolution ?? modelOptionFor(modelKey)?.defaultResolution ?? ''
-  );
-  const duration = Number(options.duration);
-  const imageUrls = Array.isArray(options.image_input)
-    ? options.image_input.map(String)
-    : [];
-  const referenceImageUrls = Array.isArray(options.reference_image_urls)
-    ? options.reference_image_urls.map(String)
-    : [];
-  const referenceAudioUrls = Array.isArray(options.reference_audio_urls)
-    ? options.reference_audio_urls.map(String)
-    : [];
-  const referenceVideoUrls = Array.isArray(options.reference_video_urls)
-    ? options.reference_video_urls.map(String)
-    : [];
-
-  if (modelKey === 'seedance-2-0' && provider === 'evolink') {
-    return {
-      aspect_ratio: aspectRatio,
-      duration,
-      quality: resolution,
-      generate_audio: true,
-      ...(kind === 'animate' && imageUrls.length > 0
-        ? { image_input: imageUrls.slice(0, 2) }
-        : {}),
-    };
-  }
-
-  if (modelKey === 'seedance-2-5') {
-    if (provider === 'fal') {
-      return {
-        ...(aspectRatio !== 'auto' ? { aspect_ratio: aspectRatio } : {}),
-        duration: String(duration),
-        resolution,
-        generate_audio: true,
-        ...(imageUrls[0] ? { image_url: imageUrls[0] } : {}),
-        ...(imageUrls[1] ? { end_image_url: imageUrls[1] } : {}),
-      };
-    }
-    if (provider === 'grouter') {
-      return {
-        ...(aspectRatio !== 'auto' ? { aspect_ratio: aspectRatio } : {}),
-        duration,
-        resolution,
-        image_input: imageUrls,
-        ...(referenceImageUrls.length > 0
-          ? { reference_image_urls: referenceImageUrls }
-          : {}),
-        ...(referenceAudioUrls.length > 0
-          ? { reference_audio_urls: referenceAudioUrls }
-          : {}),
-        ...(referenceVideoUrls.length > 0
-          ? { reference_video_urls: referenceVideoUrls }
-          : {}),
-        generate_audio: true,
-      };
-    }
-    return {};
-  }
-
-  if (provider === 'replicate') {
-    return {
-      duration,
-      resolution,
-      prompt_optimizer: true,
-      ...(imageUrls[0] ? { first_frame_image: imageUrls[0] } : {}),
-    };
-  }
-
-  if (provider === 'fal') {
-    const isPro = resolution !== '768P';
-    return {
-      prompt_optimizer: true,
-      ...(!isPro ? { duration: String(duration) } : {}),
-      ...(kind === 'animate' && imageUrls[0]
-        ? { image_url: imageUrls[0] }
-        : {}),
-    };
-  }
-
-  return {
-    aspect_ratio: aspectRatio,
-    duration,
-    resolution,
-    image_input: imageUrls,
-    ...(referenceImageUrls.length > 0
-      ? { reference_image_urls: referenceImageUrls }
-      : {}),
-    ...(referenceAudioUrls.length > 0
-      ? { reference_audio_urls: referenceAudioUrls }
-      : {}),
-    ...(referenceVideoUrls.length > 0
-      ? { reference_video_urls: referenceVideoUrls }
-      : {}),
-    generate_audio: false,
-  };
-}
-
-/**
- * `adaptive` is a composer convenience, not an upstream MiniMax literal.
- * gRouter forwards the field to its Fal route, whose schema only accepts a
- * concrete ratio, so use the route's normal landscape default.
- */
-export function normalizeProviderAspectRatio(
-  modelKey: AgentModelOptionValue,
-  aspectRatio: string
-): string {
-  return modelKey === 'minimax-h3' && aspectRatio === 'adaptive'
-    ? '16:9'
-    : aspectRatio;
 }
 
 /**
@@ -775,7 +632,7 @@ export function normalizeProviderAspectRatio(
 export function pickVideoProvider(
   configs: Record<string, any>,
   modelKey?: string,
-  kind: 'generate' | 'animate' = 'generate',
+  kind: VideoGenerationKind = 'generate',
   resolution?: string
 ): VideoProviderName | null {
   const configured: Record<VideoProviderName, boolean> = {
@@ -821,7 +678,14 @@ function modelSelection(
   requested: string,
   ctx: AgentToolContext
 ): { modelKey: AgentModelOptionValue } | { error: string } {
+  const locked = ctx.policy?.lockedVideoModel;
+  if (locked && requested && requested !== locked) {
+    return {
+      error: `This generation entry is locked to ${locked}; tool arguments cannot select ${requested}.`,
+    };
+  }
   const value =
+    locked ||
     requested ||
     ctx.settings?.modelName ||
     defaultComposerSettings().modelOption;
@@ -833,11 +697,98 @@ function modelSelection(
   return { modelKey: value };
 }
 
+type VideoToolAttachment = {
+  mediaType: VideoAttachmentType;
+  url: string;
+};
+
+function validateVideoOperationAttachments(
+  ctx: AgentToolContext,
+  modelKey: AgentModelOptionValue,
+  kind: VideoGenerationKind,
+  attachments: readonly VideoToolAttachment[]
+): string | null {
+  const policyError = validateToolPolicyAttachments(ctx.policy, attachments);
+  if (policyError) return policyError;
+
+  const limits = videoOperationInputLimits(modelKey, kind);
+  if (!limits) {
+    return `${modelOptionFor(modelKey)?.label ?? modelKey} does not support the ${kind} operation.`;
+  }
+  if (attachments.length < limits.minimum) {
+    return `${kind} requires at least ${limits.minimum} source attachment${limits.minimum === 1 ? '' : 's'}.`;
+  }
+  if (attachments.length > limits.maximum) {
+    return `${kind} accepts at most ${limits.maximum} source attachment${limits.maximum === 1 ? '' : 's'}.`;
+  }
+
+  for (const mediaType of ['image', 'video', 'audio'] as const) {
+    const count = attachments.filter(
+      (attachment) => attachment.mediaType === mediaType
+    ).length;
+    const maximum = limits.maximumByType[mediaType] ?? 0;
+    if (count > maximum) {
+      return maximum === 0
+        ? `${kind} does not accept ${mediaType} attachments.`
+        : `${kind} accepts at most ${maximum} ${mediaType} attachment${maximum === 1 ? '' : 's'}.`;
+    }
+  }
+  return null;
+}
+
+function resolveToolMedia(
+  input: unknown,
+  mediaType: VideoAttachmentType
+): VideoToolAttachment[] {
+  const values = Array.isArray(input) ? input : [input];
+  return values
+    .map((item) => String(item ?? '').trim())
+    .filter(Boolean)
+    .map((url) => ({ mediaType, url: resolveReferenceImage(url) }));
+}
+
+function videoToolOptions(
+  input: Record<string, unknown>,
+  ctx: AgentToolContext,
+  modelKey: AgentModelOptionValue,
+  { includeAspectRatio = true, includeDuration = true } = {}
+): Record<string, unknown> {
+  const options: Record<string, unknown> = {};
+  if (includeAspectRatio) {
+    const aspectRatio = input.aspect_ratio || ctx.settings?.aspectRatio;
+    if (aspectRatio) options.aspect_ratio = aspectRatio;
+  }
+  const resolution = input.resolution || ctx.settings?.resolution;
+  if (resolution) options.resolution = resolution;
+  if (includeDuration) {
+    options.duration = durationSeconds(
+      input.duration,
+      ctx.settings?.duration,
+      modelKey
+    );
+  }
+  return options;
+}
+
 export function createAgentTools(ctx: AgentToolContext): ToolDefinition[] {
+  const selectedVideoModel =
+    ctx.policy?.lockedVideoModel ||
+    (isModelOptionValue(ctx.settings?.modelName)
+      ? ctx.settings.modelName
+      : defaultComposerSettings().modelOption);
+  const lockedVideoOperation = ctx.policy?.lockedVideoOperation;
+  const supportedGenerateOperations = (
+    ['generate', 'reference', 'edit', 'extend'] as const
+  ).filter(
+    (kind) =>
+      videoOperationSupported(selectedVideoModel, kind) &&
+      (!lockedVideoOperation || lockedVideoOperation === kind)
+  );
+
   const generateVideo = defineTool({
     name: 'generate_video',
     description:
-      'Generate a video clip from a text prompt. Returns JSON with `files` — public URLs of the generated clips. Rendering takes a few minutes; call this once and wait for it.',
+      'Generate a video clip from text or multimedia references, edit one source video, or extend it forward or backward. Use the optional `operation` when the intent is edit or extend; omitting it preserves the original text/reference behavior. Returns JSON with `files` — public URLs of generated clips.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -845,6 +796,12 @@ export function createAgentTools(ctx: AgentToolContext): ToolDefinition[] {
           type: 'string',
           description:
             'Detailed English prompt describing the shot: subject, action, camera move, lighting and mood',
+        },
+        operation: {
+          type: 'string',
+          enum: supportedGenerateOperations,
+          description:
+            'Optional operation supported by the selected model: generate, reference, edit, or extend. Omit it for backward-compatible inference: reference media selects reference; otherwise generate.',
         },
         aspect_ratio: {
           type: 'string',
@@ -869,7 +826,7 @@ export function createAgentTools(ctx: AgentToolContext): ToolDefinition[] {
           type: 'array',
           items: { type: 'string' },
           description:
-            'Public http(s) URLs of reference videos whose motion, subject, or visual direction should guide the result.',
+            'Public http(s) URLs of reference videos whose motion, subject, or visual direction should guide the result. For backward compatibility, one video may also be the edit/extend source when operation is explicit.',
         },
         reference_images: {
           type: 'array',
@@ -883,6 +840,17 @@ export function createAgentTools(ctx: AgentToolContext): ToolDefinition[] {
           description:
             'Public http(s) URLs of reference audio clips whose sound or rhythm should guide the result.',
         },
+        source_video: {
+          type: 'string',
+          description:
+            'The single public http(s) source video for edit or extend. New calls should prefer this over reference_videos for those operations.',
+        },
+        direction: {
+          type: 'string',
+          enum: ['forward', 'backward'],
+          description:
+            'For extend only: continue after the source (forward) or generate footage before it (backward). Default forward.',
+        },
       },
       required: ['prompt'],
     },
@@ -893,34 +861,97 @@ export function createAgentTools(ctx: AgentToolContext): ToolDefinition[] {
       if ('error' in selection) {
         return JSON.stringify({ status: 'error', message: selection.error });
       }
-      const options: Record<string, unknown> = {};
-      for (const [inputKey, optionKey] of [
-        ['reference_images', 'reference_image_urls'],
-        ['reference_audios', 'reference_audio_urls'],
-        ['reference_videos', 'reference_video_urls'],
-      ] as const) {
-        const references = Array.isArray(input[inputKey])
-          ? input[inputKey]
-              .map((item: unknown) => String(item ?? '').trim())
-              .filter(Boolean)
-              .map((src: string) => resolveReferenceImage(src))
-          : [];
-        if (references.length > 0) options[optionKey] = references;
+      const images = resolveToolMedia(input.reference_images, 'image');
+      const videos = resolveToolMedia(input.reference_videos, 'video');
+      const audios = resolveToolMedia(input.reference_audios, 'audio');
+      const explicitSources = resolveToolMedia(input.source_video, 'video');
+      const requestedOperation = String(input.operation ?? '');
+      const explicitOperations = [
+        'generate',
+        'reference',
+        'edit',
+        'extend',
+      ] as const;
+      if (
+        requestedOperation !== '' &&
+        !(explicitOperations as readonly string[]).includes(requestedOperation)
+      ) {
+        return JSON.stringify({
+          status: 'error',
+          message: `Unsupported video operation "${requestedOperation}".`,
+        });
       }
-      const aspectRatio = input.aspect_ratio || ctx.settings?.aspectRatio;
-      if (aspectRatio) options.aspect_ratio = aspectRatio;
-      const resolution = input.resolution || ctx.settings?.resolution;
-      if (resolution) options.resolution = resolution;
-      options.duration = durationSeconds(
-        input.duration,
-        ctx.settings?.duration,
-        selection.modelKey
+      if (
+        lockedVideoOperation &&
+        lockedVideoOperation !== 'animate' &&
+        requestedOperation !== '' &&
+        requestedOperation !== lockedVideoOperation
+      ) {
+        return JSON.stringify({
+          status: 'error',
+          message: `This tool entry is locked to the ${lockedVideoOperation} operation.`,
+        });
+      }
+      const kind: Exclude<VideoGenerationKind, 'animate'> =
+        lockedVideoOperation && lockedVideoOperation !== 'animate'
+          ? lockedVideoOperation
+          : requestedOperation === ''
+            ? images.length + videos.length + audios.length > 0
+              ? 'reference'
+              : 'generate'
+            : (requestedOperation as Exclude<VideoGenerationKind, 'animate'>);
+      const sourceVideos =
+        explicitSources.length > 0
+          ? explicitSources
+          : kind === 'edit' || kind === 'extend'
+            ? videos
+            : [];
+      const operationAttachments: VideoToolAttachment[] =
+        kind === 'reference'
+          ? [...images, ...videos, ...audios]
+          : kind === 'edit' || kind === 'extend'
+            ? [
+                ...sourceVideos,
+                ...images,
+                ...audios,
+                ...(explicitSources.length > 0 ? videos : []),
+              ]
+            : [...images, ...videos, ...audios, ...explicitSources];
+      const operationError = validateVideoOperationAttachments(
+        ctx,
+        selection.modelKey,
+        kind,
+        operationAttachments
       );
+      if (operationError) {
+        return JSON.stringify({ status: 'error', message: operationError });
+      }
+      const options: Record<string, unknown> = {
+        ...videoToolOptions(input, ctx, selection.modelKey, {
+          includeAspectRatio: kind !== 'edit' && kind !== 'extend',
+          includeDuration: kind !== 'edit',
+        }),
+        ...(kind === 'reference'
+          ? {
+              reference_image_urls: images.map(({ url }) => url),
+              reference_video_urls: videos.map(({ url }) => url),
+              reference_audio_urls: audios.map(({ url }) => url),
+            }
+          : {}),
+        ...(kind === 'edit' || kind === 'extend'
+          ? { video_input: sourceVideos.map(({ url }) => url) }
+          : {}),
+      };
+      const direction = input.direction === 'backward' ? 'backward' : 'forward';
+      const prompt =
+        kind === 'extend'
+          ? `Extend the source video ${direction}. ${String(input.prompt ?? '')}`
+          : String(input.prompt ?? '');
       return runVideoGeneration({
         ctx,
-        prompt: String(input.prompt ?? ''),
+        prompt,
         ...selection,
-        kind: 'generate',
+        kind,
         options,
         signal: context.abortSignal,
       });
@@ -992,22 +1023,25 @@ export function createAgentTools(ctx: AgentToolContext): ToolDefinition[] {
           message: 'animate_image needs at least one source image',
         });
       }
-      const inputImages = sources.map((src: string) =>
+      const inputImages: string[] = sources.map((src: string) =>
         resolveReferenceImage(src)
       );
+      const operationError = validateVideoOperationAttachments(
+        ctx,
+        selection.modelKey,
+        'animate',
+        inputImages.map((url) => ({ mediaType: 'image', url }))
+      );
+      if (operationError) {
+        return JSON.stringify({ status: 'error', message: operationError });
+      }
       // Normalized key — each provider's formatInput() maps this to the
       // field name the selected model actually expects. Don't hardcode a
       // provider-specific key in the tool schema.
-      const options: Record<string, unknown> = { image_input: inputImages };
-      const aspectRatio = input.aspect_ratio || ctx.settings?.aspectRatio;
-      if (aspectRatio) options.aspect_ratio = aspectRatio;
-      const resolution = input.resolution || ctx.settings?.resolution;
-      if (resolution) options.resolution = resolution;
-      options.duration = durationSeconds(
-        input.duration,
-        ctx.settings?.duration,
-        selection.modelKey
-      );
+      const options: Record<string, unknown> = {
+        ...videoToolOptions(input, ctx, selection.modelKey),
+        image_input: inputImages,
+      };
       return runVideoGeneration({
         ctx,
         prompt: String(input.prompt ?? ''),
@@ -1020,13 +1054,27 @@ export function createAgentTools(ctx: AgentToolContext): ToolDefinition[] {
   });
 
   const skillTools = ctx.skill ? createSkillResourceTools(ctx.skill) : [];
+  const videoTools = lockedVideoOperation
+    ? lockedVideoOperation === 'animate'
+      ? videoOperationSupported(selectedVideoModel, 'animate')
+        ? [animateImage]
+        : []
+      : videoOperationSupported(selectedVideoModel, lockedVideoOperation)
+        ? [generateVideo]
+        : []
+    : [
+        generateVideo,
+        ...(videoOperationSupported(selectedVideoModel, 'animate')
+          ? [animateImage]
+          : []),
+      ];
   let mediaTools: ToolDefinition[];
   if (ctx.settings?.mediaMode === 'image') {
     mediaTools = [createImageTool(ctx)];
   } else if (ctx.settings?.mediaMode === 'video') {
-    mediaTools = [generateVideo, animateImage];
+    mediaTools = videoTools;
   } else {
-    mediaTools = [createImageTool(ctx), generateVideo, animateImage];
+    mediaTools = [createImageTool(ctx), ...videoTools];
   }
   return [
     ...skillTools,

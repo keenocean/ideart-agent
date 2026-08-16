@@ -6,10 +6,22 @@ import { useEffect, useRef, useState } from 'react';
  */
 export function ViewportVideo({
   src,
+  poster,
   className,
+  controls = false,
+  autoPlay = true,
+  loop = true,
+  muted = true,
+  ariaLabel,
 }: {
   src: string;
+  poster?: string;
   className?: string;
+  controls?: boolean;
+  autoPlay?: boolean;
+  loop?: boolean;
+  muted?: boolean;
+  ariaLabel?: string;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [shouldLoad, setShouldLoad] = useState(false);
@@ -22,7 +34,10 @@ export function ViewportVideo({
       ([entry]) => {
         if (entry?.isIntersecting) {
           setShouldLoad(true);
-          if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+          if (
+            autoPlay &&
+            !window.matchMedia('(prefers-reduced-motion: reduce)').matches
+          ) {
             void video.play().catch(() => {});
           }
         } else {
@@ -34,25 +49,31 @@ export function ViewportVideo({
 
     observer.observe(video);
     return () => observer.disconnect();
-  }, []);
+  }, [autoPlay]);
 
   useEffect(() => {
     const video = videoRef.current;
     if (!video || !shouldLoad) return;
     video.load();
-    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    if (
+      autoPlay &&
+      !window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    ) {
       void video.play().catch(() => {});
     }
-  }, [shouldLoad, src]);
+  }, [autoPlay, shouldLoad, src]);
 
   return (
     <video
       ref={videoRef}
       src={shouldLoad ? src : undefined}
-      loop
-      muted
+      poster={shouldLoad ? poster : undefined}
+      loop={loop}
+      muted={muted}
+      controls={controls}
       playsInline
       preload="none"
+      aria-label={ariaLabel}
       className={className}
     />
   );

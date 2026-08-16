@@ -8,6 +8,7 @@ export interface StorageUploadOptions {
   bucket?: string;
   onProgress?: (progress: number) => void;
   disposition?: 'inline' | 'attachment';
+  cacheControl?: string;
 }
 
 /**
@@ -19,6 +20,7 @@ export interface StorageDownloadUploadOptions {
   bucket?: string;
   contentType?: string;
   disposition?: 'inline' | 'attachment';
+  cacheControl?: string;
 }
 
 /**
@@ -166,3 +168,4 @@ export const storageManager = new StorageManager();
 // Export all providers
 export * from './s3';
 export * from './r2';
+export * from './marketing';

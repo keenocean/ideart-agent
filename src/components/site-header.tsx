@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { ArrowRight, Menu, X } from 'lucide-react';
 
 import { useSession } from '@/core/auth/client';
@@ -10,9 +10,14 @@ import { cn } from '@/lib/utils';
 import { withUtmSource } from '@/lib/utm';
 import { m } from '@/paraglide/messages.js';
 import { LocaleSelector } from '@/components/locale-selector';
-import { SiteUserMenu } from '@/components/site-user-menu';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { buttonVariants } from '@/components/ui/button';
+
+const LazySiteUserMenu = lazy(() =>
+  import('@/components/site-user-menu').then((module) => ({
+    default: module.SiteUserMenu,
+  }))
+);
 
 export interface NavLink {
   href: string;
@@ -92,11 +97,20 @@ export function SiteHeader({ navLinks }: { navLinks?: NavLink[] }) {
           <LocaleSelector />
           <ThemeToggle />
           {user ? (
-            <SiteUserMenu
-              name={user.name || 'User'}
-              email={user.email}
-              image={user.image}
-            />
+            <Suspense
+              fallback={
+                <span
+                  aria-hidden="true"
+                  className="bg-muted size-9 animate-pulse rounded-full"
+                />
+              }
+            >
+              <LazySiteUserMenu
+                name={user.name || 'User'}
+                email={user.email}
+                image={user.image}
+              />
+            </Suspense>
           ) : (
             <Link href="/chat" className={cn(buttonVariants(), 'gap-1.5')}>
               {m['common.nav.get_started']()}
@@ -150,11 +164,20 @@ export function SiteHeader({ navLinks }: { navLinks?: NavLink[] }) {
             <ThemeToggle />
             <div className="flex-1" />
             {user ? (
-              <SiteUserMenu
-                name={user.name || 'User'}
-                email={user.email}
-                image={user.image}
-              />
+              <Suspense
+                fallback={
+                  <span
+                    aria-hidden="true"
+                    className="bg-muted size-9 animate-pulse rounded-full"
+                  />
+                }
+              >
+                <LazySiteUserMenu
+                  name={user.name || 'User'}
+                  email={user.email}
+                  image={user.image}
+                />
+              </Suspense>
             ) : (
               <Link
                 href="/chat"

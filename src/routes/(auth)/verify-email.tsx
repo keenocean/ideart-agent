@@ -6,6 +6,12 @@ import { toast } from 'sonner';
 import { authClient, useSession } from '@/core/auth/client';
 import { Link, useRouter } from '@/core/i18n/navigation';
 import { envConfigs } from '@/config';
+import {
+  EMAIL_VERIFICATION_CHANNEL,
+  parseEmailVerificationSignal,
+  sanitizeAuthCallback,
+  verificationCompletionPath,
+} from '@/lib/auth-callback';
 import { m } from '@/paraglide/messages.js';
 import { deLocalizeHref, localizeHref } from '@/paraglide/runtime.js';
 import { Button } from '@/components/ui/button';
@@ -19,17 +25,6 @@ import {
 } from '@/components/ui/card';
 
 const RESEND_COOLDOWN_SECONDS = 60;
-
-function safeDecodeCallbackUrl(raw?: string | null) {
-  if (!raw) return '/';
-  try {
-    const decoded = decodeURIComponent(raw);
-    if (decoded.startsWith('/')) return decoded;
-    return '/';
-  } catch {
-    return '/';
-  }
-}
 
 function stripLocalePrefix(path: string) {
   if (!path?.startsWith('/')) return '/';
@@ -64,6 +59,7 @@ function VerifyEmailPage() {
   const [email, setEmail] = useState<string | null>(null);
   const [callbackUrl, setCallbackUrl] = useState<string | null>(null);
   const [paramsReady, setParamsReady] = useState(false);
+  const [verificationComplete, setVerificationComplete] = useState(false);
   const [loading, setLoading] = useState(false);
   const [cooldownSeconds, setCooldownSeconds] = useState(0);
   const lastSessionCheckAtRef = useRef(0);
@@ -73,6 +69,7 @@ function VerifyEmailPage() {
     const e = params.get('email');
     const cb = params.get('callbackUrl');
     const sent = params.get('sent');
+    setVerificationComplete(params.get('verified') === '1');
 
     setEmail(e);
     setCallbackUrl(cb);
@@ -101,7 +98,7 @@ function VerifyEmailPage() {
   }, [paramsReady, email, callbackUrl, router]);
 
   const nextUrl = useMemo(() => {
-    const decoded = safeDecodeCallbackUrl(callbackUrl);
+    const decoded = sanitizeAuthCallback(callbackUrl, '/') ?? '/';
     return stripLocalePrefix(decoded);
   }, [callbackUrl]);
 
@@ -128,6 +125,41 @@ function VerifyEmailPage() {
     } catch {}
   };
 
+  // The verification tab carries only a safe callback identity. It signals
+  // the original tab, which owns the sessionStorage draft and re-checks the
+  // shared auth cookie before navigating.
+  useEffect(() => {
+    if (
+      !verificationComplete ||
+      !paramsReady ||
+      isPending ||
+      !session?.user ||
+      typeof BroadcastChannel === 'undefined'
+    ) {
+      return;
+    }
+    const channel = new BroadcastChannel(EMAIL_VERIFICATION_CHANNEL);
+    channel.postMessage({ type: 'verified', callbackUrl: nextUrl });
+    channel.close();
+  }, [verificationComplete, paramsReady, isPending, session?.user, nextUrl]);
+
+  useEffect(() => {
+    if (
+      !paramsReady ||
+      verificationComplete ||
+      typeof BroadcastChannel === 'undefined'
+    ) {
+      return;
+    }
+    const channel = new BroadcastChannel(EMAIL_VERIFICATION_CHANNEL);
+    channel.onmessage = (event) => {
+      if (parseEmailVerificationSignal(event.data, nextUrl)) {
+        void checkSessionAndRedirect();
+      }
+    };
+    return () => channel.close();
+  }, [paramsReady, verificationComplete, nextUrl]);
+
   // Cooldown ticker
   useEffect(() => {
     if (!paramsReady) return;
@@ -139,14 +171,15 @@ function VerifyEmailPage() {
 
   // If session exists, redirect to next.
   useEffect(() => {
-    if (!isPending && session?.user) {
+    if (paramsReady && !verificationComplete && !isPending && session?.user) {
       hardNavigateToNextUrl();
     }
-  }, [isPending, session?.user, nextUrl]);
+  }, [paramsReady, verificationComplete, isPending, session?.user, nextUrl]);
 
   // Brief polling on mount: detect verification link → cookie → session.
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined' || !paramsReady || verificationComplete)
+      return;
     let cancelled = false;
     let attempts = 0;
     const maxAttempts = 12;
@@ -164,11 +197,12 @@ function VerifyEmailPage() {
     return () => {
       cancelled = true;
     };
-  }, [nextUrl]);
+  }, [nextUrl, paramsReady, verificationComplete]);
 
   // Cross-tab sync: re-check session on focus / visibility change.
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined' || !paramsReady || verificationComplete)
+      return;
     const onFocus = () => void checkSessionAndRedirect();
     const onVisibility = () => {
       if (document.visibilityState === 'visible')
@@ -180,7 +214,7 @@ function VerifyEmailPage() {
       window.removeEventListener('focus', onFocus);
       document.removeEventListener('visibilitychange', onVisibility);
     };
-  }, [nextUrl]);
+  }, [nextUrl, paramsReady, verificationComplete]);
 
   const handleResend = async () => {
     if (!email) {
@@ -194,7 +228,7 @@ function VerifyEmailPage() {
       setLoading(true);
       const result = await authClient.sendVerificationEmail({
         email,
-        callbackURL: localizeHref(nextUrl || '/'),
+        callbackURL: localizeHref(verificationCompletionPath(nextUrl || '/')),
       });
       if (result?.error) {
         toast.error(
@@ -237,59 +271,71 @@ function VerifyEmailPage() {
         <Card>
           <CardHeader>
             <CardTitle className="text-lg md:text-xl">
-              {m['common.sign.verify_email_page_title']()}
+              {verificationComplete
+                ? m['common.sign.verify_email_complete_title']()
+                : m['common.sign.verify_email_page_title']()}
             </CardTitle>
             <CardDescription className="text-xs md:text-sm">
-              {m['common.sign.verify_email_page_description']()}
-              {email ? ` ${email}` : ''}
+              {verificationComplete ? (
+                m['common.sign.verify_email_complete_description']()
+              ) : (
+                <>
+                  {m['common.sign.verify_email_page_description']()}
+                  {email ? ` ${email}` : ''}
+                </>
+              )}
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="grid gap-3">
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full"
-                disabled={loading || cooldownSeconds > 0}
-                onClick={handleResend}
-              >
-                {loading ? (
-                  <Loader2 size={16} className="animate-spin" />
-                ) : cooldownSeconds > 0 ? (
-                  m['common.sign.resend_verification_countdown']({
-                    seconds: cooldownSeconds,
-                  })
-                ) : (
-                  m['common.sign.resend_verification']()
-                )}
-              </Button>
+          {!verificationComplete && (
+            <CardContent>
+              <div className="grid gap-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  disabled={loading || cooldownSeconds > 0}
+                  onClick={handleResend}
+                >
+                  {loading ? (
+                    <Loader2 size={16} className="animate-spin" />
+                  ) : cooldownSeconds > 0 ? (
+                    m['common.sign.resend_verification_countdown']({
+                      seconds: cooldownSeconds,
+                    })
+                  ) : (
+                    m['common.sign.resend_verification']()
+                  )}
+                </Button>
 
-              <Button
-                type="button"
-                className="w-full"
-                disabled={isPending}
-                onClick={handleContinue}
-              >
-                {isPending ? (
-                  <Loader2 size={16} className="animate-spin" />
-                ) : (
-                  m['common.sign.verify_email_continue']()
-                )}
-              </Button>
+                <Button
+                  type="button"
+                  className="w-full"
+                  disabled={isPending}
+                  onClick={handleContinue}
+                >
+                  {isPending ? (
+                    <Loader2 size={16} className="animate-spin" />
+                  ) : (
+                    m['common.sign.verify_email_continue']()
+                  )}
+                </Button>
 
-              <Button
-                type="button"
-                variant="ghost"
-                className="w-full"
-                onClick={() => router.push(signInPath)}
-              >
-                {m['common.sign.back_to_sign_in']()}
-              </Button>
-            </div>
-          </CardContent>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="w-full"
+                  onClick={() => router.push(signInPath)}
+                >
+                  {m['common.sign.back_to_sign_in']()}
+                </Button>
+              </div>
+            </CardContent>
+          )}
           <CardFooter>
             <p className="text-muted-foreground w-full text-center text-xs">
-              {m['common.sign.verify_email_tip']()}
+              {verificationComplete
+                ? m['common.sign.verify_email_draft_boundary']()
+                : m['common.sign.verify_email_tip']()}
             </p>
           </CardFooter>
         </Card>

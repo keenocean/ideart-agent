@@ -76,7 +76,8 @@ describe('runAgentTurn', () => {
       'session-1',
       'user-1',
       'message-current',
-      []
+      [],
+      undefined
     );
     expect(events.find((event) => event.type === 'error')).toBeUndefined();
     expect(mocks.createAgent).toHaveBeenCalledWith(

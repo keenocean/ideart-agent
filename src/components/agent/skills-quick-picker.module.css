@@ -1,0 +1,22 @@
+.layout {
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+
+.preview {
+  flex-direction: column;
+}
+
+@media (min-width: 48rem) {
+  .layout {
+    grid-template-columns: minmax(0, 1.55fr) minmax(18rem, 0.9fr);
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  .listPane {
+    border-right-width: 1px;
+  }
+
+  .preview {
+    border-top-width: 0;
+  }
+}

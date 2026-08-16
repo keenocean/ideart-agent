@@ -1,0 +1,30 @@
+{
+  "routeBundle": {
+    "representativeRouteIds": [
+      "__root__",
+      "/",
+      "/pricing",
+      "/(pages)",
+      "/blog/",
+      "/blog/$slug"
+    ],
+    "baselineGzipBytes": {
+      "__root__": 272684,
+      "/": 382525,
+      "/pricing": 320711,
+      "/(pages)": 282335,
+      "/blog/": 292012,
+      "/blog/$slug": 292297
+    },
+    "explainedGzipIncreases": {},
+    "explainIncreaseAboveGzipBytes": 102400,
+    "maxClientJsRawBytes": 500000
+  },
+  "cloudflare": {
+    "plan": "free",
+    "workerGzipBudgetBytes": 2516582,
+    "paidWorkerGzipBudgetBytes": 8388608,
+    "singleStaticAssetMaxBytes": 26214400,
+    "staticAssetCountBudget": 250
+  }
+}

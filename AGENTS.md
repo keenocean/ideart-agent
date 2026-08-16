@@ -1,4 +1,4 @@
-# Ideart — Agent Instructions
+# ShipAny Next — Agent Instructions
 
 This is a **headless SaaS engine** — pre-wired business logic (payments, credits, subscriptions, auth, RBAC) with minimal UI. Users build their product pages on top of it.
 
@@ -64,7 +64,7 @@ src/
 ├── core/                        # Infrastructure — every project uses this
 │   ├── db/                      # Multi-DB (PostgreSQL, MySQL, SQLite, D1)
 │   ├── auth/                    # better-auth (server + client) + RBAC
-│   ├── i18n/                    # navigation.tsx (locale-aware Link/router) + dynamic.ts (tDynamic)
+│   ├── i18n/                    # navigation.tsx + deprecated dynamic.ts compatibility escape hatch
 │   ├── payment/                 # Payment providers (Stripe, PayPal, Creem)
 │   ├── email/                   # Email providers (Resend)
 │   ├── storage/                 # Storage providers (S3, R2)
@@ -82,7 +82,7 @@ src/
 ├── config/
 │   ├── index.ts                 # All env vars (app, db, auth, stripe, resend, storage, ai, locale)
 │   ├── db/schema.ts             # All table definitions (21 built-in + custom tables)
-│   └── locale/index.ts          # localeNames map for the language-switcher UI (locales live in project.inlang)
+│   └── locale/index.ts          # AppLocale/isSupportedLocale + localeNames (locales live in project.inlang)
 │
 ├── messages/{en,zh}.json        # Translation source — flat dot-keyed (e.g. "landing.hero.headline")
 ├── project.inlang/settings.json # Inlang project config (locales, baseLocale, plugins)
@@ -117,7 +117,7 @@ src/
 
 Key entry files:
 
-- `vite.config.ts` — plugins: mdx → tailwindcss → **paraglideVitePlugin** (outdir `./src/paraglide`, `strategy: ['url','cookie','baseLocale']`, `urlPatterns` for the `/zh` prefix) → tanstackStart → viteReact → nitro. Calls `loadEnvFiles()` so server-side `process.env` is populated from `.env.{NODE_ENV}`.
+- `vite.config.ts` — plugins: mdx → tailwindcss → **paraglideVitePlugin** (outdir `./src/paraglide`, `strategy: ['url','cookie','baseLocale']`; `urlPatterns` are derived from `project.inlang/settings.json`, with the base locale unprefixed and every other locale under `/<locale>`) → tanstackStart → viteReact → nitro. Calls `loadEnvFiles()` so server-side `process.env` is populated from `.env.{NODE_ENV}`.
 - `src/server.ts` — Nitro fetch entry; wraps the request in `paraglideMiddleware` so `getLocale()` resolves server-side.
 - `src/router.tsx` — exports `getRouter`; its `rewrite` runs Paraglide `deLocalizeUrl`/`localizeUrl` so routes stay locale-free while URLs gain the `/zh` prefix.
 - `src/routes/__root.tsx` — HTML shell (`QueryClientProvider` + `ReactQueryDevtools` in dev, fonts via `@fontsource` + a Google Fonts `<link>` for Noto Serif SC, `ThemeProvider`/`Toaster`/`GoogleOneTap`/`Analytics`, hreflang `<link>`s, `notFoundComponent`).
@@ -167,13 +167,15 @@ export function MyButton() {
 
 - With params: `m['common.table.total']({ count })`
 - Explicit locale (e.g. in a loader): `m['landing.pricing.title']({}, { locale })`
-- Runtime-built keys (tab labels, keyed lists): `tDynamic(key)` from `@/core/i18n/dynamic`. Prefer static `m['ns.key']()` whenever the key is known — dynamic access opts the bundle out of tree-shaking.
+- Runtime-built client message keys are forbidden because they opt the bundle out of tree-shaking. Use static `m['ns.key']()` calls or an explicit static message-function map for finite tabs, statuses, and keyed lists. `@/core/i18n/dynamic` remains only as a deprecated compatibility escape hatch; client routes, blocks, components, and hooks must not import it without an explicit bundle-reviewed exception.
 
-**Adding a translation:** add the key to **both** `messages/en.json` and `messages/zh.json`, then call `m['the.key']()`. No per-namespace folders, no `localeMessagesPaths` registration — `src/config/locale/index.ts` now only exports `localeNames` for the switcher UI.
+**Adding a translation:** add the key to every `messages/<locale>.json` registered in `project.inlang/settings.json`, then call `m['the.key']()`. No per-namespace folders or `localeMessagesPaths` registration. `pnpm i18n:check` reads the registered locale set and rejects key drift.
+
+**Adding a locale:** add it to `project.inlang/settings.json`, create its complete `messages/<locale>.json`, and add its display name to `src/config/locale/index.ts` (the `Record<AppLocale, string>` check keeps these in sync). URL patterns are generated automatically; do not hand-add a `$locale` route or prefix. Static MDX and Blog content remain explicit per locale: missing content returns 404 and must not be added to sitemap/hreflang.
 
 **Locale runtime:** `import { getLocale, setLocale, localizeHref, localizeUrl, locales, baseLocale } from '@/paraglide/runtime.js'`. `getLocale()` works in components and in loaders (server-side via the `paraglideMiddleware` AsyncLocalStorage, client-side after hydration).
 
-**Switching locale:** call `setLocale('zh')` — it writes the `PARAGLIDE_LOCALE` cookie and triggers a full reload. See `src/components/locale-selector.tsx` / `user-menu.tsx`.
+**Switching locale:** call `setLocale('zh')` — it writes the `PARAGLIDE_LOCALE` cookie and triggers a full reload. See `src/components/locale-selector.tsx` / `user-menu.tsx`. Content details with partial translations (currently Blog articles) wrap their shell in `LocaleSwitchProvider`: a published translation keeps the detail path; a missing translation navigates to the target locale directory instead of a known 404.
 
 **Locale-aware links:** Use `Link` from `@/core/i18n/navigation` instead of a raw anchor for pages. Internal hrefs stay **locale-free** (`href="/pricing"`); the router rewrite localizes the output URL (en = no prefix, zh = `/zh`). `useRouter`/`usePathname` come from the same module.
 
@@ -428,14 +430,11 @@ it when the task matches:
 | `new-page`          | New dashboard page with API wiring + nav entry                                                                                      |
 | `new-static-page`   | Static MDX page (legal, about, etc.)                                                                                                |
 | `generate-image`    | AI-generate a decorative image for a page/block                                                                                     |
+| `marketing-seo`     | Agent-owned lifecycle for adding, updating, renaming, publishing, or monitoring public tool/model/marketing pages                   |
 | `security-scan`     | **Before every git commit** — secrets, vulns, ignore gaps                                                                           |
 | `launch-audit`      | Whole-project sweep on one axis — responsive, light/dark theme, SEO, performance (Lighthouse), or security; run `all` before deploy |
 | `sync-upstream`     | Pull latest template updates; local changes win on conflict                                                                         |
-| `deploy-cloudflare` | Deploy to Cloudflare Workers (D1 or Postgres+Hyperdrive + secrets + schema, idempotent)                                             |
-
-Product Agent contracts are documented in [`docs/agent-template.md`](docs/agent-template.md).
-Marketing/tool/model page rules are documented in
-[`docs/marketing-pages-guide.md`](docs/marketing-pages-guide.md).
+| `deploy-cloudflare` | Deploy to Cloudflare Workers (DB, private release buckets, content publish/pinning, secrets, schema; idempotent)                    |
 
 **Database backends on Cloudflare Workers** (chosen by `wrangler.jsonc` `vars.DATABASE_PROVIDER`):
 
@@ -465,7 +464,7 @@ All functionality is self-contained — no external packages needed.
 | `@/paraglide/messages.js` | `m` — compiled message functions (`m['ns.key']()`)                                                  |
 | `@/paraglide/runtime.js`  | `getLocale`, `setLocale`, `localizeHref`, `localizeUrl`, `locales`, `baseLocale`                    |
 | `@/core/i18n/navigation`  | `Link`, `useRouter`, `usePathname` (locale-aware)                                                   |
-| `@/core/i18n/dynamic`     | `tDynamic` (runtime-built message keys)                                                             |
+| `@/core/i18n/dynamic`     | Deprecated `tDynamic` compatibility escape hatch; forbidden in ordinary client code                 |
 
 ## Database Schema (21 tables)
 

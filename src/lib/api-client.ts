@@ -24,10 +24,14 @@ export interface PageParams {
 }
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
+  const isFormData =
+    typeof FormData !== 'undefined' && init?.body instanceof FormData;
   const res = await fetch(url, {
     ...init,
     headers: {
-      ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
+      ...(init?.body && !isFormData
+        ? { 'Content-Type': 'application/json' }
+        : {}),
       ...init?.headers,
     },
   });
@@ -53,6 +57,9 @@ export const apiPost = <T = void>(url: string, body?: unknown) =>
     method: 'POST',
     body: body == null ? undefined : JSON.stringify(body),
   });
+
+export const apiUpload = <T = void>(url: string, body: FormData) =>
+  request<T>(url, { method: 'POST', body });
 
 export const apiPut = <T = void>(url: string, body?: unknown) =>
   request<T>(url, { method: 'PUT', body: JSON.stringify(body) });

@@ -1,22 +1,16 @@
 import { createFileRoute } from '@tanstack/react-router';
 
-import { envConfigs } from '@/config';
-import { baseLocale, locales, localizeUrl } from '@/paraglide/runtime.js';
+import { catalog } from '@/config/catalog';
+import type { AppLocale } from '@/config/locale';
+import { selectIndexableFixedUrls } from '@/config/seo/public-routes';
+import { buildAbsoluteSeoUrl, type SeoRouteRef } from '@/lib/seo';
+import { baseLocale, locales } from '@/paraglide/runtime.js';
+import { selectLoadableIndexableCatalogUrls } from '@/content/catalog-pages';
+import { getPublishedBlogLocales } from '@/content/posts';
 
-const STATIC_PATHS = [
-  '',
-  '/pricing',
-  '/blog',
-  '/privacy-policy',
-  '/terms-of-service',
-];
-
-type Entry = {
-  path: string;
-  availableLocales: string[];
-  lastModified?: string;
-  changeFrequency: string;
-  priority: number;
+export type SitemapEntry = {
+  groupId: string;
+  routes: Array<SeoRouteRef & { lastModified?: string }>;
 };
 
 function xml(value: string): string {
@@ -28,102 +22,194 @@ function xml(value: string): string {
     .replace(/'/g, '&apos;');
 }
 
-function urlFor(path: string, locale: string): string {
-  return localizeUrl(`${envConfigs.app_url}${path || '/'}`, {
-    locale: locale as (typeof locales)[number],
-  }).href;
-}
-
-function entryXml(entry: Entry, locale: string): string {
-  const defaultLocale = entry.availableLocales.includes(baseLocale)
-    ? baseLocale
-    : entry.availableLocales[0];
+function entryXml(
+  entry: SitemapEntry,
+  route: SeoRouteRef & { lastModified?: string }
+): string {
+  const defaultRoute = entry.routes.find(
+    (candidate) => candidate.locale === baseLocale
+  );
   const alternates = [
-    ...entry.availableLocales.map(
-      (loc) =>
-        `    <xhtml:link rel="alternate" hreflang="${xml(loc)}" href="${xml(urlFor(entry.path, loc))}"/>`
+    ...entry.routes.map(
+      (alternate) =>
+        `    <xhtml:link rel="alternate" hreflang="${xml(alternate.locale)}" href="${xml(buildAbsoluteSeoUrl(alternate))}"/>`
     ),
-    `    <xhtml:link rel="alternate" hreflang="x-default" href="${xml(urlFor(entry.path, defaultLocale))}"/>`,
-  ].join('\n');
+    defaultRoute
+      ? `    <xhtml:link rel="alternate" hreflang="x-default" href="${xml(buildAbsoluteSeoUrl(defaultRoute))}"/>`
+      : null,
+  ]
+    .filter(Boolean)
+    .join('\n');
   return [
     '  <url>',
-    `    <loc>${xml(urlFor(entry.path, locale))}</loc>`,
+    `    <loc>${xml(buildAbsoluteSeoUrl(route))}</loc>`,
     alternates,
-    entry.lastModified
-      ? `    <lastmod>${xml(entry.lastModified)}</lastmod>`
+    route.lastModified
+      ? `    <lastmod>${xml(route.lastModified)}</lastmod>`
       : null,
-    `    <changefreq>${entry.changeFrequency}</changefreq>`,
-    `    <priority>${entry.priority}</priority>`,
     '  </url>',
   ]
     .filter(Boolean)
     .join('\n');
 }
 
-async function blogEntries(): Promise<Entry[]> {
-  const entries = new Map<
+function fixedEntries(): SitemapEntry[] {
+  const groups = new Map<string, SitemapEntry>();
+  for (const record of selectIndexableFixedUrls()) {
+    const group = groups.get(record.id) ?? {
+      groupId: `fixed:${record.id}`,
+      routes: [],
+    };
+    group.routes.push({
+      locale: record.locale,
+      path: record.path,
+      lastModified: record.modifiedAt,
+    });
+    groups.set(record.id, group);
+  }
+  return [...groups.values()];
+}
+
+async function catalogEntries(): Promise<SitemapEntry[]> {
+  const groups = new Map<string, SitemapEntry>();
+  for (const record of await selectLoadableIndexableCatalogUrls(catalog)) {
+    const groupId = `${record.kind}:${record.entityId}`;
+    const group = groups.get(groupId) ?? { groupId, routes: [] };
+    group.routes.push({
+      locale: record.locale,
+      path: record.path,
+      lastModified: record.modifiedAt,
+    });
+    groups.set(groupId, group);
+  }
+  return [...groups.values()];
+}
+
+async function blogEntries(): Promise<SitemapEntry[]> {
+  const posts = new Map<
     string,
-    { availableLocales: Set<string>; lastModified: string }
-  >();
-  try {
-    const { listPublishedArticles } = await import('@/modules/posts/service');
-    const rows = await listPublishedArticles();
-    for (const row of rows) {
-      const current = entries.get(row.slug) || {
-        availableLocales: new Set<string>(),
-        lastModified: new Date(row.updatedAt).toISOString(),
-      };
-      if (row.locale) current.availableLocales.add(row.locale);
-      else for (const locale of locales) current.availableLocales.add(locale);
-      const updatedAt = new Date(row.updatedAt).toISOString();
-      if (updatedAt > current.lastModified) current.lastModified = updatedAt;
-      entries.set(row.slug, current);
+    {
+      routes: Partial<
+        Record<AppLocale, SeoRouteRef & { lastModified?: string }>
+      >;
     }
-  } catch {
-    // An unavailable database produces a static-only sitemap.
+  >();
+  const blogIndexRoutes: Partial<
+    Record<AppLocale, SeoRouteRef & { lastModified?: string }>
+  > = {};
+  const { listPublishedArticles } = await import('@/modules/posts/service');
+  const rows = await listPublishedArticles();
+  for (const row of rows) {
+    if (!locales.includes(row.locale as AppLocale)) continue;
+    const locale = row.locale as AppLocale;
+    const updatedAt = new Date(row.updatedAt).toISOString();
+    const current = posts.get(row.slug) ?? { routes: {} };
+    current.routes[locale] = {
+      locale,
+      path: `/blog/${row.slug}`,
+      lastModified: updatedAt,
+    };
+    const blogIndexRoute = blogIndexRoutes[locale];
+    if (
+      !blogIndexRoute?.lastModified ||
+      updatedAt > blogIndexRoute.lastModified
+    ) {
+      blogIndexRoutes[locale] = {
+        locale,
+        path: '/blog',
+        lastModified: updatedAt,
+      };
+    }
+    posts.set(row.slug, current);
   }
 
-  return [...entries.entries()].map(
-    ([slug, { availableLocales, lastModified }]) => ({
-      path: `/blog/${slug}`,
-      availableLocales: locales.filter((locale) =>
-        availableLocales.has(locale)
-      ),
-      lastModified,
-      changeFrequency: 'monthly',
-      priority: 0.6,
-    })
-  );
+  const availableBlogLocales = getPublishedBlogLocales(
+    Object.keys(blogIndexRoutes) as AppLocale[],
+    locales
+  ) as AppLocale[];
+  return [
+    ...(availableBlogLocales.length
+      ? [
+          {
+            groupId: 'blog:index',
+            routes: availableBlogLocales.flatMap((locale) => {
+              const route = blogIndexRoutes[locale];
+              return route ? [route] : [];
+            }),
+          },
+        ]
+      : []),
+    ...[...posts.entries()].map(
+      ([slug, value]): SitemapEntry => ({
+        groupId: `blog:${slug}`,
+        routes: getPublishedBlogLocales(
+          Object.keys(value.routes) as AppLocale[],
+          locales
+        ).flatMap((locale) => {
+          const route = value.routes[locale as AppLocale];
+          return route ? [route] : [];
+        }),
+      })
+    ),
+  ].filter((entry) => entry.routes.length > 0);
+}
+
+export function deduplicateSitemapEntries(
+  entries: readonly SitemapEntry[]
+): SitemapEntry[] {
+  const urls = new Set<string>();
+  return entries.flatMap((entry) => {
+    const routes = entry.routes.filter((route) => {
+      const url = buildAbsoluteSeoUrl(route);
+      if (urls.has(url)) return false;
+      urls.add(url);
+      return true;
+    });
+    return routes.length ? [{ ...entry, routes }] : [];
+  });
+}
+
+export function renderSitemapXml(entries: readonly SitemapEntry[]): string {
+  return [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">',
+    ...entries.flatMap((entry) =>
+      entry.routes.map((route) => entryXml(entry, route))
+    ),
+    '</urlset>',
+    '',
+  ].join('\n');
 }
 
 export const Route = createFileRoute('/sitemap.xml')({
   server: {
     handlers: {
       GET: async () => {
-        const staticEntries: Entry[] = STATIC_PATHS.map((path) => ({
-          path,
-          availableLocales: [...locales],
-          changeFrequency: path === '/blog' ? 'daily' : 'weekly',
-          priority: path === '' ? 1 : 0.8,
-        }));
-        const entries = [...staticEntries, ...(await blogEntries())];
-        const xmlBody = [
-          '<?xml version="1.0" encoding="UTF-8"?>',
-          '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">',
-          ...entries.flatMap((entry) =>
-            entry.availableLocales.map((locale) => entryXml(entry, locale))
-          ),
-          '</urlset>',
-          '',
-        ].join('\n');
-
-        return new Response(xmlBody, {
-          headers: {
-            'Content-Type': 'application/xml',
-            'Cache-Control':
-              'public, s-maxage=3600, stale-while-revalidate=86400',
-          },
-        });
+        try {
+          const entries = deduplicateSitemapEntries([
+            ...fixedEntries(),
+            ...(await catalogEntries()),
+            ...(await blogEntries()),
+          ]);
+          const body = renderSitemapXml(entries);
+          return new Response(body, {
+            headers: {
+              'Content-Type': 'application/xml; charset=utf-8',
+              'Cache-Control':
+                'public, s-maxage=3600, stale-while-revalidate=86400',
+            },
+          });
+        } catch (error) {
+          console.error('[sitemap] Public discovery unavailable', error);
+          return new Response('Service Unavailable', {
+            status: 503,
+            headers: {
+              'Content-Type': 'text/plain; charset=utf-8',
+              'Cache-Control': 'no-store',
+              'Retry-After': '60',
+            },
+          });
+        }
       },
     },
   },

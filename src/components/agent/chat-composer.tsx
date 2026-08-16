@@ -5,17 +5,20 @@ import {
   type ReactNode,
   type RefObject,
 } from 'react';
-import { useInfiniteQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import {
   ArrowUp,
   Check,
   FileAudio2,
   Film,
+  ImagePlus,
   Images,
   Loader2,
   Paperclip,
   Plus,
+  Sparkles,
   Square,
+  Type,
   X,
 } from 'lucide-react';
 
@@ -24,15 +27,22 @@ import {
   mediaTypeForAttachment,
   type PendingAttachment,
 } from '@/lib/agent';
-import { type AgentComposerSettings } from '@/lib/agent-settings';
+import type {
+  AgentComposerSettings,
+  VideoGenerationKind,
+} from '@/lib/agent-settings';
+import {
+  normalizeAgentPromptSkills,
+  type AgentSkillResponseItem,
+} from '@/lib/agent-skills';
 import { apiGet } from '@/lib/api-client';
+import type { GenerationInputPolicy } from '@/lib/generation-entry';
 import { isVideoUrl } from '@/lib/media';
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
 import {
   ComposerControls,
   ComposerModeSelector,
-  ComposerSkillSelect,
 } from '@/components/agent/composer-controls';
 import {
   ComposerImageModel,
@@ -60,11 +70,96 @@ export interface LibraryMedia {
   src: string;
   name: string;
   alt: string;
+  mediaType?: 'image' | 'video';
+  chatId?: string;
+  sourceMessageId?: string;
+}
+
+export interface ChatComposerProps {
+  value: string;
+  onValueChange: (value: string) => void;
+  onSubmit: () => void;
+  onStop?: () => void;
+  placeholder: string;
+  attachments: PendingAttachment[];
+  onAddFiles: (files: File[]) => void;
+  onAddLibraryMedia: (media: LibraryMedia[]) => void;
+  onRemoveAttachment: (id: string) => void;
+  settings: AgentComposerSettings;
+  onSettingsChange: (settings: AgentComposerSettings) => void;
+  skillName?: string;
+  onSkillNameChange?: (skillName: string | undefined) => void;
+  disabled?: boolean;
+  running?: boolean;
+  submitDisabled?: boolean;
+  modeLocked?: boolean;
+  modelLocked?: boolean;
+  /** Restrict the video model picker on semantic tool pages. */
+  videoOperation?: VideoGenerationKind;
+  /** Hide upload affordances that the current entry cannot accept. */
+  inputPolicy?: GenerationInputPolicy;
+  /** `lg` on the start screens, `sm` for the follow-up box in a session. */
+  size?: 'sm' | 'lg';
+  /** Rendered next to the "+" menu (e.g. the selected example category). */
+  toolbarExtra?: ReactNode;
+  /** Compact public-tool chrome; all controller behavior stays unchanged. */
+  presentation?: 'default' | 'tool';
+  inputModeLabels?: {
+    prompt: string;
+    reference: string;
+  };
+  textareaRef?: RefObject<HTMLTextAreaElement | null>;
+  textareaClassName?: string;
+  className?: string;
 }
 
 interface LibraryData {
   images?: LibraryMedia[];
   nextCursor?: string;
+}
+
+const FILE_ACCEPT_BY_MEDIA_TYPE = {
+  image: [
+    'image/jpeg',
+    'image/png',
+    'image/webp',
+    '.jpg',
+    '.jpeg',
+    '.png',
+    '.webp',
+  ],
+  audio: [
+    'audio/mpeg',
+    'audio/mp4',
+    'audio/ogg',
+    'audio/wav',
+    'audio/webm',
+    '.mp3',
+    '.m4a',
+    '.wav',
+    '.ogg',
+  ],
+  video: [
+    'video/mp4',
+    'video/quicktime',
+    'video/webm',
+    '.mp4',
+    '.mov',
+    '.m4v',
+    '.webm',
+  ],
+} as const;
+
+const ALL_MEDIA_FILE_ACCEPT = Object.values(FILE_ACCEPT_BY_MEDIA_TYPE)
+  .flat()
+  .join(',');
+
+function fileAcceptFor(policy: GenerationInputPolicy | undefined): string {
+  return policy
+    ? policy.accepts
+        .flatMap((mediaType) => FILE_ACCEPT_BY_MEDIA_TYPE[mediaType])
+        .join(',')
+    : ALL_MEDIA_FILE_ACCEPT;
 }
 
 /**
@@ -90,38 +185,39 @@ export function ChatComposer({
   disabled = false,
   running = false,
   submitDisabled = false,
+  modeLocked = false,
+  modelLocked = false,
+  videoOperation,
+  inputPolicy,
   size = 'lg',
   toolbarExtra,
+  presentation = 'default',
+  inputModeLabels,
   textareaRef,
+  textareaClassName,
   className,
-}: {
-  value: string;
-  onValueChange: (value: string) => void;
-  onSubmit: () => void;
-  onStop?: () => void;
-  placeholder: string;
-  attachments: PendingAttachment[];
-  onAddFiles: (files: File[]) => void;
-  onAddLibraryMedia: (media: LibraryMedia[]) => void;
-  onRemoveAttachment: (id: string) => void;
-  settings: AgentComposerSettings;
-  onSettingsChange: (settings: AgentComposerSettings) => void;
-  skillName?: string;
-  onSkillNameChange?: (skillName: string | undefined) => void;
-  disabled?: boolean;
-  running?: boolean;
-  submitDisabled?: boolean;
-  /** `lg` on the start screens, `sm` for the follow-up box in a session. */
-  size?: 'sm' | 'lg';
-  /** Rendered next to the "+" menu (e.g. the selected example category). */
-  toolbarExtra?: ReactNode;
-  textareaRef?: RefObject<HTMLTextAreaElement | null>;
-  className?: string;
-}) {
+}: ChatComposerProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [libraryOpen, setLibraryOpen] = useState(false);
   const uploading = attachments.some((item) => item.status === 'uploading');
   const cannotSubmit = disabled || submitDisabled || uploading;
+  const canAttach =
+    !inputPolicy ||
+    ((inputPolicy.maximum ?? Number.POSITIVE_INFINITY) > 0 &&
+      inputPolicy.accepts.length > 0);
+  const fileAccept = fileAcceptFor(inputPolicy);
+  const skillsQuery = useQuery({
+    queryKey: ['agent-skills'],
+    queryFn: () =>
+      apiGet<{ items: AgentSkillResponseItem[] }>('/api/agent/skills'),
+    enabled: Boolean(skillName),
+    staleTime: 5 * 60 * 1000,
+  });
+  const selectedSkill = skillName
+    ? normalizeAgentPromptSkills(skillsQuery.data?.items ?? []).find(
+        (skill) => skill.name === skillName
+      )
+    : undefined;
 
   const attachmentLabels = {
     image: m['agent.composer.media_image'](),
@@ -138,9 +234,49 @@ export function ChatComposer({
       }}
       className={cn(
         'border-border bg-card rounded-3xl border shadow-sm transition-shadow focus-within:shadow-md',
+        presentation === 'tool' && 'overflow-hidden',
         className
       )}
     >
+      {presentation === 'tool' && inputModeLabels && (
+        <div className="border-border bg-muted/50 flex min-h-10 items-end gap-1 border-b px-2 pt-2">
+          <button
+            type="button"
+            aria-pressed={attachments.length === 0}
+            onClick={(event) =>
+              event.currentTarget.form?.querySelector('textarea')?.focus()
+            }
+            disabled={disabled}
+            className={cn(
+              'flex h-8 items-center gap-1.5 rounded-t-[10px] px-3 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50',
+              attachments.length === 0
+                ? 'bg-card text-foreground font-medium'
+                : 'text-muted-foreground hover:text-foreground'
+            )}
+          >
+            <Type aria-hidden="true" className="size-3.5" />
+            {inputModeLabels.prompt}
+          </button>
+          {canAttach && (
+            <button
+              type="button"
+              aria-pressed={attachments.length > 0}
+              onClick={() => fileInputRef.current?.click()}
+              disabled={disabled || uploading}
+              className={cn(
+                'flex h-8 items-center gap-1.5 rounded-t-[10px] px-3 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50',
+                attachments.length > 0
+                  ? 'bg-card text-foreground font-medium'
+                  : 'text-muted-foreground hover:text-foreground'
+              )}
+            >
+              <ImagePlus aria-hidden="true" className="size-3.5" />
+              {inputModeLabels.reference}
+            </button>
+          )}
+        </div>
+      )}
+
       {attachments.length > 0 && (
         <div className="flex flex-wrap gap-2 px-3 pt-3">
           {attachments.map((item) => {
@@ -203,6 +339,33 @@ export function ChatComposer({
         </div>
       )}
 
+      {skillName && (
+        <div className="flex max-w-full flex-wrap items-center px-4 pt-3">
+          <div
+            className="bg-primary/10 text-primary flex h-8 max-w-full min-w-0 items-center gap-1.5 rounded-full px-3 text-sm font-medium"
+            title={
+              selectedSkill?.description || selectedSkill?.label || skillName
+            }
+          >
+            <Sparkles aria-hidden="true" className="size-4 shrink-0" />
+            <span className="max-w-52 min-w-0 truncate">
+              {selectedSkill?.label || `/${skillName}`}
+            </span>
+            {onSkillNameChange && (
+              <button
+                type="button"
+                disabled={disabled}
+                onClick={() => onSkillNameChange(undefined)}
+                aria-label={m['agent.skills.remove_selected']()}
+                className="hover:bg-background/80 ml-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded-full opacity-70 transition-opacity hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <X aria-hidden="true" className="size-3.5" />
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       <textarea
         ref={textareaRef}
         value={value}
@@ -225,7 +388,8 @@ export function ChatComposer({
         disabled={disabled}
         className={cn(
           'text-foreground placeholder:text-muted-foreground w-full resize-none rounded-3xl bg-transparent px-4 pt-4 pb-2 leading-relaxed focus:outline-none',
-          size === 'lg' ? 'min-h-[92px] text-sm' : 'min-h-[64px] text-sm'
+          size === 'lg' ? 'min-h-[92px] text-sm' : 'min-h-[64px] text-sm',
+          textareaClassName
         )}
       />
 
@@ -233,78 +397,91 @@ export function ChatComposer({
           submit is wider than a 390px viewport. */}
       <div className="flex flex-wrap items-center justify-between gap-2 px-3 pb-3">
         <div className="flex min-w-0 items-center gap-1.5">
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              render={
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  disabled={disabled}
-                  aria-label={m['agent.home.attach']()}
-                  className="text-muted-foreground size-8 rounded-full"
-                />
-              }
-            >
-              {uploading ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <Plus className="size-4" />
-              )}
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-56">
-              <DropdownMenuItem
-                disabled={uploading}
-                onClick={() => fileInputRef.current?.click()}
-                className="gap-2.5"
+          {canAttach && (
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    disabled={disabled}
+                    aria-label={m['agent.home.attach']()}
+                    className="text-muted-foreground size-8 rounded-full"
+                  />
+                }
               >
-                <Paperclip className="size-4" />
-                {m['landing.hero.upload_local']()}
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => setLibraryOpen(true)}
-                className="gap-2.5"
-              >
-                <Images className="size-4" />
-                {m['agent.composer.add_from_library']()}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/jpeg,image/png,image/webp,audio/mpeg,audio/mp4,audio/ogg,audio/wav,audio/webm,.mp3,.m4a,.wav,.ogg,video/mp4,video/quicktime,video/webm,.mp4,.mov,.m4v"
-            multiple
-            aria-label={m['landing.hero.upload_local']()}
-            className="sr-only"
-            onChange={(event) => {
-              onAddFiles(Array.from(event.currentTarget.files ?? []));
-              event.currentTarget.value = '';
-            }}
-          />
-          <ComposerModeSelector
-            settings={settings}
-            onChange={onSettingsChange}
-            disabled={disabled}
-          />
-          {toolbarExtra}
-        </div>
-        {/* ml-auto keeps this group right-aligned after the row wraps. */}
-        <div className="ml-auto flex shrink-0 items-center gap-1.5">
-          {onSkillNameChange && (
-            <ComposerSkillSelect
-              skillName={skillName}
-              onChange={onSkillNameChange}
-              disabled={disabled}
+                {uploading ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Plus className="size-4" />
+                )}
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-56">
+                <DropdownMenuItem
+                  disabled={uploading}
+                  onClick={() => fileInputRef.current?.click()}
+                  className="gap-2.5"
+                >
+                  <Paperclip className="size-4" />
+                  {m['landing.hero.upload_local']()}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setLibraryOpen(true)}
+                  className="gap-2.5"
+                >
+                  <Images className="size-4" />
+                  {m['agent.composer.add_from_library']()}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+          {canAttach && (
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept={fileAccept}
+              multiple
+              aria-label={m['landing.hero.upload_local']()}
+              className="sr-only"
+              onChange={(event) => {
+                onAddFiles(Array.from(event.currentTarget.files ?? []));
+                event.currentTarget.value = '';
+              }}
             />
           )}
+          {!(presentation === 'tool' && modeLocked) && (
+            <ComposerModeSelector
+              settings={settings}
+              onChange={onSettingsChange}
+              disabled={disabled || modeLocked}
+            />
+          )}
+          {toolbarExtra}
+        </div>
+        {/* Mobile translations can make this control group wider than the
+            composer. Give it a full wrapping row, then keep the compact
+            single-row treatment once the viewport has room. */}
+        <div
+          className={cn(
+            'ml-auto flex min-w-0 items-center justify-end gap-1.5',
+            presentation === 'tool'
+              ? 'flex-1 flex-nowrap'
+              : 'w-full flex-wrap sm:w-auto sm:flex-nowrap'
+          )}
+        >
           {settings.mediaMode === 'image' ? (
             <>
-              <ComposerImageModel />
+              <ComposerImageModel
+                settings={settings}
+                onChange={onSettingsChange}
+                disabled={disabled || modelLocked}
+              />
               <ComposerImageSettings
                 settings={settings}
                 onChange={onSettingsChange}
                 disabled={disabled}
+                compact={presentation === 'tool'}
               />
             </>
           ) : (
@@ -312,7 +489,8 @@ export function ChatComposer({
               <ComposerControls
                 settings={settings}
                 onChange={onSettingsChange}
-                disabled={disabled}
+                disabled={disabled || modelLocked}
+                operation={videoOperation}
               />
               <ComposerSettings
                 settings={settings}
@@ -342,14 +520,16 @@ export function ChatComposer({
           </Button>
         </div>
       </div>
-      <LibraryPicker
-        open={libraryOpen}
-        onOpenChange={setLibraryOpen}
-        onAdd={(media) => {
-          onAddLibraryMedia(media);
-          setLibraryOpen(false);
-        }}
-      />
+      {canAttach && (
+        <LibraryPicker
+          open={libraryOpen}
+          onOpenChange={setLibraryOpen}
+          onAdd={(media) => {
+            onAddLibraryMedia(media);
+            setLibraryOpen(false);
+          }}
+        />
+      )}
     </form>
   );
 }

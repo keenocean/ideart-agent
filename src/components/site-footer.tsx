@@ -27,11 +27,13 @@ export function SiteFooter({
   columns,
   socials,
   copyright,
+  showBuiltWithShipAny = true,
 }: {
   tagline?: string;
   columns?: FooterColumn[];
   socials?: FooterSocial[];
   copyright?: string;
+  showBuiltWithShipAny?: boolean;
 }) {
   const year = new Date().getFullYear();
 
@@ -128,8 +130,13 @@ export function SiteFooter({
 
         {/* Bottom bar */}
         <div className="mt-6 flex flex-col gap-3 border-t border-neutral-800 pt-5 sm:flex-row sm:items-center sm:justify-between">
-          <BuiltWithShipAny />
-          <span className="text-sm text-neutral-400">
+          {showBuiltWithShipAny && <BuiltWithShipAny />}
+          <span
+            className={cn(
+              'text-sm text-neutral-400',
+              !showBuiltWithShipAny && 'sm:ml-auto'
+            )}
+          >
             {copyright ?? (
               <>
                 © {year}{' '}

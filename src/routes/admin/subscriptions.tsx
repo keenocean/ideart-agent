@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
 
-import { tDynamic } from '@/core/i18n/dynamic';
 import { apiGet, type PageResult } from '@/lib/api-client';
 import { formatDateTime } from '@/lib/time';
 import { cn } from '@/lib/utils';
@@ -31,6 +30,12 @@ const PAGE_SIZE = 20;
 
 const TABS = ['all', 'month', 'year'] as const;
 type Tab = (typeof TABS)[number];
+
+const TAB_LABELS: Record<Tab, () => string> = {
+  all: m['admin.subscriptions.tab_all'],
+  month: m['admin.subscriptions.tab_month'],
+  year: m['admin.subscriptions.tab_year'],
+};
 
 function SubscriptionsPage() {
   const [page, setPage] = useState(1);
@@ -159,7 +164,7 @@ function SubscriptionsPage() {
                 : 'text-muted-foreground hover:text-foreground border-transparent'
             )}
           >
-            {tDynamic(`admin.subscriptions.tab_${tb}`)}
+            {TAB_LABELS[tb]()}
           </button>
         ))}
       </div>

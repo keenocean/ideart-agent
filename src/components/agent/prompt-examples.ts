@@ -1,6 +1,6 @@
 import { Film, type LucideIcon } from 'lucide-react';
 
-import { tDynamic } from '@/core/i18n/dynamic';
+import { m } from '@/paraglide/messages.js';
 
 export interface PromptExample {
   key: string;
@@ -121,21 +121,100 @@ const SHOWCASE = [
   },
 ] as const;
 
+type ShowcaseKey = (typeof SHOWCASE)[number]['key'];
+
+const SHOWCASE_MESSAGES: Record<
+  ShowcaseKey,
+  { title: () => string; prompt: () => string }
+> = {
+  monster_bakery: {
+    title: m['video.clone.prompts.monster_bakery'],
+    prompt: m['video.clone.prompts.monster_bakery_text'],
+  },
+  web_acrobat: {
+    title: m['video.clone.prompts.web_acrobat'],
+    prompt: m['video.clone.prompts.web_acrobat_text'],
+  },
+  paper_dragon: {
+    title: m['video.clone.prompts.paper_dragon'],
+    prompt: m['video.clone.prompts.paper_dragon_text'],
+  },
+  glacier_titan: {
+    title: m['video.clone.prompts.glacier_titan'],
+    prompt: m['video.clone.prompts.glacier_titan_text'],
+  },
+  airglide: {
+    title: m['video.clone.prompts.airglide'],
+    prompt: m['video.clone.prompts.airglide_text'],
+  },
+  poppies: {
+    title: m['video.clone.prompts.poppies'],
+    prompt: m['video.clone.prompts.poppies_text'],
+  },
+  monster_commuter: {
+    title: m['video.clone.prompts.monster_commuter'],
+    prompt: m['video.clone.prompts.monster_commuter_text'],
+  },
+  dragon: {
+    title: m['video.clone.prompts.dragon'],
+    prompt: m['video.clone.prompts.dragon_text'],
+  },
+  koi_train: {
+    title: m['video.clone.prompts.koi_train'],
+    prompt: m['video.clone.prompts.koi_train_text'],
+  },
+  conservatory: {
+    title: m['video.clone.prompts.conservatory'],
+    prompt: m['video.clone.prompts.conservatory_text'],
+  },
+  rain_market: {
+    title: m['video.clone.prompts.rain_market'],
+    prompt: m['video.clone.prompts.rain_market_text'],
+  },
+  orb: {
+    title: m['video.clone.prompts.orb'],
+    prompt: m['video.clone.prompts.orb_text'],
+  },
+  tidal: {
+    title: m['video.clone.prompts.tidal'],
+    prompt: m['video.clone.prompts.tidal_text'],
+  },
+  laundromat: {
+    title: m['video.clone.prompts.laundromat'],
+    prompt: m['video.clone.prompts.laundromat_text'],
+  },
+  ship: {
+    title: m['video.clone.prompts.ship'],
+    prompt: m['video.clone.prompts.ship_text'],
+  },
+  asteroids: {
+    title: m['video.clone.prompts.asteroids'],
+    prompt: m['video.clone.prompts.asteroids_text'],
+  },
+  woman: {
+    title: m['video.clone.prompts.woman'],
+    prompt: m['video.clone.prompts.woman_text'],
+  },
+};
+
 /** Reads translations at render time, matching the rest of the Agent UI. */
 export function promptCategories(): PromptCategory[] {
   return [
     {
       key: 'showcase',
       icon: Film,
-      title: tDynamic('video.clone.prompts.eyebrow'),
-      examples: SHOWCASE.map((item, index) => ({
-        key: item.slug,
-        title: tDynamic(`video.clone.prompts.${item.key}`),
-        prompt: tDynamic(`video.clone.prompts.${item.key}_text`),
-        video: item.video,
-        sourceImage: 'sourceImage' in item ? item.sourceImage : undefined,
-        swatch: SWATCHES[index % SWATCHES.length],
-      })),
+      title: m['video.clone.prompts.eyebrow'](),
+      examples: SHOWCASE.map((item, index) => {
+        const messages = SHOWCASE_MESSAGES[item.key];
+        return {
+          key: item.slug,
+          title: messages.title(),
+          prompt: messages.prompt(),
+          video: item.video,
+          sourceImage: 'sourceImage' in item ? item.sourceImage : undefined,
+          swatch: SWATCHES[index % SWATCHES.length],
+        };
+      }),
     },
   ];
 }

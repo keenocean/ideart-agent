@@ -8,7 +8,6 @@ import { createFileRoute } from '@tanstack/react-router';
 import { MessageSquare, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { tDynamic } from '@/core/i18n/dynamic';
 import { apiGet, apiPatch, apiPost, type PageResult } from '@/lib/api-client';
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
@@ -94,6 +93,12 @@ const STATUS_BADGE: Record<TicketStatus, 'default' | 'secondary' | 'outline'> =
     replied: 'secondary',
     closed: 'outline',
   };
+
+const STATUS_LABELS: Record<TicketStatus, () => string> = {
+  open: m['settings.tickets.status_open'],
+  replied: m['settings.tickets.status_replied'],
+  closed: m['settings.tickets.status_closed'],
+};
 
 function TicketsPage() {
   const queryClient = useQueryClient();
@@ -256,7 +261,7 @@ function TicketsPage() {
       className: 'w-[120px]',
       cell: (r) => (
         <Badge variant={STATUS_BADGE[r.status]}>
-          {tDynamic(`settings.tickets.status_${r.status}`)}
+          {STATUS_LABELS[r.status]()}
         </Badge>
       ),
     },
@@ -396,7 +401,7 @@ function TicketsPage() {
               {activeTicket?.title}
               {activeTicket && (
                 <Badge variant={STATUS_BADGE[activeTicket.status]}>
-                  {tDynamic(`settings.tickets.status_${activeTicket.status}`)}
+                  {STATUS_LABELS[activeTicket.status]()}
                 </Badge>
               )}
             </DialogTitle>

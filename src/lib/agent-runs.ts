@@ -13,6 +13,10 @@ import {
   type ToolCall,
 } from '@/lib/agent-chat';
 import type { AgentGenerationSettings } from '@/lib/agent-settings';
+import {
+  requestAttachments,
+  type GenerationEntryContext,
+} from '@/lib/generation-entry';
 
 /**
  * Live agent turns, keyed by session and held outside React.
@@ -186,6 +190,7 @@ export interface StartRunOptions {
   attachments?: PendingAttachment[];
   settings?: AgentGenerationSettings;
   skillName?: string;
+  entryContext?: GenerationEntryContext;
   /** Called once the server has the turn (and has persisted the user message). */
   onAccepted?: () => void;
   /** Called when the turn ends, however it ends. */
@@ -209,6 +214,32 @@ export interface CreditRefusal {
   balance: number;
   /** On a plan already — offer a top-up rather than the plan catalog. */
   subscribed: boolean;
+}
+
+export function buildAgentChatRequestPayload({
+  sessionId,
+  text,
+  attachments = [],
+  settings = {},
+  skillName,
+  entryContext = { kind: 'home' },
+}: Pick<
+  StartRunOptions,
+  | 'sessionId'
+  | 'text'
+  | 'attachments'
+  | 'settings'
+  | 'skillName'
+  | 'entryContext'
+>) {
+  return {
+    sessionId,
+    message: buildAgentMessage(text, attachments, settings.mediaMode),
+    settings,
+    skillName,
+    entryContext,
+    attachments: requestAttachments(attachments),
+  };
 }
 
 function parseInsufficientCredits(
@@ -259,12 +290,21 @@ export async function startRun({
   attachments = [],
   settings = {},
   skillName,
+  entryContext = { kind: 'home' },
   onAccepted,
   onSettled,
   onInsufficientCredits,
   onTurnConflict,
 }: StartRunOptions): Promise<void> {
-  const content = buildAgentMessage(text, attachments, settings.mediaMode);
+  const requestPayload = buildAgentChatRequestPayload({
+    sessionId,
+    text,
+    attachments,
+    settings,
+    skillName,
+    entryContext,
+  });
+  const content = requestPayload.message;
   if (!content || isRunning(sessionId)) return;
 
   const controller = new AbortController();
@@ -330,12 +370,7 @@ export async function startRun({
     const res = await fetch('/api/agent/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        sessionId,
-        message: content,
-        settings,
-        skillName,
-      }),
+      body: JSON.stringify(requestPayload),
       signal: controller.signal,
     });
 

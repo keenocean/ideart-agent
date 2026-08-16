@@ -15,6 +15,56 @@ import { loadEnvFiles } from './src/lib/env';
 // from the actual host/container environment.
 loadEnvFiles();
 
+type LocaleSettings = {
+  baseLocale: string;
+  locales: string[];
+};
+
+function readLocaleSettings(): LocaleSettings {
+  const settings = JSON.parse(
+    readFileSync(
+      new URL('./project.inlang/settings.json', import.meta.url),
+      'utf8'
+    )
+  ) as Partial<LocaleSettings>;
+  const locales = settings.locales || [];
+  const baseLocale = settings.baseLocale || '';
+  const invalidLocale = locales.find(
+    (locale) => !/^[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*$/.test(locale)
+  );
+  if (
+    !baseLocale ||
+    locales.length === 0 ||
+    !locales.includes(baseLocale) ||
+    new Set(locales).size !== locales.length ||
+    invalidLocale
+  ) {
+    throw new Error('Invalid locales in project.inlang/settings.json');
+  }
+  return { baseLocale, locales };
+}
+
+const localeSettings = readLocaleSettings();
+const localePatternOrder = [
+  ...localeSettings.locales.filter(
+    (locale) => locale !== localeSettings.baseLocale
+  ),
+  localeSettings.baseLocale,
+];
+
+function localizedPattern(pattern: string): Array<[string, string]> {
+  // Non-base patterns must precede the catch-all base pattern. Otherwise
+  // `/:path(.*)?` consumes `/zh/...` before Paraglide can strip the prefix.
+  return localePatternOrder.map((locale) => [
+    locale,
+    locale === localeSettings.baseLocale
+      ? pattern
+      : pattern === '/'
+        ? `/${locale}`
+        : `/${locale}${pattern}`,
+  ]);
+}
+
 // Cloudflare Workers build (pnpm cf:build / cf:deploy): stub out unused DB
 // drivers — mysql2 crashes workerd at module evaluation (node:net,
 // node:process requires); postgres.js runs fine under nodejs_compat but is
@@ -73,6 +123,34 @@ export default defineConfig({
       : {},
   },
   plugins: [
+    {
+      name: 'client-react-boundary',
+      configEnvironment(name, _config, env) {
+        if (env.command !== 'build' || env.isSsrBuild || name !== 'client') {
+          return;
+        }
+        return {
+          build: {
+            rolldownOptions: {
+              output: {
+                codeSplitting: {
+                  groups: [
+                    {
+                      name: 'react-core',
+                      test: /node_modules[\\/](?:react|react-dom|scheduler)(?:[\\/]|$)/,
+                    },
+                    {
+                      name: 'lucide-icons',
+                      test: /node_modules[\\/]lucide-react(?:[\\/]|$)/,
+                    },
+                  ],
+                },
+              },
+            },
+          },
+        };
+      },
+    },
     // MDX must run before the react plugin so JSX in compiled MDX gets transformed.
     { enforce: 'pre', ...mdx({ providerImportSource: '@mdx-js/react' }) },
     tailwindcss(),
@@ -87,32 +165,44 @@ export default defineConfig({
         {
           pattern: '/api/:path(.*)?',
           localized: [
-            ['en', '/api/:path(.*)?'],
-            ['zh', '/api/:path(.*)?'],
-          ],
+            localeSettings.baseLocale,
+            ...localeSettings.locales.filter(
+              (locale) => locale !== localeSettings.baseLocale
+            ),
+          ].map((locale): [string, string] => [locale, '/api/:path(.*)?']),
         },
         // Bare locale homes match without a trailing-slash redirect.
         {
           pattern: '/',
-          localized: [
-            ['zh', '/zh'],
-            ['en', '/'],
-          ],
+          localized: localizedPattern('/'),
         },
-        // "as-needed" prefix: zh under /zh, en (default) unprefixed.
+        // "as-needed" prefix: every non-base locale uses /<locale>.
         {
           pattern: '/:path(.*)?',
-          localized: [
-            ['zh', '/zh/:path(.*)?'],
-            ['en', '/:path(.*)?'],
-          ],
+          localized: localizedPattern('/:path(.*)?'),
         },
       ],
     }),
     tanstackStart({
       srcDirectory: 'src',
+      server: {
+        build: {
+          // Keep the first paint independent of a second, render-blocking CSS
+          // request. The global stylesheet is intentionally kept below the
+          // catalog bundle budget and contains no network font declarations.
+          inlineCss: true,
+        },
+      },
     }),
     viteReact(),
-    nitro(),
+    nitro({
+      // Node deployments do not have Cloudflare's automatic edge
+      // compression. Pre-compress immutable client assets so both Node
+      // production and local Lighthouse exercise the real transfer path.
+      // Workers assets stay singular because Cloudflare compresses them.
+      compressPublicAssets: isCloudflareBuild
+        ? false
+        : { gzip: true, brotli: true },
+    }),
   ],
 });

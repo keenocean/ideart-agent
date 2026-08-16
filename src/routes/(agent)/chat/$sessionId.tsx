@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 
 import { useRouter } from '@/core/i18n/navigation';
 import {
+  authorizeLibraryMediaForChat,
   isLocalChatMediaUrl,
   mediaTypeForFile,
   newAttachmentId,
@@ -20,10 +21,11 @@ import {
   type PendingAttachment,
 } from '@/lib/agent';
 import {
+  initialTurnStorageKey,
+  parseInitialTurnHandoff,
   splitAttachedImages,
   storedToMessages,
   type ChatHistoryData,
-  type InitialTurnPayload,
 } from '@/lib/agent-chat';
 import {
   dropRun,
@@ -40,7 +42,8 @@ import {
 } from '@/lib/agent-settings';
 import { apiGet, apiPatch, apiPost } from '@/lib/api-client';
 import { ChatAutoScroll } from '@/lib/chat-scroll';
-import { mediaNameFromUrl } from '@/lib/media';
+import type { GenerationEntryContext } from '@/lib/generation-entry';
+import { isVideoUrl, mediaNameFromUrl } from '@/lib/media';
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
 import { useComposerSettings } from '@/hooks/use-composer-settings';
@@ -122,7 +125,8 @@ function ChatSessionPage() {
   );
   const generationRunning = streaming || serverRunning || pendingGeneration;
   const [value, setValue] = useState('');
-  const [composerSettings, setComposerSettings] = useComposerSettings();
+  const [composerSettings, setComposerSettings, setTemporaryComposerSettings] =
+    useComposerSettings();
   const [skillName, setSkillName] = useComposerSkill();
   const [attachments, setAttachments] = useState<PendingAttachment[]>([]);
   const attachmentsRef = useRef<PendingAttachment[]>([]);
@@ -310,6 +314,7 @@ function ChatSessionPage() {
       imageAttachments: PendingAttachment[] = [],
       settings: AgentGenerationSettings = {},
       selectedSkillName?: string,
+      entryContext?: GenerationEntryContext,
       // Fired once the server has accepted the turn (and therefore persisted
       // the user message) — the caller uses it to drop its retry copy.
       onAccepted?: () => void
@@ -322,6 +327,7 @@ function ChatSessionPage() {
         attachments: imageAttachments,
         settings,
         skillName: selectedSkillName,
+        entryContext,
         onAccepted: () => {
           onAccepted?.();
           // The chat row exists the moment the server accepts the turn, so
@@ -340,7 +346,6 @@ function ChatSessionPage() {
         // Refused before anything ran. No plan yet means "subscribe";
         // already on one just means the balance ran out, so offer a top-up.
         onInsufficientCredits: ({ subscribed }) => {
-          onAccepted?.();
           if (subscribed) setTopUpOpen(true);
           else setUpgradeOpen(true);
         },
@@ -362,30 +367,40 @@ function ChatSessionPage() {
     initialPromptHandled.current = true;
     try {
       const key = `agent:initial-prompt:${sessionId}`;
-      const turnKey = `agent:initial-turn:${sessionId}`;
+      const turnKey = initialTurnStorageKey(sessionId);
       const rawTurn = sessionStorage.getItem(turnKey);
       if (rawTurn) {
-        const payload = JSON.parse(rawTurn) as InitialTurnPayload;
-        const initialSettings = normalizeComposerSettings(payload.settings);
-        if (payload.settings) setComposerSettings(initialSettings);
-        if (payload.skillName !== undefined) setSkillName(payload.skillName);
-        const initialAttachments = (payload.attachments ?? []).filter(
-          (item) => item.status === 'uploaded' && item.url
-        );
-        if (payload.prompt || initialAttachments.length > 0) {
-          // The stash is only dropped once the server has the turn. If this
-          // page re-mounts before that (dev HMR, a stray re-render), the
-          // handoff survives and the turn is retried instead of vanishing.
-          send(
-            payload.prompt ?? '',
-            initialAttachments,
-            resolveGenerationSettings(initialSettings),
-            payload.skillName,
-            () => sessionStorage.removeItem(turnKey)
+        const payload = parseInitialTurnHandoff(rawTurn);
+        if (!payload) sessionStorage.removeItem(turnKey);
+        if (payload) {
+          const initialSettings = normalizeComposerSettings(payload.settings);
+          if (payload.settings) {
+            if (payload.entryContext && payload.entryContext.kind !== 'home') {
+              setTemporaryComposerSettings(initialSettings);
+            } else {
+              setComposerSettings(initialSettings);
+            }
+          }
+          if (payload.skillName !== undefined) setSkillName(payload.skillName);
+          const initialAttachments = (payload.attachments ?? []).filter(
+            (item) => item.status === 'uploaded' && item.url
           );
-          return;
+          if (payload.prompt || initialAttachments.length > 0) {
+            // The stash is only dropped once the server has the turn. If this
+            // page re-mounts before that (dev HMR, a stray re-render), the
+            // handoff survives and the turn is retried instead of vanishing.
+            send(
+              payload.prompt ?? '',
+              initialAttachments,
+              resolveGenerationSettings(initialSettings),
+              payload.skillName,
+              payload.entryContext,
+              () => sessionStorage.removeItem(turnKey)
+            );
+            return;
+          }
+          sessionStorage.removeItem(turnKey);
         }
-        sessionStorage.removeItem(turnKey);
       }
       const stashed = sessionStorage.getItem(key);
       if (stashed) {
@@ -394,13 +409,22 @@ function ChatSessionPage() {
           [],
           resolveGenerationSettings(composerSettings),
           skillName,
+          undefined,
           () => sessionStorage.removeItem(key)
         );
       }
     } catch {
       // ignore
     }
-  }, [sessionId, send, composerSettings, skillName, setSkillName]);
+  }, [
+    sessionId,
+    send,
+    composerSettings,
+    skillName,
+    setSkillName,
+    setComposerSettings,
+    setTemporaryComposerSettings,
+  ]);
 
   function handleSend() {
     const uploadedAttachments = attachments.filter(
@@ -463,14 +487,22 @@ function ChatSessionPage() {
     ]);
 
     try {
-      const urls = await uploadChatMedia(created.map((item) => item.file));
+      const uploaded = await uploadChatMedia(
+        created.map((item) => item.file),
+        sessionId
+      );
       setAttachments((prev) =>
         prev.map((item) => {
           const index = created.findIndex(
             (createdItem) => createdItem.id === item.id
           );
-          return index >= 0 && urls[index]
-            ? { ...item, url: urls[index], status: 'uploaded' }
+          return index >= 0 && uploaded[index]
+            ? {
+                ...item,
+                url: uploaded[index].url,
+                receipt: uploaded[index].receipt,
+                status: 'uploaded',
+              }
             : item;
         })
       );
@@ -498,39 +530,47 @@ function ChatSessionPage() {
 
     const created: PendingAttachment[] = selected.map((item) => ({
       id: newAttachmentId(),
-      name: item.name || 'video',
-      kind: 'video',
+      name: item.name || 'media',
+      kind: item.mediaType ?? (isVideoUrl(item.src) ? 'video' : 'image'),
       preview: item.src,
       ...(isLocalChatMediaUrl(item.src) ? {} : { url: item.src }),
-      status: isLocalChatMediaUrl(item.src) ? 'uploading' : 'uploaded',
+      status: 'uploading',
     }));
     setAttachments((previous) => [...previous, ...created]);
 
     try {
-      const urls = await publishChatMediaSources(
-        selected.map((item) => ({ src: item.src, name: item.name }))
+      const uploaded = await Promise.all(
+        selected.map((item) =>
+          isLocalChatMediaUrl(item.src)
+            ? publishChatMediaSources(
+                [{ src: item.src, name: item.name }],
+                sessionId
+              ).then(([uploadedItem]) => uploadedItem)
+            : authorizeLibraryMediaForChat(item, sessionId)
+        )
       );
       setAttachments((current) =>
         current.map((item) => {
           const index = created.findIndex(
             (createdItem) => createdItem.id === item.id
           );
-          return index >= 0 && urls[index]
-            ? { ...item, url: urls[index], status: 'uploaded' }
+          return index >= 0 && uploaded[index]
+            ? {
+                ...item,
+                url: uploaded[index].url,
+                receipt: uploaded[index].receipt,
+                status: 'uploaded',
+              }
             : item;
         })
       );
     } catch (error) {
       const message = (error as Error).message || 'Upload failed';
       toast.error(message);
-      const localIds = new Set(
-        created
-          .filter((item) => item.status === 'uploading')
-          .map((item) => item.id)
-      );
+      const createdIds = new Set(created.map((item) => item.id));
       setAttachments((current) =>
         current.map((item) =>
-          localIds.has(item.id)
+          createdIds.has(item.id)
             ? { ...item, status: 'error', error: message }
             : item
         )

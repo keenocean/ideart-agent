@@ -1,13 +1,14 @@
 import { Calendar } from 'lucide-react';
 
 import { Link } from '@/core/i18n/navigation';
+import type { BlogImageRef } from '@/lib/blog-images';
 import type { BlogCategory } from '@/content/posts';
 
 export type BlogCardProps = {
   href: string;
   title: string;
   description?: string;
-  image?: string;
+  image?: BlogImageRef;
   date?: string;
   authorName?: string;
   authorImage?: string;
@@ -31,11 +32,12 @@ export function BlogCard({
     >
       {image && (
         <img
-          src={image}
-          alt={title}
-          width={640}
-          height={360}
+          src={image.url}
+          alt={image.alt}
+          width={image.width}
+          height={image.height}
           loading="lazy"
+          decoding="async"
           className="aspect-video w-full object-cover object-center"
         />
       )}

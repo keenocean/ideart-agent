@@ -1,30 +1,30 @@
 import { useRef, useState } from 'react';
-import { FileVideo2, Play, WandSparkles } from 'lucide-react';
+import {
+  FileVideo2,
+  GraduationCap,
+  ImageIcon,
+  Play,
+  Search,
+  Sparkles,
+  WandSparkles,
+} from 'lucide-react';
 import { toast } from 'sonner';
 
 import { useSession } from '@/core/auth/client';
-import { useRouter } from '@/core/i18n/navigation';
 import {
   isLocalChatMediaUrl,
-  mediaTypeForFile,
-  newAgentSessionId,
-  newAttachmentId,
   publishChatMediaSources,
-  uploadChatMedia,
   type PendingAttachment,
 } from '@/lib/agent';
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
-import { useComposerSettings } from '@/hooks/use-composer-settings';
-import { useComposerSkill } from '@/hooks/use-composer-skill';
-import {
-  ChatComposer,
-  type LibraryMedia,
-} from '@/components/agent/chat-composer';
+import { useGenerationEntry } from '@/hooks/use-generation-entry';
+import { GenerationWorkbench } from '@/components/agent/generation-workbench';
 import {
   promptCategories,
   type PromptExample,
 } from '@/components/agent/prompt-examples';
+import { SkillsQuickPicker } from '@/components/agent/skills-quick-picker';
 import { VideoPreviewDialog } from '@/components/video-preview-dialog';
 import { ViewportVideo } from '@/components/viewport-video';
 
@@ -55,23 +55,50 @@ const EXAMPLE_ASPECT_RATIOS = [
  * first turn (prompt, model settings, uploaded images) to /chat/$sessionId
  * through sessionStorage.
  */
-export function PromptLauncher({ className }: { className?: string }) {
-  const router = useRouter();
+export function PromptLauncher({
+  className,
+  workbenchClassName,
+  textareaClassName,
+  showHeading = true,
+  showExamples = true,
+  showQuickActions = true,
+}: {
+  className?: string;
+  workbenchClassName?: string;
+  textareaClassName?: string;
+  showHeading?: boolean;
+  showExamples?: boolean;
+  showQuickActions?: boolean;
+}) {
   const { data: session } = useSession();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-  const [value, setValue] = useState('');
-  const [attachments, setAttachments] = useState<PendingAttachment[]>([]);
-  const [composerSettings, setComposerSettings] = useComposerSettings();
-  const [skillName, setSkillName] = useComposerSkill();
-  const [submitting, setSubmitting] = useState(false);
+  const entry = useGenerationEntry({
+    entryContext: { kind: 'home' },
+    persistSettingsOnChange: true,
+  });
+  const {
+    value,
+    setValue,
+    attachments,
+    setAttachments,
+    settings: composerSettings,
+    setSettings: setComposerSettings,
+    skillName,
+    setSkillName,
+    submitting,
+    uploading,
+    hasUploaded,
+    ensureSessionId,
+    addFiles,
+    addLibraryMedia,
+    removeAttachment,
+    submit,
+  } = entry;
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
 
   const examples = promptCategories()[0]?.examples ?? [];
   const preview =
     previewIndex === null ? null : (examples[previewIndex] ?? null);
-  const uploading = attachments.some((item) => item.status === 'uploading');
-  const hasUploaded = attachments.some((item) => item.status === 'uploaded');
 
   function fillPrompt(prompt: string) {
     setValue(prompt);
@@ -137,16 +164,22 @@ export function PromptLauncher({ className }: { className?: string }) {
     });
 
     try {
-      const urls = await publishChatMediaSources(
-        sources.map((src) => ({ src, name: example.title }))
+      const uploaded = await publishChatMediaSources(
+        sources.map((src) => ({ src, name: example.title })),
+        ensureSessionId()
       );
       setAttachments((current) =>
         current.map((item) => {
           const index = created.findIndex(
             (createdItem) => createdItem.id === item.id
           );
-          return index >= 0 && urls[index]
-            ? { ...item, url: urls[index], status: 'uploaded' }
+          return index >= 0 && uploaded[index]
+            ? {
+                ...item,
+                url: uploaded[index].url,
+                receipt: uploaded[index].receipt,
+                status: 'uploaded',
+              }
             : item;
         })
       );
@@ -212,11 +245,21 @@ export function PromptLauncher({ className }: { className?: string }) {
     });
 
     try {
-      const [url] = await publishChatMediaSources([{ src: video, name }]);
-      if (!url) throw new Error('Upload failed');
+      const [uploaded] = await publishChatMediaSources(
+        [{ src: video, name }],
+        ensureSessionId()
+      );
+      if (!uploaded) throw new Error('Upload failed');
       setAttachments((current) =>
         current.map((item) =>
-          item.id === id ? { ...item, url, status: 'uploaded' } : item
+          item.id === id
+            ? {
+                ...item,
+                url: uploaded.url,
+                receipt: uploaded.receipt,
+                status: 'uploaded',
+              }
+            : item
         )
       );
     } catch (error) {
@@ -237,164 +280,25 @@ export function PromptLauncher({ className }: { className?: string }) {
     });
   }
 
-  // Uploads need a session — the API rejects anonymous requests, so say why
-  // instead of letting every thumbnail fail.
-  async function addFiles(files: File[]) {
-    const selected = files
-      .map((file) => ({ file, kind: mediaTypeForFile(file) }))
-      .filter(
-        (item): item is { file: File; kind: 'image' | 'audio' | 'video' } =>
-          item.kind !== null
-      )
-      .slice(0, 10);
-    if (selected.length === 0) return;
-    if (!session?.user) {
-      toast.error(m['landing.hero.sign_in_to_upload']());
-      return;
-    }
-
-    const created = selected.map(({ file, kind }) => ({
-      id: newAttachmentId(),
-      name: file.name || 'media',
-      kind,
-      preview: URL.createObjectURL(file),
-      status: 'uploading' as const,
-      file,
-    }));
-
-    setAttachments((prev) => [
-      ...prev,
-      ...created.map(({ file: _file, ...item }) => item),
-    ]);
-
-    try {
-      const urls = await uploadChatMedia(created.map((item) => item.file));
-      setAttachments((prev) =>
-        prev.map((item) => {
-          const index = created.findIndex(
-            (createdItem) => createdItem.id === item.id
-          );
-          return index >= 0 && urls[index]
-            ? { ...item, url: urls[index], status: 'uploaded' }
-            : item;
-        })
-      );
-    } catch (err) {
-      const error = (err as Error).message || 'Upload failed';
-      toast.error(error);
-      const createdIds = new Set(created.map((item) => item.id));
-      setAttachments((prev) =>
-        prev.map((item) =>
-          createdIds.has(item.id) ? { ...item, status: 'error', error } : item
-        )
-      );
-    }
-  }
-
-  async function addLibraryMedia(media: LibraryMedia[]) {
-    const selected = media.filter(
-      (item) =>
-        !attachments.some(
-          (attachment) =>
-            attachment.preview === item.src || attachment.url === item.src
-        )
-    );
-    if (selected.length === 0) return;
-    if (
-      selected.some((item) => isLocalChatMediaUrl(item.src)) &&
-      !session?.user
-    ) {
-      toast.error(m['landing.hero.sign_in_to_upload']());
-      return;
-    }
-
-    const created: PendingAttachment[] = selected.map((item) => ({
-      id: newAttachmentId(),
-      name: item.name || 'video',
-      kind: 'video',
-      preview: item.src,
-      ...(isLocalChatMediaUrl(item.src) ? {} : { url: item.src }),
-      status: isLocalChatMediaUrl(item.src) ? 'uploading' : 'uploaded',
-    }));
-    setAttachments((previous) => [...previous, ...created]);
-
-    try {
-      const urls = await publishChatMediaSources(
-        selected.map((item) => ({ src: item.src, name: item.name }))
-      );
-      setAttachments((current) =>
-        current.map((item) => {
-          const index = created.findIndex(
-            (createdItem) => createdItem.id === item.id
-          );
-          return index >= 0 && urls[index]
-            ? { ...item, url: urls[index], status: 'uploaded' }
-            : item;
-        })
-      );
-    } catch (error) {
-      const message = (error as Error).message || 'Upload failed';
-      toast.error(message);
-      const ids = new Set(
-        created
-          .filter((item) => item.status === 'uploading')
-          .map((item) => item.id)
-      );
-      setAttachments((current) =>
-        current.map((item) =>
-          ids.has(item.id) ? { ...item, status: 'error', error: message } : item
-        )
-      );
-    }
-  }
-
-  function removeAttachment(id: string) {
-    setAttachments((prev) => {
-      const target = prev.find((item) => item.id === id);
-      if (target?.preview.startsWith('blob:'))
-        URL.revokeObjectURL(target.preview);
-      return prev.filter((item) => item.id !== id);
-    });
-  }
-
-  function handleSubmit() {
-    const prompt = value.trim();
-    if ((!prompt && !hasUploaded) || uploading || submitting) return;
-    setSubmitting(true);
-    const sessionId = newAgentSessionId();
-    // Hand the first turn off to the chat page via sessionStorage so it can
-    // auto-send when it mounts. Avoids URL-encoding long prompts. Only
-    // uploaded attachments survive the hop — the blob previews don't.
-    try {
-      sessionStorage.setItem(
-        `agent:initial-turn:${sessionId}`,
-        JSON.stringify({
-          prompt,
-          settings: composerSettings,
-          skillName,
-          attachments: attachments
-            .filter((item) => item.status === 'uploaded' && item.url)
-            .map((item) => ({ ...item, preview: item.url })),
-        })
-      );
-    } catch {
-      // sessionStorage unavailable — chat page will start blank.
-    }
-    router.push(`/chat/${sessionId}`);
-  }
-
   return (
     <div className={cn('w-full', className)}>
-      <h1 className="text-foreground mx-auto max-w-3xl text-center font-serif text-3xl font-normal tracking-[-0.01em] sm:text-4xl">
-        {m['landing.hero.headline_1']()}
-      </h1>
+      {showHeading && (
+        <h1 className="text-foreground mx-auto max-w-3xl text-center font-serif text-3xl font-normal tracking-[-0.01em] sm:text-4xl">
+          {m['agent.home.headline']()}
+        </h1>
+      )}
 
-      <ChatComposer
-        className="mx-auto mt-10 max-w-3xl"
+      <GenerationWorkbench
+        className={cn(
+          'mx-auto max-w-3xl',
+          showHeading && 'mt-10',
+          workbenchClassName
+        )}
         textareaRef={textareaRef}
+        textareaClassName={textareaClassName}
         value={value}
         onValueChange={setValue}
-        onSubmit={handleSubmit}
+        onSubmit={submit}
         placeholder={m['agent.home.placeholder']()}
         attachments={attachments}
         onAddFiles={(files) => void addFiles(files)}
@@ -408,91 +312,163 @@ export function PromptLauncher({ className }: { className?: string }) {
         submitDisabled={(!value.trim() && !hasUploaded) || uploading}
       />
 
-      <section className="mx-auto mt-14 max-w-3xl">
-        <h2 className="text-foreground text-sm font-medium">
-          {m['landing.examples.recommended']()}
-        </h2>
-        <div className="mt-4 columns-2 gap-2 sm:columns-3 lg:columns-4">
-          {examples.map((example, index) => {
-            return (
-              <button
-                key={example.key}
-                type="button"
-                onClick={() => setPreviewIndex(index)}
-                title={example.prompt}
-                aria-label={example.title}
-                className="border-border bg-muted group focus-visible:ring-primary relative mb-2 block w-full break-inside-avoid overflow-hidden rounded-lg border text-left focus-visible:ring-2 focus-visible:outline-none focus-visible:ring-inset"
-                style={{
-                  aspectRatio:
-                    EXAMPLE_ASPECT_RATIOS[index % EXAMPLE_ASPECT_RATIOS.length],
-                }}
-              >
-                {example.video && (
-                  <ViewportVideo
-                    src={example.video}
-                    className="size-full object-cover transition-transform duration-500 group-hover:scale-[1.025]"
-                  />
-                )}
-                <span className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/5 opacity-20 transition-opacity group-hover:opacity-70" />
-                <span className="pointer-events-none absolute top-1/2 left-1/2 flex size-10 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/20 bg-black/40 text-white opacity-0 shadow-lg backdrop-blur-md transition group-hover:scale-105 group-hover:opacity-100 group-focus-visible:opacity-100">
-                  <Play className="ml-0.5 size-3.5 fill-current" />
-                </span>
-                <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 to-transparent px-3 pt-8 pb-3 text-xs font-medium text-white opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
-                  {example.title}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </section>
+      {showQuickActions && (
+        <nav
+          aria-label={m['agent.quick_actions.label']()}
+          className="mx-auto mt-5 flex max-w-full items-center gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
+          <SkillsQuickPicker
+            skillName={skillName}
+            onSkillNameChange={(nextSkillName) => {
+              setSkillName(nextSkillName);
+              textareaRef.current?.focus();
+            }}
+          />
+          <QuickAction
+            icon={Play}
+            label={m['agent.quick_actions.video_ads']()}
+            onClick={() => {
+              setComposerSettings({ ...composerSettings, mediaMode: 'video' });
+              textareaRef.current?.focus();
+            }}
+          />
+          <QuickAction
+            icon={ImageIcon}
+            label={m['agent.quick_actions.image_ads']()}
+            onClick={() => {
+              setComposerSettings({ ...composerSettings, mediaMode: 'image' });
+              textareaRef.current?.focus();
+            }}
+          />
+          <QuickAction
+            icon={Search}
+            label={m['agent.quick_actions.competitor_research']()}
+            onClick={() =>
+              fillPrompt(m['agent.quick_actions.competitor_prompt']())
+            }
+          />
+          <QuickAction
+            icon={GraduationCap}
+            label={m['agent.quick_actions.watch_tutorial']()}
+            onClick={() => {
+              if (examples.length > 0) setPreviewIndex(0);
+            }}
+          />
+        </nav>
+      )}
 
-      <VideoPreviewDialog
-        open={preview !== null}
-        item={
-          preview?.video
-            ? {
-                src: preview.video,
-                title: preview.title,
-                prompt: preview.prompt,
-              }
-            : null
-        }
-        index={previewIndex ?? -1}
-        total={examples.length}
-        labels={{
-          video: m['showcase.dialog.video'](),
-          prompt: m['showcase.dialog.prompt'](),
-          download: m['showcase.dialog.download'](),
-          previous: m['showcase.dialog.previous'](),
-          next: m['showcase.dialog.next'](),
-          close: m['showcase.dialog.close'](),
-        }}
-        downloadHref={preview?.video ?? '#'}
-        onClose={() => setPreviewIndex(null)}
-        onNavigate={navigatePreview}
-        actions={
-          preview ? (
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
-              <button
-                type="button"
-                onClick={usePreviewPrompt}
-                className="bg-primary text-primary-foreground focus-visible:ring-primary flex h-11 w-full items-center justify-center gap-2 rounded-xl px-4 text-sm font-medium transition-colors hover:opacity-90 focus-visible:ring-2 focus-visible:outline-none"
-              >
-                <WandSparkles className="size-4" />
-                {m['showcase.dialog.use_prompt']()}
-              </button>
-              <button
-                type="button"
-                onClick={usePreviewAsReference}
-                className="focus-visible:ring-primary flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-white/12 bg-white/5 px-4 text-sm font-medium text-white transition-colors hover:bg-white/10 focus-visible:ring-2 focus-visible:outline-none"
-              >
-                <FileVideo2 className="size-4" />
-                {m['showcase.dialog.use_reference']()}
-              </button>
-            </div>
-          ) : null
-        }
-      />
+      {showExamples && (
+        <section className="mx-auto mt-14 max-w-3xl">
+          <h2 className="text-foreground text-sm font-medium">
+            {m['landing.examples.recommended']()}
+          </h2>
+          <div className="mt-4 columns-2 gap-2 sm:columns-3 lg:columns-4">
+            {examples.map((example, index) => {
+              return (
+                <button
+                  key={example.key}
+                  type="button"
+                  onClick={() => setPreviewIndex(index)}
+                  title={example.prompt}
+                  aria-label={example.title}
+                  className="border-border bg-muted group focus-visible:ring-primary relative mb-2 block w-full break-inside-avoid overflow-hidden rounded-lg border text-left focus-visible:ring-2 focus-visible:outline-none focus-visible:ring-inset"
+                  style={{
+                    aspectRatio:
+                      EXAMPLE_ASPECT_RATIOS[
+                        index % EXAMPLE_ASPECT_RATIOS.length
+                      ],
+                  }}
+                >
+                  {example.video && (
+                    <ViewportVideo
+                      src={example.video}
+                      className="size-full object-cover transition-transform duration-500 group-hover:scale-[1.025]"
+                    />
+                  )}
+                  <span className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/5 opacity-20 transition-opacity group-hover:opacity-70" />
+                  <span className="pointer-events-none absolute top-1/2 left-1/2 flex size-10 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/20 bg-black/40 text-white opacity-0 shadow-lg backdrop-blur-md transition group-hover:scale-105 group-hover:opacity-100 group-focus-visible:opacity-100">
+                    <Play className="ml-0.5 size-3.5 fill-current" />
+                  </span>
+                  <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 to-transparent px-3 pt-8 pb-3 text-xs font-medium text-white opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
+                    {example.title}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      {(showExamples || showQuickActions) && (
+        <VideoPreviewDialog
+          open={preview !== null}
+          item={
+            preview?.video
+              ? {
+                  src: preview.video,
+                  title: preview.title,
+                  prompt: preview.prompt,
+                }
+              : null
+          }
+          index={previewIndex ?? -1}
+          total={examples.length}
+          labels={{
+            video: m['showcase.dialog.video'](),
+            prompt: m['showcase.dialog.prompt'](),
+            download: m['showcase.dialog.download'](),
+            previous: m['showcase.dialog.previous'](),
+            next: m['showcase.dialog.next'](),
+            close: m['showcase.dialog.close'](),
+          }}
+          downloadHref={preview?.video ?? '#'}
+          onClose={() => setPreviewIndex(null)}
+          onNavigate={navigatePreview}
+          actions={
+            preview ? (
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
+                <button
+                  type="button"
+                  onClick={usePreviewPrompt}
+                  className="bg-primary text-primary-foreground focus-visible:ring-primary flex h-11 w-full items-center justify-center gap-2 rounded-xl px-4 text-sm font-medium transition-colors hover:opacity-90 focus-visible:ring-2 focus-visible:outline-none"
+                >
+                  <WandSparkles className="size-4" />
+                  {m['showcase.dialog.use_prompt']()}
+                </button>
+                <button
+                  type="button"
+                  onClick={usePreviewAsReference}
+                  className="focus-visible:ring-primary flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-white/12 bg-white/5 px-4 text-sm font-medium text-white transition-colors hover:bg-white/10 focus-visible:ring-2 focus-visible:outline-none"
+                >
+                  <FileVideo2 className="size-4" />
+                  {m['showcase.dialog.use_reference']()}
+                </button>
+              </div>
+            ) : null
+          }
+        />
+      )}
     </div>
+  );
+}
+
+function QuickAction({
+  icon: Icon,
+  label,
+  onClick,
+}: {
+  icon: typeof Sparkles;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="border-border text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-primary flex h-10 shrink-0 items-center gap-2 rounded-full border px-4 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none"
+    >
+      <Icon aria-hidden="true" className="size-4" />
+      {label}
+    </button>
   );
 }

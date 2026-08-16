@@ -1,7 +1,14 @@
+import {
+  VIDEO_GENERATION_KINDS,
+  type VideoGenerationKind,
+} from '@/lib/agent-settings';
+
 import type {
   AgentAssistantMessageMetadataV1,
+  AgentMediaType,
   AgentMessageMetadata,
   AgentTurnMetadataV1,
+  AgentVerifiedMedia,
 } from './types';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -20,6 +27,35 @@ function stringArray(value: unknown): string[] | null {
   if (!Array.isArray(value) || !value.every(isNonEmptyString)) return null;
   if (new Set(value).size !== value.length) return null;
   return [...value];
+}
+
+function mediaType(value: unknown): AgentMediaType | null {
+  return value === 'image' || value === 'audio' || value === 'video'
+    ? value
+    : null;
+}
+
+function videoOperation(value: unknown): VideoGenerationKind | null {
+  return (VIDEO_GENERATION_KINDS as readonly unknown[]).includes(value)
+    ? (value as VideoGenerationKind)
+    : null;
+}
+
+function verifiedMediaArray(value: unknown): AgentVerifiedMedia[] | null {
+  if (value === undefined) return [];
+  if (!Array.isArray(value)) return null;
+  const parsed: AgentVerifiedMedia[] = [];
+  const seen = new Set<string>();
+  for (const item of value) {
+    if (!isRecord(item)) return null;
+    const type = mediaType(item.mediaType);
+    if (!type || !isNonEmptyString(item.url)) return null;
+    const key = `${type}\u0000${item.url}`;
+    if (seen.has(key)) return null;
+    seen.add(key);
+    parsed.push({ mediaType: type, url: item.url });
+  }
+  return parsed;
 }
 
 export function parseAgentMessageMetadata(
@@ -48,6 +84,11 @@ export function parseAgentMessageMetadata(
   if (value.kind !== 'user') return null;
   const toolNames = stringArray(value.toolNames);
   const longRunningToolNames = stringArray(value.longRunningToolNames);
+  const media = verifiedMediaArray(value.media);
+  const generationVideoOperation =
+    value.generationVideoOperation === undefined
+      ? undefined
+      : videoOperation(value.generationVideoOperation);
   if (
     !isNonEmptyString(value.agentDefinitionId) ||
     !isNonEmptyString(value.businessPromptHash) ||
@@ -59,6 +100,10 @@ export function parseAgentMessageMetadata(
     !isNullableString(value.skillReleaseId) ||
     !toolNames ||
     !longRunningToolNames ||
+    !media ||
+    (value.generationEntrySource !== undefined &&
+      !isNonEmptyString(value.generationEntrySource)) ||
+    generationVideoOperation === null ||
     longRunningToolNames.some((name) => !toolNames.includes(name))
   ) {
     return null;
@@ -78,6 +123,11 @@ export function parseAgentMessageMetadata(
     skillReleaseId: value.skillReleaseId,
     toolNames,
     longRunningToolNames,
+    ...(isNonEmptyString(value.generationEntrySource)
+      ? { generationEntrySource: value.generationEntrySource }
+      : {}),
+    ...(generationVideoOperation ? { generationVideoOperation } : {}),
+    ...(media.length > 0 ? { media } : {}),
   } satisfies AgentTurnMetadataV1;
 }
 

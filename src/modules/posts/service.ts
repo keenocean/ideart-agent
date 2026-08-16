@@ -2,6 +2,7 @@ import { and, count, desc, eq, like, or, type SQL } from 'drizzle-orm';
 
 import { db } from '@/core/db';
 import { post } from '@/config/db/schema';
+import { isSupportedLocale } from '@/config/locale';
 import { getUuid } from '@/lib/hash';
 
 export enum PostType {
@@ -30,6 +31,13 @@ export function normalizePostSlug(value: string): string {
     );
   }
   return slug;
+}
+
+export function normalizePostLocale(value: string): string {
+  const locale = value.trim();
+  if (!locale) throw new Error('Locale is required');
+  if (!isSupportedLocale(locale)) throw new Error('Unsupported locale');
+  return locale;
 }
 
 export function isValidPostSlug(value: unknown): value is string {
@@ -117,9 +125,7 @@ export async function listPublishedArticles(
     eq(post.type, PostType.ARTICLE),
     eq(post.status, PostStatus.PUBLISHED),
   ];
-  if (locale) {
-    conditions.push(or(eq(post.locale, locale), eq(post.locale, ''))!);
-  }
+  if (locale !== undefined) conditions.push(eq(post.locale, locale));
   const query = db()
     .select({
       id: post.id,
@@ -148,9 +154,7 @@ export async function listPublishedArticleDetails(
     eq(post.type, PostType.ARTICLE),
     eq(post.status, PostStatus.PUBLISHED),
   ];
-  if (locale) {
-    conditions.push(or(eq(post.locale, locale), eq(post.locale, ''))!);
-  }
+  if (locale !== undefined) conditions.push(eq(post.locale, locale));
   const query = db()
     .select({
       id: post.id,
@@ -174,25 +178,20 @@ export async function listPublishedArticleDetails(
 
 export async function findPublishedBySlug(
   slug: string,
-  locale?: string
+  locale: string
 ): Promise<Post | undefined> {
   const conditions: SQL[] = [
     eq(post.slug, slug.trim().toLowerCase()),
     eq(post.type, PostType.ARTICLE),
     eq(post.status, PostStatus.PUBLISHED),
+    eq(post.locale, locale),
   ];
-  if (locale) {
-    conditions.push(or(eq(post.locale, locale), eq(post.locale, ''))!);
-  }
   const results = (await db()
     .select()
     .from(post)
     .where(and(...conditions))
-    .limit(locale ? 2 : 1)) as Post[];
-  return locale
-    ? results.find((item) => item.locale === locale) ||
-        results.find((item) => item.locale === '')
-    : results[0];
+    .limit(1)) as Post[];
+  return results[0];
 }
 
 export async function listPublishedLocalesBySlug(
@@ -208,7 +207,20 @@ export async function listPublishedLocalesBySlug(
         eq(post.status, PostStatus.PUBLISHED)
       )
     )) as Array<Pick<Post, 'locale'>>;
-  return [...new Set(rows.map((item) => item.locale))];
+  return [...new Set(rows.map((item) => item.locale).filter(Boolean))];
+}
+
+export async function listPublishedArticleLocales(): Promise<string[]> {
+  const rows = (await db()
+    .select({ locale: post.locale })
+    .from(post)
+    .where(
+      and(
+        eq(post.type, PostType.ARTICLE),
+        eq(post.status, PostStatus.PUBLISHED)
+      )
+    )) as Array<Pick<Post, 'locale'>>;
+  return [...new Set(rows.map((item) => item.locale).filter(Boolean))];
 }
 
 export async function getById(id: string) {
@@ -223,7 +235,7 @@ export async function getById(id: string) {
 export async function create(data: {
   userId: string;
   slug: string;
-  locale?: string;
+  locale: string;
   title: string;
   description?: string;
   image?: string;
@@ -236,7 +248,7 @@ export async function create(data: {
     id: getUuid(),
     userId: data.userId,
     slug: normalizePostSlug(data.slug),
-    locale: data.locale || '',
+    locale: normalizePostLocale(data.locale),
     type: PostType.ARTICLE,
     title: data.title,
     description: data.description || '',
@@ -267,6 +279,9 @@ export async function update(
   const updateData: any = { ...data };
   if (updateData.slug !== undefined) {
     updateData.slug = normalizePostSlug(updateData.slug);
+  }
+  if (updateData.locale !== undefined) {
+    updateData.locale = normalizePostLocale(updateData.locale);
   }
   await db().update(post).set(updateData).where(eq(post.id, id));
   return getById(id);

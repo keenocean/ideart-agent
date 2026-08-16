@@ -2,6 +2,8 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { createFileRoute } from '@tanstack/react-router';
 
+import { createAgentMediaReceipt } from '@/core/agent/media-receipt';
+import type { AgentMediaType } from '@/core/agent/types';
 import { getAuth } from '@/core/auth';
 import { envConfigs } from '@/config';
 import { getStorage } from '@/modules/storage/service';
@@ -48,6 +50,16 @@ const extFromMime = (mimeType: string) => {
   };
   return map[mimeType] || '';
 };
+
+function mediaTypeFromMime(mimeType: string): AgentMediaType {
+  if (mimeType.startsWith('audio/')) return 'audio';
+  if (mimeType.startsWith('video/')) return 'video';
+  return 'image';
+}
+
+function isAgentUploadChatId(value: unknown): value is string {
+  return typeof value === 'string' && /^s-\d{10,}-[a-z0-9]{4,}$/.test(value);
+}
 
 // Cap for the no-storage local-disk fallback (dev). Configurable via INLINE_IMAGE_MAX_KB.
 const INLINE_MAX_BYTES =
@@ -110,7 +122,7 @@ function hasExpectedSignature(bytes: Uint8Array, mimeType: string): boolean {
   return false;
 }
 
-async function POST({ request }: { request: Request }) {
+export async function POST({ request }: { request: Request }) {
   const limited = enforceMinIntervalRateLimit(request, {
     intervalMs: 1000,
     keyPrefix: 'upload-image',
@@ -125,9 +137,17 @@ async function POST({ request }: { request: Request }) {
     const formData = await request.formData();
     const files = formData.getAll('files') as File[];
     const referenceMedia = formData.get('referenceMedia') === 'true';
+    const chatId = formData.get('chatId');
+    const receiptChatId =
+      referenceMedia && isAgentUploadChatId(chatId) ? chatId : null;
     const allowedTypes = referenceMedia
       ? ALLOWED_REFERENCE_TYPES
       : ALLOWED_IMAGE_TYPES;
+    if (referenceMedia && !isAgentUploadChatId(chatId)) {
+      return respErr('Valid chatId is required for reference media uploads', {
+        status: 400,
+      });
+    }
     if (!files.length) return respErr('No files provided');
     if (files.length > MAX_FILES_PER_UPLOAD) {
       return respErr(`Upload at most ${MAX_FILES_PER_UPLOAD} files at once`, {
@@ -155,6 +175,8 @@ async function POST({ request }: { request: Request }) {
       url: string;
       key: string;
       filename: string;
+      mediaType: AgentMediaType;
+      receipt?: string;
       deduped: boolean;
     }> = [];
 
@@ -192,6 +214,7 @@ async function POST({ request }: { request: Request }) {
       // R2Provider prepends its own uploadPath (default `uploads`), so the object
       // key is the bare filename. The local fallback uses `public/uploads/<file>`.
       const objectKey = `${digest}.${ext}`;
+      const mediaType = mediaTypeFromMime(file.type);
 
       // No storage configured → persist to public/uploads and return a short
       // local URL. Avoids inlining a giant base64 data URL into DB columns (some
@@ -204,6 +227,17 @@ async function POST({ request }: { request: Request }) {
           url: `/uploads/${objectKey}`,
           key: `uploads/${objectKey}`,
           filename: file.name,
+          mediaType,
+          ...(receiptChatId
+            ? {
+                receipt: await createAgentMediaReceipt({
+                  userId: session.user.id,
+                  chatId: receiptChatId,
+                  mediaType,
+                  url: `/uploads/${objectKey}`,
+                }),
+              }
+            : {}),
           deduped: false,
         });
         continue;
@@ -217,6 +251,17 @@ async function POST({ request }: { request: Request }) {
             url: publicUrl,
             key: objectKey,
             filename: file.name,
+            mediaType,
+            ...(receiptChatId
+              ? {
+                  receipt: await createAgentMediaReceipt({
+                    userId: session.user.id,
+                    chatId: receiptChatId,
+                    mediaType,
+                    url: publicUrl,
+                  }),
+                }
+              : {}),
             deduped: true,
           });
           continue;
@@ -238,6 +283,17 @@ async function POST({ request }: { request: Request }) {
         url: result.url,
         key: result.key || objectKey,
         filename: file.name,
+        mediaType,
+        ...(receiptChatId
+          ? {
+              receipt: await createAgentMediaReceipt({
+                userId: session.user.id,
+                chatId: receiptChatId,
+                mediaType,
+                url: result.url,
+              }),
+            }
+          : {}),
         deduped: false,
       });
     }

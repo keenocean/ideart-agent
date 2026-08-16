@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { EvoLinkProvider } from './evolink';
+import { EvoLinkProvider, formatEvoLinkVideoOptions } from './evolink';
 import { AIMediaType, AITaskStatus } from './types';
 
 const TEST_API_KEY = ['test', 'evolink', 'credential'].join('-');
@@ -88,7 +88,7 @@ describe('EvoLinkProvider', () => {
     });
   });
 
-  it('submits Seedance video options unchanged', async () => {
+  it('maps normalized Seedance media inputs to EvoLink URL fields', async () => {
     const request = vi.fn(
       async (_input: string | URL | Request, _init?: RequestInit) =>
         response({ id: 'task-video-1', status: 'pending', type: 'video' })
@@ -110,6 +110,8 @@ describe('EvoLinkProvider', () => {
           aspect_ratio: '16:9',
           generate_audio: true,
           image_input: ['https://cdn.example.com/start.png'],
+          video_input: ['https://cdn.example.com/motion.mp4'],
+          audio_input: ['https://cdn.example.com/voice.mp3'],
         },
       },
     });
@@ -122,6 +124,8 @@ describe('EvoLinkProvider', () => {
       aspect_ratio: '16:9',
       generate_audio: true,
       image_urls: ['https://cdn.example.com/start.png'],
+      video_urls: ['https://cdn.example.com/motion.mp4'],
+      audio_urls: ['https://cdn.example.com/voice.mp3'],
       model: 'seedance-2.0-image-to-video',
       prompt: 'slow cinematic push-in',
     });
@@ -167,5 +171,95 @@ describe('EvoLinkProvider', () => {
         },
       })
     ).rejects.toThrow('Invalid model');
+  });
+});
+
+describe('formatEvoLinkVideoOptions', () => {
+  it('maps Seedance 2.0 image-to-video settings', () => {
+    expect(
+      formatEvoLinkVideoOptions('seedance-2.0-image-to-video', {
+        aspect_ratio: '16:9',
+        duration: 8,
+        resolution: '1080p',
+        generate_audio: true,
+        image_input: [
+          'https://cdn.example.com/start.png',
+          'https://cdn.example.com/end.png',
+          'https://cdn.example.com/ignored.png',
+        ],
+      })
+    ).toEqual({
+      aspect_ratio: '16:9',
+      duration: 8,
+      quality: '1080p',
+      generate_audio: true,
+      image_input: [
+        'https://cdn.example.com/start.png',
+        'https://cdn.example.com/end.png',
+      ],
+    });
+  });
+
+  it('maps Seedance 2.5 animate, reference, edit, and extend settings', () => {
+    expect(
+      formatEvoLinkVideoOptions('seedance-2.5-image-to-video', {
+        aspect_ratio: 'auto',
+        duration: 30,
+        resolution: '720p',
+        image_input: [
+          'https://cdn.example.com/start.png',
+          'https://cdn.example.com/end.png',
+          'https://cdn.example.com/ignored.png',
+        ],
+      })
+    ).toEqual({
+      aspect_ratio: 'adaptive',
+      duration: 30,
+      quality: '720p',
+      generate_audio: true,
+      image_input: [
+        'https://cdn.example.com/start.png',
+        'https://cdn.example.com/end.png',
+      ],
+    });
+    expect(
+      formatEvoLinkVideoOptions('seedance-2.5-reference-to-video', {
+        aspect_ratio: '9:16',
+        duration: 12,
+        resolution: '720p',
+        reference_image_urls: ['https://cdn.example.com/subject.png'],
+        reference_video_urls: ['https://cdn.example.com/motion.mp4'],
+        reference_audio_urls: ['https://cdn.example.com/voice.mp3'],
+      })
+    ).toEqual({
+      aspect_ratio: '9:16',
+      duration: 12,
+      quality: '720p',
+      generate_audio: true,
+      image_input: ['https://cdn.example.com/subject.png'],
+      video_input: ['https://cdn.example.com/motion.mp4'],
+      audio_input: ['https://cdn.example.com/voice.mp3'],
+    });
+    expect(
+      formatEvoLinkVideoOptions('seedance-2.5-video-edit', {
+        duration: 5,
+        resolution: '720p',
+        video_input: ['https://cdn.example.com/source.mp4'],
+      })
+    ).toEqual({
+      quality: '720p',
+      video_input: ['https://cdn.example.com/source.mp4'],
+    });
+    expect(
+      formatEvoLinkVideoOptions('seedance-2.5-video-extend', {
+        duration: 20,
+        resolution: '480p',
+        video_input: ['https://cdn.example.com/source.mp4'],
+      })
+    ).toEqual({
+      duration: 20,
+      quality: '480p',
+      video_input: ['https://cdn.example.com/source.mp4'],
+    });
   });
 });

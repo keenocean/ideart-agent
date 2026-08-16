@@ -97,6 +97,9 @@ export class S3Provider implements StorageProvider {
         'Content-Disposition': options.disposition || 'inline',
         'Content-Length': bodyArray.length.toString(),
       };
+      if (options.cacheControl) {
+        headers['Cache-Control'] = options.cacheControl;
+      }
 
       const request = new Request(url, {
         method: 'PUT',
@@ -165,6 +168,7 @@ export class S3Provider implements StorageProvider {
         bucket: options.bucket,
         contentType: options.contentType,
         disposition: options.disposition,
+        cacheControl: options.cacheControl,
       });
     } catch (error) {
       return {

@@ -25,6 +25,9 @@ wrangler.jsonc
 # Generated immutable Agent Skill releases (published to private R2)
 /.agent-skills/
 
+# Generated immutable marketing content releases (published to private R2)
+/.marketing-content/
+
 # claude code local state
 .claude/scheduled_tasks.lock
 
