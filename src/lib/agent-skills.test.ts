@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   classifyAgentPromptSkill,
   filterAgentPromptSkills,
+  getAgentSkillPreviewMetadata,
   normalizeAgentPromptSkills,
   normalizeSavedSkillNames,
   skillCardTone,
@@ -49,7 +50,8 @@ describe('normalizeAgentPromptSkills', () => {
       classifyAgentPromptSkill({
         name: 'ads-cinematic-skill',
         label: 'Ads Cinematic',
-        description: 'A film-look direction system',
+        description:
+          'A film-look direction system and the counterpart to UGC rendering',
       })
     ).toBe('video');
   });
@@ -80,6 +82,30 @@ describe('normalizeAgentPromptSkills', () => {
         query: 'premium',
       }).map((skill) => skill.name)
     ).toEqual(['ads-cinematic-skill']);
+  });
+
+  it('derives compact best-for and style tags for the quick picker', () => {
+    expect(
+      getAgentSkillPreviewMetadata({
+        name: 'ugc-confessional',
+        label: 'UGC Confessional',
+        description:
+          'A vertical 9:16 creator-to-camera UGC ad with fast cuts and authentic iPhone texture.',
+      })
+    ).toEqual({
+      bestFor: [
+        'TikTok UGC',
+        'Instagram Reels',
+        'testimonial videos',
+        'POV creator ads',
+      ],
+      style: [
+        'vertical 9:16',
+        'creator-to-camera',
+        'fast cuts',
+        'authentic iPhone texture',
+      ],
+    });
   });
 
   it('normalizes saved skill storage and assigns deterministic cover tones', () => {

@@ -33,6 +33,17 @@ const categoryIcons = {
   other: Sparkles,
 } satisfies Record<AgentSkillCategory, typeof Sparkles>;
 
+export function SkillCategoryIcon({
+  category,
+  className,
+}: {
+  category: AgentSkillCategory;
+  className?: string;
+}) {
+  const Icon = categoryIcons[category];
+  return <Icon aria-hidden="true" className={className} />;
+}
+
 export function SkillCover({
   skill,
   className,
@@ -75,7 +86,6 @@ export function SkillCategoryBadge({
   label: string;
   className?: string;
 }) {
-  const Icon = categoryIcons[category];
   return (
     <span
       className={cn(
@@ -83,7 +93,7 @@ export function SkillCategoryBadge({
         className
       )}
     >
-      <Icon aria-hidden="true" className="size-3.5" />
+      <SkillCategoryIcon category={category} className="size-3.5" />
       {label}
     </span>
   );

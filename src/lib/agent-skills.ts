@@ -27,6 +27,11 @@ export interface AgentSkillDetailResponseItem {
   referencePaths: string[];
 }
 
+export interface AgentSkillPreviewMetadata {
+  bestFor: string[];
+  style: string[];
+}
+
 function isValidSkillName(value: string): boolean {
   return /^[a-zA-Z0-9_.:-]+$/.test(value);
 }
@@ -59,10 +64,16 @@ const CATEGORY_PATTERNS: ReadonlyArray<{
 export function classifyAgentPromptSkill(
   skill: AgentPromptSkill
 ): AgentSkillCategory {
-  const searchable = `${skill.name} ${skill.label} ${skill.description ?? ''}`;
+  const identity = `${skill.name} ${skill.label}`;
+  const identityCategory = CATEGORY_PATTERNS.find(({ pattern }) =>
+    pattern.test(identity)
+  )?.category;
+  if (identityCategory) return identityCategory;
+
   return (
-    CATEGORY_PATTERNS.find(({ pattern }) => pattern.test(searchable))
-      ?.category ?? 'other'
+    CATEGORY_PATTERNS.find(({ pattern }) =>
+      pattern.test(skill.description ?? '')
+    )?.category ?? 'other'
   );
 }
 
@@ -80,6 +91,69 @@ export function filterAgentPromptSkills(
       .toLocaleLowerCase()
       .includes(normalizedQuery);
   });
+}
+
+const BEST_FOR_BY_CATEGORY = {
+  ugc: [
+    'TikTok UGC',
+    'Instagram Reels',
+    'testimonial videos',
+    'POV creator ads',
+  ],
+  video: ['video ads', 'TikTok', 'Instagram Reels', 'YouTube Shorts'],
+  static: ['image ads', 'social feeds', 'display creative', 'carousels'],
+  product: ['ecommerce', 'product launches', 'marketplace ads', 'retail'],
+  other: ['creative workflows', 'campaign concepts', 'production briefs'],
+} satisfies Record<AgentSkillCategory, string[]>;
+
+const STYLE_TAG_RULES: ReadonlyArray<{
+  pattern: RegExp;
+  label: string;
+}> = [
+  { pattern: /\b(vertical|9:16)\b/i, label: 'vertical 9:16' },
+  {
+    pattern: /\b(creator[- ]to[- ]camera|talking[- ]head|spokesperson)\b/i,
+    label: 'creator-to-camera',
+  },
+  { pattern: /\b(fast[- ]?cuts?|rapid[- ]?cuts?)\b/i, label: 'fast cuts' },
+  {
+    pattern: /\b(iphone|authentic texture|phone[- ]shot)\b/i,
+    label: 'authentic iPhone texture',
+  },
+  {
+    pattern: /\b(cinematic|film[- ]look|film look)\b/i,
+    label: 'cinematic',
+  },
+  { pattern: /\b(animated|animation|3d)\b/i, label: 'animated' },
+  { pattern: /\b(luxury|editorial|premium)\b/i, label: 'editorial' },
+  { pattern: /\b(split[- ]screen)\b/i, label: 'split screen' },
+  { pattern: /\b(static|image ad|carousel)\b/i, label: 'static composition' },
+];
+
+const FALLBACK_STYLE_BY_CATEGORY = {
+  ugc: ['authentic', 'creator-led'],
+  video: ['story-driven', 'motion-first'],
+  static: ['feed-native', 'graphic-led'],
+  product: ['product-led', 'conversion-focused'],
+  other: ['guided workflow'],
+} satisfies Record<AgentSkillCategory, string[]>;
+
+export function getAgentSkillPreviewMetadata(
+  skill: AgentPromptSkill
+): AgentSkillPreviewMetadata {
+  const category = classifyAgentPromptSkill(skill);
+  const searchable = `${skill.name} ${skill.label} ${skill.description ?? ''}`;
+  const derivedStyle = STYLE_TAG_RULES.filter(({ pattern }) =>
+    pattern.test(searchable)
+  ).map(({ label }) => label);
+
+  return {
+    bestFor: BEST_FOR_BY_CATEGORY[category].slice(0, 4),
+    style: (derivedStyle.length > 0
+      ? derivedStyle
+      : FALLBACK_STYLE_BY_CATEGORY[category]
+    ).slice(0, 4),
+  };
 }
 
 export function normalizeSavedSkillNames(value: unknown): string[] {

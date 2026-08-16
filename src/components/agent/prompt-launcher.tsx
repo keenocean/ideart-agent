@@ -11,7 +11,6 @@ import {
 import { toast } from 'sonner';
 
 import { useSession } from '@/core/auth/client';
-import { Link } from '@/core/i18n/navigation';
 import {
   isLocalChatMediaUrl,
   publishChatMediaSources,
@@ -25,6 +24,7 @@ import {
   promptCategories,
   type PromptExample,
 } from '@/components/agent/prompt-examples';
+import { SkillsQuickPicker } from '@/components/agent/skills-quick-picker';
 import { VideoPreviewDialog } from '@/components/video-preview-dialog';
 import { ViewportVideo } from '@/components/viewport-video';
 
@@ -317,13 +317,13 @@ export function PromptLauncher({
           aria-label={m['agent.quick_actions.label']()}
           className="mx-auto mt-5 flex max-w-full items-center gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         >
-          <Link
-            href="/skills"
-            className="border-border text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-primary flex h-10 shrink-0 items-center gap-2 rounded-full border px-4 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none"
-          >
-            <Sparkles aria-hidden="true" className="size-4" />
-            {m['agent.quick_actions.skills']()}
-          </Link>
+          <SkillsQuickPicker
+            skillName={skillName}
+            onSkillNameChange={(nextSkillName) => {
+              setSkillName(nextSkillName);
+              textareaRef.current?.focus();
+            }}
+          />
           <QuickAction
             icon={Play}
             label={m['agent.quick_actions.video_ads']()}
