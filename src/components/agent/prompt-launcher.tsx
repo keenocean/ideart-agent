@@ -48,10 +48,14 @@ const EXAMPLE_ASPECT_RATIOS = [
  */
 export function PromptLauncher({
   className,
+  workbenchClassName,
+  textareaClassName,
   showHeading = true,
   showExamples = true,
 }: {
   className?: string;
+  workbenchClassName?: string;
+  textareaClassName?: string;
   showHeading?: boolean;
   showExamples?: boolean;
 }) {
@@ -274,8 +278,13 @@ export function PromptLauncher({
       )}
 
       <GenerationWorkbench
-        className={cn('mx-auto max-w-3xl', showHeading && 'mt-10')}
+        className={cn(
+          'mx-auto max-w-3xl',
+          showHeading && 'mt-10',
+          workbenchClassName
+        )}
         textareaRef={textareaRef}
+        textareaClassName={textareaClassName}
         value={value}
         onValueChange={setValue}
         onSubmit={submit}

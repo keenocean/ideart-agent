@@ -97,6 +97,7 @@ export interface ChatComposerProps {
     reference: string;
   };
   textareaRef?: RefObject<HTMLTextAreaElement | null>;
+  textareaClassName?: string;
   className?: string;
 }
 
@@ -135,6 +136,7 @@ export function ChatComposer({
   presentation = 'default',
   inputModeLabels,
   textareaRef,
+  textareaClassName,
   className,
 }: ChatComposerProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -282,7 +284,8 @@ export function ChatComposer({
         disabled={disabled}
         className={cn(
           'text-foreground placeholder:text-muted-foreground w-full resize-none rounded-3xl bg-transparent px-4 pt-4 pb-2 leading-relaxed focus:outline-none',
-          size === 'lg' ? 'min-h-[92px] text-sm' : 'min-h-[64px] text-sm'
+          size === 'lg' ? 'min-h-[92px] text-sm' : 'min-h-[64px] text-sm',
+          textareaClassName
         )}
       />
 

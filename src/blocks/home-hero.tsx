@@ -29,7 +29,9 @@ export function HomeHero() {
       </header>
 
       <PromptLauncher
-        className="mx-auto mt-8 max-w-3xl"
+        className="mt-8"
+        workbenchClassName="max-w-none"
+        textareaClassName="min-h-[112px] sm:min-h-[120px]"
         showHeading={false}
         showExamples={false}
       />
