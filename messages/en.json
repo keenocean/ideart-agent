@@ -1195,6 +1195,7 @@
   "agent.skills.style": "Style",
   "agent.skills.slash_command": "Slash command",
   "agent.skills.use": "Use skill",
+  "agent.skills.remove_selected": "Remove selected skill",
   "agent.skills.references": "Includes {count} reference files",
   "agent.skills.create_placeholder": "What do you want to create with this skill?",
   "agent.skills.create_hint": "This skill will guide the next generation.",

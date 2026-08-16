@@ -84,9 +84,8 @@ export function SkillsQuickPicker({
         side="bottom"
         sideOffset={10}
         style={{
-          width: 'calc(100vw - 1.5rem)',
-          maxWidth: '118rem',
-          height: 'min(clamp(24rem, 50vw, 34rem), var(--available-height))',
+          width: 'min(64rem, calc(100vw - 1.5rem))',
+          height: 'min(28rem, var(--available-height))',
         }}
         className="border-border bg-popover gap-0 overflow-hidden rounded-2xl border p-0 shadow-2xl"
       >
@@ -102,8 +101,8 @@ export function SkillsQuickPicker({
               'border-border flex min-h-0 min-w-0 flex-col'
             )}
           >
-            <div className="flex shrink-0 items-center gap-3 p-3">
-              <label className="bg-muted focus-within:ring-primary flex h-12 min-w-0 flex-1 items-center gap-3 rounded-xl px-4 focus-within:ring-2">
+            <div className="flex shrink-0 items-center gap-2.5 p-3">
+              <label className="bg-muted focus-within:ring-primary flex h-10 min-w-0 flex-1 items-center gap-2.5 rounded-xl px-3.5 focus-within:ring-2">
                 <Search
                   aria-hidden="true"
                   className="text-muted-foreground size-5 shrink-0"
@@ -116,13 +115,13 @@ export function SkillsQuickPicker({
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
                   placeholder={m['agent.skills.search_placeholder']()}
-                  className="placeholder:text-muted-foreground min-w-0 flex-1 bg-transparent text-base outline-none"
+                  className="placeholder:text-muted-foreground min-w-0 flex-1 bg-transparent text-sm outline-none"
                 />
               </label>
               <Link
                 href="/skills"
                 onClick={() => setOpen(false)}
-                className="bg-primary/10 text-primary hover:bg-primary/5 focus-visible:ring-primary flex h-12 shrink-0 items-center rounded-xl px-4 text-base font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none"
+                className="bg-primary/10 text-primary hover:bg-primary/5 focus-visible:ring-primary flex h-10 shrink-0 items-center rounded-xl px-4 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none"
               >
                 {m['agent.skills.browse_all']()}
               </Link>
@@ -158,7 +157,7 @@ export function SkillsQuickPicker({
                         onClick={() => setPreviewName(skill.name)}
                         onDoubleClick={() => applySkill(skill)}
                         className={cn(
-                          'focus-visible:ring-primary flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition-colors focus-visible:ring-2 focus-visible:outline-none',
+                          'focus-visible:ring-primary flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors focus-visible:ring-2 focus-visible:outline-none',
                           selected
                             ? 'bg-muted text-foreground'
                             : 'hover:bg-muted/70'
@@ -171,10 +170,10 @@ export function SkillsQuickPicker({
                           />
                         </span>
                         <span className="min-w-0 flex-1">
-                          <span className="text-foreground block truncate text-base font-medium sm:text-lg">
+                          <span className="text-foreground block truncate text-sm font-medium sm:text-base">
                             {skill.label}
                           </span>
-                          <span className="text-muted-foreground mt-1 block truncate text-sm">
+                          <span className="text-muted-foreground mt-0.5 block truncate text-xs">
                             {skill.description}
                           </span>
                         </span>
@@ -224,16 +223,16 @@ function SkillPreview({
         'border-border bg-muted/20 min-h-0 border-t md:flex'
       )}
     >
-      <div className="hidden min-h-0 flex-1 overflow-y-auto p-6 md:block">
+      <div className="hidden min-h-0 flex-1 overflow-y-auto p-5 md:block">
         <div className="flex items-center gap-3">
           <span className="text-muted-foreground flex size-9 shrink-0 items-center justify-center rounded-lg">
             <SkillCategoryIcon category={category} className="size-5" />
           </span>
-          <h3 className="text-foreground min-w-0 truncate text-xl font-medium">
+          <h3 className="text-foreground min-w-0 truncate text-lg font-medium">
             {skill.label}
           </h3>
         </div>
-        <p className="text-muted-foreground mt-6 line-clamp-4 text-sm leading-6">
+        <p className="text-muted-foreground mt-4 line-clamp-4 text-sm leading-6">
           {skill.description}
         </p>
         <Link
@@ -245,18 +244,18 @@ function SkillPreview({
         </Link>
 
         <MetadataTags
-          className="mt-7"
+          className="mt-5"
           label={m['agent.skills.best_for']()}
           tags={metadata.bestFor}
         />
         <MetadataTags
-          className="mt-6"
+          className="mt-5"
           label={m['agent.skills.style']()}
           tags={metadata.style}
         />
       </div>
 
-      <div className="border-border shrink-0 border-t p-3 md:p-6">
+      <div className="border-border shrink-0 border-t p-3 md:p-5">
         <p className="text-muted-foreground hidden text-xs font-medium md:block">
           {m['agent.skills.slash_command']()}
         </p>

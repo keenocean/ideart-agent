@@ -1195,6 +1195,7 @@
   "agent.skills.style": "风格",
   "agent.skills.slash_command": "Slash 命令",
   "agent.skills.use": "使用技能",
+  "agent.skills.remove_selected": "移除已选技能",
   "agent.skills.references": "包含 {count} 个参考文件",
   "agent.skills.create_placeholder": "你想用这个技能创作什么？",
   "agent.skills.create_hint": "下一次生成会由此技能指导。",

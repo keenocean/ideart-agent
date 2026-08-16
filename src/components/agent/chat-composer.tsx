@@ -5,7 +5,7 @@ import {
   type ReactNode,
   type RefObject,
 } from 'react';
-import { useInfiniteQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import {
   ArrowUp,
   Check,
@@ -16,6 +16,7 @@ import {
   Loader2,
   Paperclip,
   Plus,
+  Sparkles,
   Square,
   Type,
   X,
@@ -30,6 +31,10 @@ import type {
   AgentComposerSettings,
   VideoGenerationKind,
 } from '@/lib/agent-settings';
+import {
+  normalizeAgentPromptSkills,
+  type AgentSkillResponseItem,
+} from '@/lib/agent-skills';
 import { apiGet } from '@/lib/api-client';
 import type { GenerationInputPolicy } from '@/lib/generation-entry';
 import { isVideoUrl } from '@/lib/media';
@@ -175,6 +180,8 @@ export function ChatComposer({
   onRemoveAttachment,
   settings,
   onSettingsChange,
+  skillName,
+  onSkillNameChange,
   disabled = false,
   running = false,
   submitDisabled = false,
@@ -199,6 +206,18 @@ export function ChatComposer({
     ((inputPolicy.maximum ?? Number.POSITIVE_INFINITY) > 0 &&
       inputPolicy.accepts.length > 0);
   const fileAccept = fileAcceptFor(inputPolicy);
+  const skillsQuery = useQuery({
+    queryKey: ['agent-skills'],
+    queryFn: () =>
+      apiGet<{ items: AgentSkillResponseItem[] }>('/api/agent/skills'),
+    enabled: Boolean(skillName),
+    staleTime: 5 * 60 * 1000,
+  });
+  const selectedSkill = skillName
+    ? normalizeAgentPromptSkills(skillsQuery.data?.items ?? []).find(
+        (skill) => skill.name === skillName
+      )
+    : undefined;
 
   const attachmentLabels = {
     image: m['agent.composer.media_image'](),
@@ -317,6 +336,33 @@ export function ChatComposer({
               </div>
             );
           })}
+        </div>
+      )}
+
+      {skillName && (
+        <div className="flex max-w-full flex-wrap items-center px-4 pt-3">
+          <div
+            className="bg-primary/10 text-primary flex h-8 max-w-full min-w-0 items-center gap-1.5 rounded-full px-3 text-sm font-medium"
+            title={
+              selectedSkill?.description || selectedSkill?.label || skillName
+            }
+          >
+            <Sparkles aria-hidden="true" className="size-4 shrink-0" />
+            <span className="max-w-52 min-w-0 truncate">
+              {selectedSkill?.label || `/${skillName}`}
+            </span>
+            {onSkillNameChange && (
+              <button
+                type="button"
+                disabled={disabled}
+                onClick={() => onSkillNameChange(undefined)}
+                aria-label={m['agent.skills.remove_selected']()}
+                className="hover:bg-background/80 ml-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded-full opacity-70 transition-opacity hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <X aria-hidden="true" className="size-3.5" />
+              </button>
+            )}
+          </div>
         </div>
       )}
 
