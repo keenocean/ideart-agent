@@ -5,7 +5,7 @@
 // the generated .output/server/wrangler.json; deploy with `pnpm cf:deploy`.
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "video-agent",
+  "name": "agent-saas-template",
   // Pinned rather than left to the build, which stamps today's date — the
   // API rejects a date it considers to be in the future, so a machine
   // running ahead of Cloudflare's clock fails to deploy.
@@ -19,18 +19,18 @@
     // Server-side runtime fallbacks for the build-time VITE_* values — keep in
     // sync with .env.production (better-auth trustedOrigins, payment callbacks).
     "VITE_APP_URL": "https://<worker>.<your-subdomain>.workers.dev",
-    "VITE_APP_NAME": "Video Agent",
+    "VITE_APP_NAME": "Agent Starter",
     // Immutable content hash printed by `pnpm skills:build`. Publish it to
     // the private bucket with `pnpm skills:publish -- --bucket=<name>`.
     "AGENT_SKILLS_RELEASE": "REPLACE_WITH_OUTPUT_OF_PNPM_SKILLS_BUILD",
-    // Built from messages/marketing. Publish objects before the manifest, then
+    // Built from product/marketing. Publish objects before the manifest, then
     // pin this id and deploy so Catalog + content switch atomically.
     "MARKETING_CONTENT_RELEASE": "REPLACE_WITH_OUTPUT_OF_PNPM_MARKETING_SYNC_CONTENT_RELEASE",
   },
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "video-agent-db",
+      "database_name": "REPLACE_WITH_D1_DATABASE_NAME",
       "database_id": "REPLACE_WITH_OUTPUT_OF_WRANGLER_D1_CREATE",
       "migrations_dir": "drizzle",
     },

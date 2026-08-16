@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 
-const STORAGE_KEY = 'video-agent:composer-skill';
+const STORAGE_KEY = 'agent-saas:composer-skill';
 
 function readStoredSkillName(): string | undefined {
   try {

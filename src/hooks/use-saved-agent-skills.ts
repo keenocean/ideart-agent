@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { normalizeSavedSkillNames } from '@/lib/agent-skills';
 
-const STORAGE_KEY = 'video-agent:saved-skills';
+const STORAGE_KEY = 'agent-saas:saved-skills';
 
 function readSavedSkills(): string[] {
   try {

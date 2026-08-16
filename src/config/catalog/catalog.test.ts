@@ -196,7 +196,7 @@ describe('Catalog contract', () => {
   });
 
   it('enforces publication, availability, placement and input-policy states', () => {
-    const base = catalog.find(
+    const base = toolCatalog.find(
       (entry) => entry.entityId === 'ai-image-generator'
     )!;
     const comingSoonIndexable = {
@@ -252,7 +252,7 @@ describe('Catalog contract', () => {
       /archetype\/media mode mismatch/
     );
 
-    const textTool = catalog.find(
+    const textTool = toolCatalog.find(
       (entry) => entry.entityId === 'text-to-video'
     )!;
     const invalidOperation = {
@@ -271,7 +271,7 @@ describe('Catalog contract', () => {
       /archetype\/video operation mismatch/
     );
 
-    const imageToVideo = catalog.find(
+    const imageToVideo = toolCatalog.find(
       (entry) => entry.entityId === 'image-to-video'
     )!;
     const widenedInput = {

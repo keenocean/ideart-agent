@@ -2,6 +2,7 @@ export * from './generation';
 export * from './legacy-routes';
 export * from './models';
 export * from './paths';
+export * from './product-catalog';
 export * from './readiness';
 export * from './registry';
 export * from './resolver';

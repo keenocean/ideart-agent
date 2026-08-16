@@ -83,7 +83,7 @@ export const DEFAULT_RESOLUTION = '2K';
 export const DEFAULT_DURATION = 5;
 
 /**
- * Video Agent starts from the shipany-video-lite catalog and adds provider-
+ * The agent runtime starts from the ShipAny video catalog and adds provider-
  * specific models only under distinct picker keys. Never map an older provider
  * model to a newer label: the picker key is also the pricing and capability
  * boundary.

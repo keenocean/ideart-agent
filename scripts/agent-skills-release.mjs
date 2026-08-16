@@ -21,7 +21,7 @@ const SAFE_DIRECTORY_PATTERN = /^[a-zA-Z0-9._/-]+$/;
 
 function parseArgs(argv) {
   const options = {
-    source: 'packages/agent-skills',
+    source: 'product/skills',
     output: '.agent-skills',
     config: 'wrangler.jsonc',
     publish: false,
@@ -158,9 +158,6 @@ async function buildRelease(options) {
   }
 
   const selected = catalog.skills.filter(isPromptOnly);
-  if (selected.length === 0) {
-    throw new Error('catalog.json contains no prompt-only Agent Skills');
-  }
   selected.sort((a, b) => {
     const left = String(a.title || a.slug);
     const right = String(b.title || b.slug);

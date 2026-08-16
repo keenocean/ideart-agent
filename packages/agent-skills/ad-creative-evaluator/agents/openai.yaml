@@ -1,4 +1,0 @@
-interface:
-  display_name: 'Ad Creative Evaluator'
-  short_description: 'Score ads with a structured expert creative review'
-  default_prompt: 'Use $ad-creative-evaluator to review this ad and prioritize improvements.'

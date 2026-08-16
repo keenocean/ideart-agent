@@ -1,6 +1,6 @@
 # Marketing Content on private R2
 
-Public tool/model/home content is edited under `messages/marketing/**`, but the
+Public tool/model/home content is edited under `product/marketing/**`, but the
 page bodies are not shipped in Paraglide, Worker Static Assets, or client
 chunks. A build produces immutable JSON release objects which the Worker reads
 from a private R2 binding.
@@ -131,7 +131,7 @@ with a retention period and dry-run.
 - Choose a project-specific Worker and bucket name.
 - Create or verify the private bucket.
 - Configure exact binding `MARKETING_CONTENT`.
-- Build and validate `messages/marketing/**`.
+- Build and validate `product/marketing/**`.
 - Dry-run, publish, download, and hash-verify the release.
 - Pin `MARKETING_CONTENT_RELEASE` only after verification.
 - Deploy through `pnpm cf:deploy`.

@@ -20,7 +20,7 @@ import { buildSkillSystemPrompt, type PromptSkill } from './skills';
 import { createAgentTools } from './tools';
 import { assertTurnLeaseOwnership } from './turn-lease';
 
-// In-process runtime for the Video Agent chat, replacing the remote
+// In-process runtime for the product Agent chat, replacing the remote
 // FastClaw runtime the Next.js version proxied to. Each request creates a
 // fresh Agent seeded with the conversation replayed from the database, runs
 // one turn, and emits the same event shapes the old runtime streamed:

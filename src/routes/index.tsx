@@ -1,5 +1,7 @@
+import { Fragment, type ReactNode } from 'react';
 import { createFileRoute } from '@tanstack/react-router';
 
+import { homeConfig, type HomeSectionId } from '@/config/home';
 import {
   getFixedLocalePage,
   getFixedRouteAlternates,
@@ -22,25 +24,40 @@ import { UseCases } from '@/blocks/use-cases';
 import { getHomeProjectionFn } from '@/content/home/server';
 import { getBlogPostsFn } from '@/content/posts/server';
 
+function isHomeSectionEnabled(sectionId: HomeSectionId): boolean {
+  return homeConfig.sections.some(
+    (section) => section.id === sectionId && section.enabled
+  );
+}
+
 function HomePage() {
   const { home, posts } = Route.useLoaderData();
+  const sectionRegistry = {
+    hero: <HomeHero />,
+    gallery: <HomeGallery media={home.media.examples} />,
+    features: <HomeFeatures />,
+    useCases: <UseCases media={home.media.useCases} />,
+    howItWorks: <HowItWorks />,
+    featuredCatalog: (
+      <FeaturedCatalog
+        tools={home.featured.tools}
+        models={home.featured.models}
+      />
+    ),
+    faq: <HomeFAQ />,
+    blog: posts.length > 0 ? <Blog posts={posts} /> : null,
+    cta: <HomeCTA />,
+  } satisfies Record<HomeSectionId, ReactNode>;
 
   return (
     <div className="bg-background text-foreground flex min-h-screen flex-col">
       <Header />
       <main className="flex flex-1 flex-col">
-        <HomeHero />
-        <HomeGallery media={home.media.examples} />
-        <HomeFeatures />
-        <UseCases media={home.media.useCases} />
-        <HowItWorks />
-        <FeaturedCatalog
-          tools={home.featured.tools}
-          models={home.featured.models}
-        />
-        <HomeFAQ />
-        {posts.length > 0 && <Blog posts={posts} />}
-        <HomeCTA />
+        {homeConfig.sections.map((section) =>
+          section.enabled ? (
+            <Fragment key={section.id}>{sectionRegistry[section.id]}</Fragment>
+          ) : null
+        )}
       </main>
       <Footer />
       <SupportWidget />
@@ -53,9 +70,14 @@ export const Route = createFileRoute('/')({
     const locale = getLocale();
     const page = getFixedLocalePage('home', locale);
     if (!page) throw new Error(`Home is not registered for locale ${locale}`);
+    const blogEnabled = isHomeSectionEnabled('blog');
     const [home, posts] = await Promise.all([
       getHomeProjectionFn({ data: { locale } }),
-      getBlogPostsFn({ data: { locale, limit: 3 } }).catch(() => []),
+      blogEnabled
+        ? getBlogPostsFn({
+            data: { locale, limit: homeConfig.blogPostLimit },
+          }).catch(() => [])
+        : Promise.resolve([]),
     ]);
     const faq = [
       {
@@ -100,7 +122,7 @@ export const Route = createFileRoute('/')({
           height: home.media.og.height,
           type: home.media.og.mimeType,
         },
-        faq,
+        faq: isHomeSectionEnabled('faq') ? faq : undefined,
       },
     };
   },

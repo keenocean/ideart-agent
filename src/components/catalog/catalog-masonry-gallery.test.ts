@@ -17,7 +17,7 @@ const item = (
   media: {
     id,
     kind: 'image',
-    url: `https://cdn.ugcmind.com/${id}.jpg`,
+    url: `https://cdn.example.test/${id}.jpg`,
     mimeType: 'image/jpeg',
     width,
     height,

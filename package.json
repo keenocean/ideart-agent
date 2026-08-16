@@ -1,6 +1,7 @@
 {
-  "name": "video-agent",
+  "name": "agent-saas-template",
   "version": "0.1.0",
+  "description": "A JSON-configurable AI agent SaaS template.",
   "private": true,
   "type": "module",
   "scripts": {
@@ -37,6 +38,7 @@
     "marketing:publish-content-release": "tsx scripts/marketing-content-release.ts --publish --sync-config --sync-index",
     "marketing:check-content-bundle": "node scripts/check-marketing-content-bundle.mjs",
     "marketing:check-scale": "tsx scripts/check-marketing-content-scale.ts",
+    "product:validate": "tsx scripts/check-product-pack.ts && pnpm i18n:check && pnpm skills:build && pnpm marketing:build-content-release",
     "i18n:compile": "paraglide-js compile --project ./project.inlang --outdir ./src/paraglide --strategy url cookie baseLocale --output-structure message-modules --silent",
     "i18n:check": "node scripts/check-i18n.mjs",
     "i18n:check-static-usage": "vitest run src/core/i18n/static-message-usage.test.ts",

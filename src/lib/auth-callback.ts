@@ -65,7 +65,7 @@ export function sanitizeAuthCallback(
   return sanitizeCandidate(raw) ?? sanitizeCandidate(fallback);
 }
 
-export const EMAIL_VERIFICATION_CHANNEL = 'ugcmind:email-verification';
+export const EMAIL_VERIFICATION_CHANNEL = 'agent-saas:email-verification';
 
 export type EmailVerificationSignal = {
   type: 'verified';

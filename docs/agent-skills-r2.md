@@ -9,7 +9,7 @@ scripts, or assets.
 
 | Layer                         | Responsibility                                                 |
 | ----------------------------- | -------------------------------------------------------------- |
-| `packages/agent-skills`       | Authoring source and `catalog.json`                            |
+| `product/skills`              | Product-owned authoring source and `catalog.json`              |
 | `.agent-skills`               | Generated local releases; ignored by Git                       |
 | private R2 bucket             | Immutable production release objects                           |
 | Worker `AGENT_SKILLS` binding | Read-only runtime access to the private bucket                 |
@@ -50,6 +50,10 @@ Generate a release explicitly:
 ```bash
 pnpm skills:build
 ```
+
+An empty `product/skills/catalog.json` is valid. It produces a pinned release
+whose manifest contains `skills: []`, so products can keep the Skills UI and
+runtime API available without shipping a default Skill Catalog.
 
 Set `AGENT_SKILLS_LOCAL_ROOT` only when a consuming project wants the local
 release directory somewhere other than `.agent-skills`.
@@ -96,7 +100,7 @@ pnpm cf:deploy
 
 ## Updating or rolling back
 
-1. Change source under `packages/agent-skills`.
+1. Change source under `product/skills`.
 2. Run `pnpm skills:publish -- --bucket=<bucket>`.
 3. Review the new release ID in `wrangler.jsonc`.
 4. Deploy the Worker.
@@ -116,7 +120,7 @@ Copy these files and preserve their public contracts:
 
 The consuming project must:
 
-1. provide `packages/agent-skills/catalog.json` and per-Skill `SKILL.md` files;
+1. provide `product/skills/catalog.json` and per-Skill `SKILL.md` files;
 2. add the package scripts and `.agent-skills/` ignore rule;
 3. stash Cloudflare bindings before route execution, or replace
    `getDefaultSkillRegistry()` with its own dependency injection;

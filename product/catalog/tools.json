@@ -1,0 +1,142 @@
+{
+  "schemaVersion": 1,
+  "tools": [
+    {
+      "kind": "tool",
+      "entityId": "ai-image-generator",
+      "publication": "listed",
+      "availability": "live",
+      "localePages": {
+        "en": {
+          "slug": "ai-image-generator",
+          "indexing": "noindex",
+          "contentModifiedAt": "2026-08-15"
+        },
+        "zh": {
+          "slug": "ai-image-generator",
+          "indexing": "noindex",
+          "contentModifiedAt": "2026-08-15"
+        }
+      },
+      "placement": {
+        "directoryOrder": 10,
+        "home": { "featured": true, "order": 10 }
+      },
+      "related": ["ai-image-editor", "gpt-image-2"],
+      "archetype": "image-generator",
+      "execution": {
+        "kind": "agent-preset",
+        "mediaMode": "image",
+        "inputPolicy": {
+          "minimum": 0,
+          "maximum": 16,
+          "accepts": ["image"]
+        }
+      }
+    },
+    {
+      "kind": "tool",
+      "entityId": "ai-image-editor",
+      "publication": "listed",
+      "availability": "live",
+      "localePages": {
+        "en": { "slug": "ai-image-editor", "indexing": "noindex" },
+        "zh": { "slug": "ai-image-editor", "indexing": "noindex" }
+      },
+      "placement": { "directoryOrder": 20 },
+      "related": ["ai-image-generator", "background-remover", "gpt-image-2"],
+      "archetype": "image-editor",
+      "execution": {
+        "kind": "agent-preset",
+        "mediaMode": "image",
+        "inputPolicy": {
+          "minimum": 1,
+          "maximum": 16,
+          "accepts": ["image"]
+        }
+      }
+    },
+    {
+      "kind": "tool",
+      "entityId": "text-to-video",
+      "publication": "listed",
+      "availability": "live",
+      "localePages": {
+        "en": { "slug": "text-to-video", "indexing": "noindex" },
+        "zh": { "slug": "text-to-video", "indexing": "noindex" }
+      },
+      "placement": {
+        "directoryOrder": 30,
+        "home": { "featured": true, "order": 20 }
+      },
+      "related": ["image-to-video", "reference-to-video", "minimax-h3"],
+      "archetype": "text-to-video",
+      "execution": {
+        "kind": "agent-preset",
+        "mediaMode": "video",
+        "videoOperation": "generate"
+      }
+    },
+    {
+      "kind": "tool",
+      "entityId": "image-to-video",
+      "publication": "listed",
+      "availability": "live",
+      "localePages": {
+        "en": { "slug": "image-to-video", "indexing": "noindex" },
+        "zh": { "slug": "image-to-video", "indexing": "noindex" }
+      },
+      "placement": {
+        "directoryOrder": 40,
+        "home": { "featured": true, "order": 30 }
+      },
+      "related": ["text-to-video", "reference-to-video", "seedance-2-0"],
+      "archetype": "image-to-video",
+      "execution": {
+        "kind": "agent-preset",
+        "mediaMode": "video",
+        "videoOperation": "animate"
+      }
+    },
+    {
+      "kind": "tool",
+      "entityId": "reference-to-video",
+      "publication": "listed",
+      "availability": "live",
+      "localePages": {
+        "en": { "slug": "reference-to-video", "indexing": "noindex" },
+        "zh": { "slug": "reference-to-video", "indexing": "noindex" }
+      },
+      "placement": { "directoryOrder": 50 },
+      "related": ["image-to-video", "text-to-video", "seedance-2-0"],
+      "archetype": "reference-to-video",
+      "execution": {
+        "kind": "agent-preset",
+        "mediaMode": "video",
+        "videoOperation": "reference"
+      }
+    },
+    {
+      "kind": "tool",
+      "entityId": "background-remover",
+      "publication": "listed",
+      "availability": "beta",
+      "localePages": {
+        "en": { "slug": "background-remover", "indexing": "noindex" },
+        "zh": { "slug": "background-remover", "indexing": "noindex" }
+      },
+      "placement": { "directoryOrder": 60 },
+      "related": ["ai-image-editor", "gpt-image-2"],
+      "archetype": "background-editor",
+      "execution": {
+        "kind": "agent-preset",
+        "mediaMode": "image",
+        "inputPolicy": {
+          "minimum": 1,
+          "maximum": 16,
+          "accepts": ["image"]
+        }
+      }
+    }
+  ]
+}

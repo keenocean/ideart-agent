@@ -1,0 +1,99 @@
+{
+  "schemaVersion": 1,
+  "models": [
+    {
+      "kind": "model",
+      "entityId": "gpt-image-2",
+      "publication": "listed",
+      "availability": "live",
+      "modality": "image",
+      "runtimeModelKey": "gpt-image-2",
+      "localePages": {
+        "en": { "slug": "gpt-image-2", "indexing": "noindex" },
+        "zh": { "slug": "gpt-image-2", "indexing": "noindex" }
+      },
+      "placement": {
+        "directoryOrder": 10,
+        "home": { "featured": true, "order": 10 }
+      },
+      "related": ["ai-image-generator", "ai-image-editor"],
+      "variant": {
+        "hero": "visual-first",
+        "workbench": "composer",
+        "examples": "gallery",
+        "sections": ["model-specs", "prompt-guide", "use-cases", "limitations"]
+      }
+    },
+    {
+      "kind": "model",
+      "entityId": "minimax-h3",
+      "publication": "listed",
+      "availability": "live",
+      "modality": "video",
+      "runtimeModelKey": "minimax-h3",
+      "localePages": {
+        "en": { "slug": "minimax-h3", "indexing": "noindex" },
+        "zh": { "slug": "minimax-h3", "indexing": "noindex" }
+      },
+      "placement": {
+        "directoryOrder": 20,
+        "home": { "featured": true, "order": 20 }
+      },
+      "related": ["text-to-video", "image-to-video", "seedance-2-5"],
+      "variant": {
+        "hero": "visual-first",
+        "workbench": "composer",
+        "examples": "gallery",
+        "sections": ["model-specs", "prompt-guide", "use-cases", "limitations"]
+      }
+    },
+    {
+      "kind": "model",
+      "entityId": "seedance-2-5",
+      "publication": "listed",
+      "availability": "live",
+      "modality": "video",
+      "runtimeModelKey": "seedance-2-5",
+      "localePages": {
+        "en": {
+          "slug": "seedance-2-5",
+          "indexing": "noindex",
+          "contentModifiedAt": "2026-08-16"
+        },
+        "zh": {
+          "slug": "seedance-2-5",
+          "indexing": "noindex",
+          "contentModifiedAt": "2026-08-16"
+        }
+      },
+      "placement": { "directoryOrder": 30 },
+      "related": ["text-to-video", "image-to-video", "minimax-h3"],
+      "variant": {
+        "hero": "split",
+        "workbench": "composer",
+        "examples": "gallery",
+        "sections": ["model-specs", "comparison", "use-cases", "limitations"]
+      }
+    },
+    {
+      "kind": "model",
+      "entityId": "seedance-2-0",
+      "publication": "listed",
+      "availability": "live",
+      "modality": "video",
+      "runtimeModelKey": "seedance-2-0",
+      "localePages": {
+        "en": { "slug": "seedance-2-0", "indexing": "noindex" },
+        "zh": { "slug": "seedance-2-0", "indexing": "noindex" }
+      },
+      "placement": { "directoryOrder": 40 },
+      "related": ["image-to-video", "reference-to-video", "seedance-2-5"],
+      "variant": {
+        "hero": "split",
+        "workbench": "upload-first",
+        "examples": "timeline",
+        "sections": ["model-specs", "prompt-guide", "use-cases", "limitations"]
+      }
+    }
+  ]
+}

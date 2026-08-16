@@ -4,8 +4,8 @@ import path from 'node:path';
 const outputRoot = path.resolve('.output');
 const forbidden = [
   'Cinematic Style Anchors',
-  'packages/agent-skills/*/SKILL.md',
-  'packages/agent-skills/*/references/**/*.md',
+  'product/skills/*/SKILL.md',
+  'product/skills/*/references/**/*.md',
 ];
 
 async function filesUnder(directory) {

@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "sections": [
+    { "id": "hero", "enabled": true },
+    { "id": "gallery", "enabled": true },
+    { "id": "features", "enabled": true },
+    { "id": "useCases", "enabled": true },
+    { "id": "howItWorks", "enabled": true },
+    { "id": "featuredCatalog", "enabled": true },
+    { "id": "faq", "enabled": true },
+    { "id": "blog", "enabled": true },
+    { "id": "cta", "enabled": true }
+  ],
+  "blogPostLimit": 3
+}

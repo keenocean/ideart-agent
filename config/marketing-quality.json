@@ -37,7 +37,7 @@
       "src/config/catalog",
       "src/content/marketing",
       "src/content/tools",
-      "messages/marketing",
+      "product/marketing",
       "src/routes/index.tsx",
       "src/routes/pricing.tsx",
       "src/routes/tools",

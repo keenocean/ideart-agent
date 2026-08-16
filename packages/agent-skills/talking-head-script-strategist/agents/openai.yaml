@@ -1,4 +1,0 @@
-interface:
-  display_name: 'Talking Head Script Strategist'
-  short_description: 'Plan natural spokesperson and UGC ad scripts'
-  default_prompt: 'Use $talking-head-script-strategist to write a natural talking-head ad script.'

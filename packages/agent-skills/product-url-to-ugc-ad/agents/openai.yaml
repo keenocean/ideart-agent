@@ -1,4 +1,0 @@
-interface:
-  display_name: 'Product URL to UGC Ad'
-  short_description: 'Turn product evidence into a grounded UGC ad'
-  default_prompt: 'Use $product-url-to-ugc-ad to create a vertical UGC ad from this product URL, brief, or project asset.'

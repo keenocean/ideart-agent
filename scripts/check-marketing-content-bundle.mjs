@@ -7,8 +7,8 @@ const forbidden = [
   'A studio product photo of a translucent orange water bottle',
   '把文字提示变成静态图片，并在同一个 Agent 对话中继续调整方向',
   'tools-ai-image-generator-c59b7a4f2cbfdc3b',
-  'messages/marketing/tools/',
-  'messages/marketing/assets.json',
+  'product/marketing/tools/',
+  'product/marketing/assets.json',
 ];
 
 async function filesUnder(directory) {

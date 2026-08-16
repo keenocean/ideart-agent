@@ -30,7 +30,7 @@ describe('composer settings persistence actions', () => {
   it('ignores retired image or video picker keys', () => {
     const videoStorage = memoryStorage();
     videoStorage.setItem(
-      'video-agent:composer-settings',
+      'agent-saas:composer-settings',
       JSON.stringify({
         ...defaultComposerSettings(),
         modelOption: 'retired-video',
@@ -40,7 +40,7 @@ describe('composer settings persistence actions', () => {
 
     const imageStorage = memoryStorage();
     imageStorage.setItem(
-      'video-agent:composer-settings',
+      'agent-saas:composer-settings',
       JSON.stringify({
         ...defaultComposerSettings(),
         imageModelOption: 'retired-image',

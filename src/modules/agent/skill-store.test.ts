@@ -54,6 +54,19 @@ async function r2Fixture() {
   };
 }
 
+async function emptyR2Fixture() {
+  const base = {
+    schemaVersion: SKILL_RELEASE_SCHEMA_VERSION,
+    sourceCatalogSha256: await sha256('empty-catalog'),
+    skills: [],
+  };
+  const releaseId = await sha256(JSON.stringify(base));
+  return {
+    releaseId,
+    manifestText: jsonText({ ...base, releaseId }),
+  };
+}
+
 function installCloudflareEnv(env: Record<string, unknown>) {
   const runtime = globalThis as typeof globalThis & {
     Cloudflare?: unknown;
@@ -73,6 +86,32 @@ afterEach(() => {
 });
 
 describe('Cloudflare Agent Skill store', () => {
+  it('serves an empty product catalog as an available registry', async () => {
+    const fixture = await emptyR2Fixture();
+    const reads: string[] = [];
+    installCloudflareEnv({
+      AGENT_SKILLS_RELEASE: fixture.releaseId,
+      AGENT_SKILLS: {
+        async get(key: string) {
+          reads.push(key);
+          return key === skillManifestKey(fixture.releaseId)
+            ? {
+                size: new TextEncoder().encode(fixture.manifestText).byteLength,
+                async text() {
+                  return fixture.manifestText;
+                },
+              }
+            : null;
+        },
+      },
+    });
+
+    const registry = await getDefaultSkillRegistry();
+    await expect(registry.list()).resolves.toEqual([]);
+    await expect(registry.get('missing-skill')).resolves.toBeNull();
+    expect(reads).toEqual([skillManifestKey(fixture.releaseId)]);
+  });
+
   it('reads the pinned manifest and selected object through the private R2 binding', async () => {
     const fixture = await r2Fixture();
     const reads: string[] = [];

@@ -2,7 +2,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { extname, join, relative, resolve } from 'node:path';
 
 const projectRoot = resolve(import.meta.dirname, '..');
-const postsDir = join(projectRoot, 'src/content/posts');
+const postsDir = join(projectRoot, 'product/posts');
 const outputDir = join(projectRoot, '.output');
 
 function walk(directory) {
@@ -28,7 +28,7 @@ const forbiddenRuntimeReferences = [
   'getLocalPostLocales',
   'getLocalPosts',
   'loadLocalPost',
-  '/src/content/posts/*.mdx',
+  '/product/posts/*.mdx',
   '@/content/posts/raw',
 ];
 

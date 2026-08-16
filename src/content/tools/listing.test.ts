@@ -98,7 +98,7 @@ describe('tool content manifest', () => {
     const indexableTools = toolCatalog.map((definition) => ({
       ...definition,
       localePages: Object.fromEntries(
-        Object.entries(definition.localePages).map(([locale, page]) => [
+        Object.entries(definition.localePages ?? {}).map(([locale, page]) => [
           locale,
           { ...page, indexing: 'index' as const },
         ])
@@ -126,15 +126,23 @@ describe('tool content manifest', () => {
   });
 
   it('keeps exact Catalog paths when translated slugs differ', () => {
+    const imageGenerator = toolCatalog.find(
+      (entry) =>
+        entry.entityId === 'ai-image-generator' &&
+        entry.publication === 'listed'
+    );
+    if (!imageGenerator || imageGenerator.publication !== 'listed') {
+      throw new Error('Expected the listed image-generator fixture');
+    }
     const definition = {
-      ...toolCatalog[0],
+      ...imageGenerator,
       localePages: {
         en: {
-          ...toolCatalog[0].localePages.en,
+          ...imageGenerator.localePages.en,
           slug: catalogRouteSegment('english-image-tool'),
         },
         zh: {
-          ...toolCatalog[0].localePages.zh,
+          ...imageGenerator.localePages.zh,
           slug: catalogRouteSegment('zhongwen-image-tool'),
         },
       },
@@ -280,7 +288,7 @@ describe('tool route content gate', () => {
     'returns null for every unopened or unknown %s slug',
     async (locale) => {
       const contentlessSlugs = toolCatalog.flatMap((definition) => {
-        const page = definition.localePages[locale];
+        const page = definition.localePages?.[locale];
         return page && !hasToolContent(definition.entityId, locale)
           ? [page.slug]
           : [];

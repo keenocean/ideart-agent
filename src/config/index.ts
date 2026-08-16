@@ -1,3 +1,5 @@
+import { resolveProductBrandEnv } from './product/brand';
+
 export const AUTH_SECRET_PLACEHOLDER =
   'shipany-dev-secret-change-in-production';
 
@@ -12,15 +14,14 @@ const procEnv: Record<string, string | undefined> =
   typeof process !== 'undefined' && process.env ? process.env : {};
 
 const publicEnv = (key: string) => metaEnv[key] ?? procEnv[key];
+const brand = resolveProductBrandEnv(publicEnv);
 
 export const envConfigs: Record<string, string> = {
   // App (public)
   app_url: publicEnv('VITE_APP_URL') ?? 'http://localhost:3000',
-  app_name: publicEnv('VITE_APP_NAME') ?? 'Video Agent',
-  app_description:
-    publicEnv('VITE_APP_DESCRIPTION') ??
-    'Create and refine AI video clips through conversation.',
-  app_logo: publicEnv('VITE_APP_LOGO') ?? '/logo.png',
+  app_name: brand.name,
+  app_description: brand.description,
+  app_logo: brand.logo,
 
   // Database
   database_url: procEnv.DATABASE_URL ?? '',

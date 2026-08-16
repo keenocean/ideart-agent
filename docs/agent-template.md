@@ -7,7 +7,7 @@ This project ships one `primary` conversational Agent with image and video gener
 - `defaultSystemPrompt`: version-controlled business behavior.
 - `maxTurns`: maximum SDK loop count.
 
-Do not rename or move `generate_image`, `generate_video`, `animate_image`, `mediaMode`, composer settings, SSE events, API request fields, AI task statuses, or `video-agent:*` browser storage keys as part of a rebrand. Image/video tools, providers, storage, credits, Stop, history, composer controls, and renderers are template capabilities, not a project adapter.
+Do not rename or move `generate_image`, `generate_video`, `animate_image`, `mediaMode`, composer settings, SSE events, API request fields, AI task statuses, or `agent-saas:*` browser storage keys as part of a rebrand. Image/video tools, providers, storage, credits, Stop, history, composer controls, and renderers are template capabilities, not a project adapter.
 
 ## Prompt boundary
 

@@ -8,7 +8,7 @@ import {
   type AgentComposerSettings,
 } from '@/lib/agent-settings';
 
-export const COMPOSER_SETTINGS_STORAGE_KEY = 'video-agent:composer-settings';
+export const COMPOSER_SETTINGS_STORAGE_KEY = 'agent-saas:composer-settings';
 
 export function readStoredComposerSettings(
   storage: Pick<Storage, 'getItem'> = window.localStorage

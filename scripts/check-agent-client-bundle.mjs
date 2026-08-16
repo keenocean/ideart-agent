@@ -2,10 +2,21 @@ import { readdir, readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 
 const root = '.output/public';
-const forbidden = [
-  'You are Video Agent, an AI image-and-video generation assistant.',
-  'Core security and execution rules:',
-];
+const productAgent = JSON.parse(
+  await readFile(new URL('../product/agent.json', import.meta.url), 'utf8')
+);
+const promptMarker = productAgent.defaultSystemPrompt
+  ?.split('\n')
+  .map((line) => line.trim())
+  .find((line) => line.length >= 24);
+
+if (!promptMarker) {
+  throw new Error(
+    'product/agent.json must contain a distinctive defaultSystemPrompt line'
+  );
+}
+
+const forbidden = [promptMarker];
 
 async function filesUnder(path) {
   const result = [];

@@ -1,0 +1,281 @@
+{
+  "schemaVersion": 1,
+  "contentModifiedAt": "2026-08-16",
+  "content": {
+    "entityId": "seedance-2-5",
+    "locale": "zh",
+    "template": "video-model",
+    "seo": {
+      "title": "Seedance 2.5 AI 视频生成器 | Agent Starter",
+      "description": "在锁定 Seedance 2.5 模型的 Agent Starter Agent 工作流中生成、参考、编辑和扩展 AI 视频。"
+    },
+    "directory": {
+      "title": "Seedance 2.5",
+      "description": "提供文生、帧生、混合参考、视频编辑和视频扩展五种精确路由，并在支持的模式中生成音频。"
+    },
+    "hero": {
+      "eyebrow": "视频模型",
+      "title": "使用 Seedance 2.5 创作视频",
+      "description": "描述目标，Agent 会在同一私密会话中选择文生视频、图生视频、混合参考生成、视频编辑或视频扩展。"
+    },
+    "workbench": {
+      "title": "Seedance 2.5 工作台",
+      "description": "媒体类型和模型会被锁定；Agent 根据你的指令和已验证素材选择对应的 Seedance 2.5 操作。",
+      "placeholder": "描述主体、动作、环境、镜头运动、节奏和你希望听到的声音……"
+    },
+    "specs": {
+      "title": "Seedance 2.5 运行规格",
+      "description": "这些参数来自 Agent Starter 真正执行生成任务的运行时配置，不在营销内容中重复维护。",
+      "labels": {
+        "modality": "输出类型",
+        "duration": "时长",
+        "resolutions": "分辨率",
+        "aspectRatios": "画面比例",
+        "audio": "生成音频",
+        "referenceImages": "单次参考操作图片上限",
+        "enabled": "支持",
+        "disabled": "不支持",
+        "image": "图片",
+        "video": "视频",
+        "notApplicable": "不适用"
+      }
+    },
+    "examples": {
+      "title": "用于改进提示词的动态参考",
+      "description": "打开视频查看可复用的创作方向，并把提示词直接送入锁定模型的工作台。",
+      "disclosure": "这些是存放在 Agent Starter R2 素材库中的创作评估参考，不会被描述成已验证的 Seedance 2.5 API 输出。",
+      "labels": {
+        "image": "图片",
+        "video": "视频",
+        "prompt": "提示词",
+        "download": "下载",
+        "previous": "上一个",
+        "next": "下一个",
+        "close": "关闭",
+        "usePrompt": "使用这个提示词",
+        "expand": "显示全部"
+      },
+      "items": [
+        {
+          "id": "cinematic-product",
+          "title": "电影感产品揭示",
+          "description": "用克制的镜头运动和材质光线完成商业化视觉节拍。",
+          "prompt": "镜头缓慢推进至暗色摄影棚中的高端产品，精准轮廓光，少量漂浮颗粒，克制反射，真实材质细节，干净商业节奏，并带同步环境音。",
+          "media": {
+            "assetId": "tools-ai-image-generator-da9cec431f963fbc",
+            "alt": "表现电影感产品揭示的创作参考视频"
+          }
+        },
+        {
+          "id": "character-motion",
+          "title": "角色动作设计",
+          "description": "以稳定主体和清晰动作弧线组织镜头。",
+          "prompt": "一只奇幻生物穿过细节丰富的环境，身体重心自然，表情有张力但保持一致，中景跟拍，轻微手持感，带有层次的环境声音。",
+          "media": {
+            "assetId": "tools-ai-image-generator-dc695c6c59eedafa",
+            "alt": "以动画角色运动为主体的创作参考视频"
+          }
+        },
+        {
+          "id": "fashion-camera",
+          "title": "时尚镜头练习",
+          "description": "为竖屏社交广告设计构图明确的运动。",
+          "prompt": "黄昏时分的时尚大片场景，人物随风转向镜头，布料自然飘动，镜头平滑环绕，柔和逆光，精致色彩对比，高级广告节奏，细微城市环境音。",
+          "media": {
+            "assetId": "tools-ai-image-generator-28464f03f575b12e",
+            "alt": "用于时尚镜头运动研究的创作参考视频"
+          }
+        },
+        {
+          "id": "food-detail",
+          "title": "食物细节镜头",
+          "description": "用微距质感、明确节奏和少量运动呈现产品。",
+          "prompt": "微距食物广告：温热酥点裂开并升起蒸汽，镜头缓慢横移，纹理清晰，温馨烘焙光线，浅景深，轻柔厨房环境音。",
+          "media": {
+            "assetId": "tools-ai-image-generator-ef56dc352549bc2b",
+            "alt": "表现食物细节运动的创作参考视频"
+          }
+        },
+        {
+          "id": "atmospheric-space",
+          "title": "氛围环境镜头",
+          "description": "用空间深度、天气和明确镜头路径推动场景。",
+          "prompt": "移动云层下的辽阔氛围景观，镜头低空向前滑行，层次分明的空间和漂浮雾气，真实尺度，电影感对比，远处风声和环境音。",
+          "media": {
+            "assetId": "tools-ai-image-generator-e89f518697d042d0",
+            "alt": "用于氛围环境运动设计的创作参考视频"
+          }
+        },
+        {
+          "id": "graphic-transition",
+          "title": "图形化转场",
+          "description": "为短视频开场设计简洁有力的一次变化。",
+          "prompt": "一个醒目的图形物体通过一次干净的视觉变化完成转场，构图锁定，节奏精准，高对比光线，极简背景，有力音效，六秒社交视频开场。",
+          "media": {
+            "assetId": "tools-ai-image-generator-f657512a8700976c",
+            "alt": "表现简洁图形转场的创作参考视频"
+          }
+        }
+      ]
+    },
+    "capabilities": {
+      "title": "这个模型页当前支持什么",
+      "description": "页面只展示 Agent Starter 现在能够路由和校验的能力。",
+      "items": [
+        {
+          "title": "文生视频",
+          "description": "无需上传素材，直接从完整的动态创意描述开始。"
+        },
+        {
+          "title": "图生视频",
+          "description": "把一至两张图片作为明确的开场帧或结束帧生成动态镜头。"
+        },
+        {
+          "title": "参考生成视频",
+          "description": "用最多 30 张图片、10 个视频和 10 个音频约束身份、风格、动作、节奏或声音，合计不超过 50 个参考素材。"
+        },
+        {
+          "title": "视频编辑",
+          "description": "以一个现有视频为编辑上下文，对其中的内容执行明确修改。"
+        },
+        {
+          "title": "视频扩展",
+          "description": "基于一个源视频向前或向后生成衔接的新画面。"
+        },
+        {
+          "title": "生成音频",
+          "description": "运行时会与视频一起请求生成音频。"
+        }
+      ]
+    },
+    "workflows": {
+      "title": "可执行的创作循环",
+      "description": "先用首个结果确认方向，再一次只调整一个变量。",
+      "items": [
+        {
+          "title": "定义镜头",
+          "description": "说明主体、动作、环境、镜头行为、节奏和需要的声音。"
+        },
+        {
+          "title": "用自然语言说明素材角色",
+          "description": "说明素材是帧、创作参考、待编辑视频还是待扩展视频，Agent 会选择对应路由。"
+        },
+        {
+          "title": "选择交付参数",
+          "description": "生成前根据发布渠道设置时长、分辨率和画面比例。"
+        },
+        {
+          "title": "在上下文中迭代",
+          "description": "把有价值的结果留在同一会话里，并发起一次目标明确的下一轮。"
+        }
+      ]
+    },
+    "promptGuide": {
+      "title": "用制作语言编写 Seedance 2.5 提示词",
+      "description": "明确的镜头意图通常比堆叠大量修饰词更有效。",
+      "items": [
+        {
+          "title": "描述可观察的动作",
+          "description": "说明从第一秒到最后一秒发生了什么变化，而不只是写一个氛围词。"
+        },
+        {
+          "title": "指定主要镜头运动",
+          "description": "选择推进、环绕、跟拍、升降或固定机位等一个主要运动。"
+        },
+        {
+          "title": "控制节奏和声音",
+          "description": "需要时明确剪辑节奏、转场时点、环境声、对白或音效。"
+        }
+      ]
+    },
+    "useCases": {
+      "title": "Seedance 2.5 适合的工作",
+      "description": "适用于重视动作方向和快速迭代的视频创作流程。",
+      "items": [
+        {
+          "id": "social-hooks",
+          "eyebrow": "付费与自然流量内容",
+          "title": "测试多个开场钩子",
+          "description": "围绕同一产品或创意快速生成短视频变化，并让每个提示词只聚焦一个视觉节拍。",
+          "bullets": [
+            "支持竖屏和横屏比例",
+            "支持短片和较长片段",
+            "可以复用参考区提示词"
+          ],
+          "mediaPosition": "right",
+          "media": {
+            "assetId": "tools-ai-image-generator-0c6193822673c248",
+            "alt": "适合社交视频开场的创作动态参考"
+          }
+        },
+        {
+          "id": "product-concepts",
+          "eyebrow": "创意开发",
+          "title": "预演广告创意",
+          "description": "在投入完整制作前，先把文字概念或产品画面转成动态方向。",
+          "bullets": ["镜头和光线测试", "参考图约束构图", "基于会话持续调整"],
+          "mediaPosition": "left",
+          "media": {
+            "assetId": "tools-ai-image-generator-cd6a1545d0bb900d",
+            "alt": "用于产品广告预演的创作动态参考"
+          }
+        },
+        {
+          "id": "story-moments",
+          "eyebrow": "叙事探索",
+          "title": "探索一个明确的故事瞬间",
+          "description": "把角色动作、环境氛围和镜头路径组织成一个聚焦的场景，而不是一次描述完整故事。",
+          "bullets": ["角色动作", "环境运动", "同步声音方向"],
+          "mediaPosition": "right",
+          "media": {
+            "assetId": "tools-ai-image-generator-8c2cfa5620e683cc",
+            "alt": "用于聚焦叙事场景的创作动态参考"
+          }
+        }
+      ]
+    },
+    "comparison": {
+      "title": "比较可执行的模型规格",
+      "description": "表格由生成服务使用的同一份运行时设置生成，因此 Provider 路由变化后仍能保持一致。",
+      "modelLabel": "规格",
+      "relatedModelIds": ["minimax-h3", "seedance-2-0"]
+    },
+    "limitations": {
+      "title": "使用输出前需要检查什么",
+      "description": "生成视频具有随机性。请检查每个结果，不要假设模型会逐字重建提示词。",
+      "items": [
+        "人脸、手部、小字、重复物体和反射可能在不同帧之间漂移。",
+        "参考素材可以引导结果，但不能保证像素级身份、时序或构图一致。",
+        "过长且信息密集的提示词可能产生相互竞争的动作；先简化镜头，再添加细节。",
+        "生成音频需要检查时点、可理解性、品牌安全和具体使用场景。"
+      ]
+    },
+    "faq": {
+      "title": "Seedance 2.5 常见问题",
+      "items": [
+        {
+          "question": "Agent 可以使用 Seedance 2.5 的哪些模式？",
+          "answer": "Agent Starter 已映射五条明确路由：文生视频、图生视频、参考生成视频、视频编辑和视频扩展。Agent 根据你的指令判断；仅上传附件不会自动决定素材角色。"
+        },
+        {
+          "question": "这里支持哪些参数？",
+          "answer": "工作台支持 4–30 秒、480p 和 720p、页面列出的画面比例和生成音频。图生视频可用一至两张帧图片；混合参考可用最多 30 张图片、10 个视频和 10 个音频，总计不超过 50 个；编辑和扩展各需要一个源视频。"
+        },
+        {
+          "question": "案例区视频是已经验证的 Seedance 2.5 输出吗？",
+          "answer": "不是。它们被明确标注为来自项目 R2 素材库的创作评估参考，用于研究动作和提示词结构。"
+        },
+        {
+          "question": "为什么这个页面暂时没有被搜索引擎收录？",
+          "answer": "在第一方案例证据和发布审核完成前，页面保持 noindex。路径可以使用，但不会把尚未完成的证据包装成搜索结果。"
+        }
+      ]
+    },
+    "cta": {
+      "title": "开始一个 Seedance 2.5 视频草稿",
+      "description": "写清一个镜头，选择交付格式，再在私密会话中持续优化有价值的结果。",
+      "primaryLabel": "使用 Seedance 2.5",
+      "secondaryLabel": "查看价格"
+    }
+  }
+}

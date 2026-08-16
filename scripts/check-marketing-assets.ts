@@ -29,7 +29,7 @@ type QualityConfig = {
 const cwd = process.cwd();
 const assetSource = marketingAssetsSourceSchema.parse(
   JSON.parse(
-    readFileSync(path.join(cwd, 'messages/marketing/assets.json'), 'utf8')
+    readFileSync(path.join(cwd, 'product/marketing/assets.json'), 'utf8')
   )
 ) as MarketingAssetsSource;
 const sourceAssets = new Map(
