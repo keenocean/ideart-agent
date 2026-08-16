@@ -23,6 +23,20 @@ runtime code.
 | Auth, billing, credits, RBAC | Never JSON                            | `src/core/**`, `src/modules/**`                      |
 | Deployment resource IDs      | local environment / Wrangler config   | deployment scripts and bindings contract             |
 
+## Agent workflow integration
+
+The Product Pack is an ownership boundary used by the repository's existing
+Agent workflows; it is not a replacement workflow or a requirement that users
+manually author JSON. A product brief enters through `quick-start`, while
+specialized work continues through `clone-website`, `marketing-seo`,
+`new-module`, `new-page`, and the deployment/audit skills.
+
+Agents translate the brief into Product Pack changes first, then widen into
+shared TypeScript only when the requested behavior cannot be expressed by an
+existing typed registry, Block, route, module, or provider capability. The
+completion report must distinguish Product Pack changes from shared-runtime
+extensions so future template upgrades remain reviewable.
+
 ## Safety boundary
 
 Product JSON is data, not code:

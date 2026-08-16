@@ -72,4 +72,43 @@ describe('product pack identity', () => {
     expect(trackedTemplates).not.toMatch(/[0-9a-f]{64}/i);
     expect(trackedTemplates).toContain('agent-saas-template');
   });
+
+  it('keeps upstream agent workflows aligned with the Product Pack', () => {
+    const readProjectFile = (path: string) =>
+      readFileSync(new URL(`../../../${path}`, import.meta.url), 'utf8');
+    const quickStart = readProjectFile('.claude/skills/quick-start/SKILL.md');
+    const newPage = readProjectFile('.claude/skills/new-page/SKILL.md');
+    const cloneWebsite = readProjectFile(
+      '.claude/skills/clone-website/SKILL.md'
+    );
+    const marketingAdapter = readProjectFile(
+      '.claude/skills/marketing-seo/references/shipany-tanstack.md'
+    );
+    const syncUpstream = readProjectFile(
+      '.claude/skills/sync-upstream/SKILL.md'
+    );
+
+    expect(quickStart).toContain('product/brand.json');
+    expect(quickStart).toContain('product/home.json');
+    expect(quickStart).toContain('product/catalog/');
+    expect(quickStart).toContain('product/messages/');
+    expect(quickStart).toContain('pnpm product:validate');
+    expect(quickStart).toContain('template/main');
+    expect(quickStart).not.toMatch(/(?<!product\/)messages\/en\.json/);
+    expect(quickStart).not.toContain('shipany-ai/shipany-tanstack');
+    expect(quickStart).not.toContain('src/app/globals.css');
+
+    expect(newPage).toContain('product/messages/en.json');
+    expect(cloneWebsite).toContain('product/brand.json');
+    expect(cloneWebsite).toContain('product/research/');
+    expect(marketingAdapter).toContain('product/messages/<locale>.json');
+    expect(marketingAdapter).toContain('product/marketing/**');
+    expect(syncUpstream).toContain('docs/template-upgrades.md');
+    expect(syncUpstream).toContain('template/main');
+
+    const adaptedSkills = [newPage, cloneWebsite, marketingAdapter].join('\n');
+    expect(adaptedSkills).not.toMatch(/(?<!product\/)messages\/en\.json/);
+    expect(adaptedSkills).not.toContain('messages/marketing');
+    expect(syncUpstream).not.toContain('shipany-ai/shipany-next');
+  });
 });

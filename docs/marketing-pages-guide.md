@@ -30,7 +30,7 @@ Runtime
 - `src/routes/*` 用代码表达页面 section 顺序。
 - `src/blocks/*` 是项目内容包，允许在新项目中重写。
 - `src/components/*` 是模板底盘，尽量跨项目保留。
-- `messages/{en,zh}.json` 承载 Paraglide 短 UI 与 metadata；营销长正文在 `product/marketing/**` 编辑，经 schema 校验后发布为外置不可变 content release，不能进入 Worker 或客户端 bundle。
+- `product/messages/{en,zh}.json` 承载 Paraglide 短 UI 与 metadata；营销长正文在 `product/marketing/**` 编辑，经 schema 校验后发布为外置不可变 content release，不能进入 Worker 或客户端 bundle。
 - `src/config/catalog/*` 用 TypeScript Catalog 表达可发布实体。
 - 模型、参数、积分和 Provider 继续以运行时 Catalog 为权威。
 
@@ -150,7 +150,7 @@ scripts/
 
 保留文件不等于发布空目录。某个 locale 的目录只有在 pinned release 至少包含一个可加载、允许列出的同语言条目时才返回公开的 200；否则 route 在 head 前 404，且不进入 Header/Footer、sitemap、hreflang 或 llms。已有实质目录可先 `200 + noindex`，通过独立内容与内链门禁后才 `index`。
 
-`src/blocks/` 中可执行的 React Blocks 保持现有扁平结构，不再添加 `blocks/marketing/`。首页对齐 ShipAny TanStack：`src/routes/index.tsx` 显式组合稳定 Blocks，Blocks 静态读取顶层 `landing.*`。标准换项目只需替换 `messages/<locale>.json`、当前仓库 `product/marketing/assets.json` 和对应 R2 对象；只有新交互或信息架构变化才改 Route/Blocks/Components。工具、模型和目录长正文在 `product/marketing/**` 编辑，运行时只读取已发布 release。Catalog 被路由、目录、Related、Sitemap 和 llms 共同消费。只有真正共享的 durable 纯展示组件进入 `components/catalog/`。
+`src/blocks/` 中可执行的 React Blocks 保持现有扁平结构，不再添加 `blocks/marketing/`。首页对齐 ShipAny TanStack：`src/routes/index.tsx` 通过 `product/home.json` 的闭集注册表组合稳定 Blocks，Blocks 静态读取顶层 `landing.*`。标准换项目只需替换 `product/messages/<locale>.json`、当前仓库 `product/marketing/assets.json` 和对应 R2 对象；只有新交互或信息架构变化才改 Route/Blocks/Components。工具、模型和目录长正文在 `product/marketing/**` 编辑，运行时只读取已发布 release。Catalog 被路由、目录、Related、Sitemap 和 llms 共同消费。只有真正共享的 durable 纯展示组件进入 `components/catalog/`。
 
 `scripts/marketing-content-release.ts` 扫描 `product/marketing/**`，校验路径中的 kind/entityId/locale 与 JSON 身份、Catalog、template/variant、assetId 和内链，再输出不可变 content release、目录投影与轻量可用性索引。运行时的 `registry.ts` + `store.ts` 只按 `kind + entityId + locale + pinned releaseId` 精确读取；未实现 release resolver 的 kind 必须 fail closed。源 JSON 不得被 root、route、Block 或 client 代码 import。
 
@@ -1090,7 +1090,7 @@ Worker gzip 体积只衡量服务端部署包，不能代替浏览器 route JS �
 
 - [ ] 页面结构由 Route/Block 显式 composition；没有任意 `sections[]` JSON renderer、component name 或 HTML 驱动页面
 - [ ] 首页 `landing.*`、Typed Catalog、工具/模型 `product/marketing/**` 编辑源/pinned release、Runtime 事实、当前项目 R2 媒体和 Blog 数据库各自位于规定的权威源，没有互相复制
-- [ ] 标准换项目只修改 `messages/<locale>.json` 的 `landing.*`、当前项目 `product/marketing/assets.json` 和 R2 对象；首页 Route/Blocks/Components 无业务必要时不改
+- [ ] 标准换项目只修改 `product/home.json`、`product/messages/<locale>.json` 的 `landing.*`、当前项目 `product/marketing/assets.json` 和 R2 对象；首页 Route/Blocks/Components 无业务必要时不改
 - [ ] durable Components 只接收 props，不读取 `m`、Catalog、R2/Admin 配置或 server-only modules；Home/Tool/Model Blocks 保持独立
 - [ ] 页面实体的 publication/availability/locale indexing/placement 组合合法；每条 locale path 能正向生成并反向解析
 - [ ] 每条会被首页、目录或 Related 链接的 Catalog locale route 同时存在同语言 source 和 pinned release entry；unknown/hidden/unregistered/明确未发布在 head 前返回 404，已发布对象故障返回 `503 + Retry-After`

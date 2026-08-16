@@ -387,16 +387,38 @@ const rows = await db()
 - **Pattern:** pages consume only blocks. Blocks read i18n and configure components. Components render — they don't know the app's content.
 - **Naming:** `site-*` = public marketing chrome (`SiteHeader`, `SiteFooter`). `app-*` = authenticated-app chrome (`AppSidebar`, `AppLayout`). These are separate surfaces — don't merge them.
 
-### Template Philosophy: Blocks Are Disposable, Components Are Durable
+### Agent-Native Product Pack Overlay
+
+The upstream Agent workflows remain the control surface. `/quick-start` owns a
+new-product brief, `/clone-website` owns reference-site reconstruction,
+`/marketing-seo` owns public Catalog page lifecycle, and the module/page skills
+own typed platform extensions. This template adds one storage and ownership
+rule to those workflows: ordinary product identity and content changes land in
+`product/**` first.
+
+- Brand, Agent persona, homepage composition, localized copy, Catalog,
+  long-form marketing content, research, editorial sources, and optional Skills
+  are Product Pack concerns.
+- Reuse the registered homepage, tool/model routes, and platform modules when a
+  brief changes only content or branding.
+- Modify Blocks/Components/Routes only for new interactions or information
+  architecture. Modify providers/modules only for new executable capability.
+- Product JSON never defines components, imports, SQL, provider requests,
+  authorization, or billing behavior.
+- Finish Product Pack work with `pnpm product:validate`; relevant workflows add
+  their own build, route, visual, SEO, release, or deployment checks.
+
+### Template Philosophy: Product Pack First, Components Durable
 
 This repo ships with a default landing page (`blocks/header`, `hero`, `features`, `pricing`, `footer`) so a fresh clone has something to render. **That content is demo material — it's expected to be rewritten for any real project.**
 
 When starting a new project:
 
 1. **Keep** `src/components/*` and `src/components/ui/*` — they're the durable primitives (`PricingTable`, `SiteHeader`, `SiteFooter`, `AppSidebar`, shadcn UI). These are the chassis.
-2. **Rewrite** `src/blocks/*` — delete the demo blocks, write new ones that wire the user's real content and i18n into the primitives. Or compose fresh sections directly.
-3. **Rewrite** `src/routes/index.tsx` — it's ~17 lines of pure composition. Recompose from the new blocks.
+2. **Start with** `product/home.json`, `product/messages/*`, and `product/marketing/assets.json`; keep the registered Blocks when their interaction and information architecture fit.
+3. **Rewrite** a Block or `src/routes/index.tsx` only when the Product Pack's closed section registry cannot express the requested layout or behavior.
 4. **Rewrite** the `landing.*` keys in `product/messages/en.json` and `product/messages/zh.json` — the translations that feed the blocks.
+5. **Replace** `product/catalog/*` and matching `product/marketing/**` when the product exposes a different public tool/model surface.
 
 The `/quick-start` and `/clone-website` skills automate this workflow.
 

@@ -14,6 +14,27 @@ The repository is split into two ownership zones:
 The included product pack is a working image/video-agent example. It is sample
 content, not a second source of platform behavior.
 
+## Agent-native workflow
+
+The normal entry point is a product brief given to a coding Agent, not a form
+that the user must fill by hand. For example:
+
+> Build a bilingual research agent for investment teams, with a restrained
+> editorial homepage, subscription billing, and public pages for each research
+> workflow.
+
+Repository guidance routes this through the existing `quick-start` workflow.
+That workflow retains its reference-site, generated-design, dashboard, module,
+and visual-QA lanes; the template adds a Product Pack overlay so the Agent puts
+identity and content in `product/**`, reuses the platform by default, and edits
+shared runtime only when the brief requires a new executable capability or
+interaction.
+
+The Agent may still request a material missing business fact, credential, or
+authorization for an external/irreversible action. Manual file instructions
+below document the resulting ownership model; they are not a prerequisite for
+using the template through an Agent.
+
 ## What stays in the template
 
 - Homepage blocks and a JSON-controlled section order

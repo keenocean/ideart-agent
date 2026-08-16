@@ -9,7 +9,7 @@ user-invocable: true
 
 You are about to reverse-engineer and rebuild **$ARGUMENTS** as pixel-perfect clones.
 
-When multiple URLs are provided, process them independently and in parallel where possible, while keeping each site's extraction artifacts isolated in dedicated folders (for example, `docs/research/<hostname>/`).
+When multiple URLs are provided, process them independently and in parallel where possible, while keeping each site's extraction artifacts isolated in dedicated folders (for example, `product/research/<hostname>/`).
 
 This is not a two-phase process (inspect then build). You are a **foreman walking the job site** — as you inspect each section of the page, you write a detailed specification to a file, then hand that file to a specialist builder agent with everything they need. Extraction and construction happen in parallel, but extraction is meticulous and produces auditable artifacts.
 
@@ -39,7 +39,7 @@ If the user provides additional instructions (specific fidelity level, customiza
 1. **Browser automation is required.** Check for available browser MCP tools (Chrome MCP, Playwright MCP, Browserbase MCP, Puppeteer MCP) or the `agent-browser` CLI tool (`npx agent-browser`). Use whichever is available — if multiple exist, prefer `agent-browser` or Chrome MCP. If none are detected, ask the user which browser tool they have and how to connect it. This skill cannot work without browser automation.
 2. Parse `$ARGUMENTS` as one or more URLs. Normalize and validate each URL; if any are invalid, ask the user to correct them before proceeding. For each valid URL, verify it is accessible via your browser MCP tool.
 3. Verify the base project builds: `pnpm build`. The TanStack Start + shadcn/ui + Tailwind v4 scaffold should already be in place. If not, tell the user to set it up first.
-4. Create the output directories if they don't exist: `docs/research/`, `docs/research/components/`, `docs/design-references/`, `scripts/`. For multiple clones, also prepare per-site folders like `docs/research/<hostname>/` and `docs/design-references/<hostname>/`.
+4. Create the output directories if they don't exist: `product/research/`, `product/research/components/`, `product/research/design-references/`, `scripts/`. For multiple clones, also prepare per-site folders like `product/research/<hostname>/` and `product/research/design-references/<hostname>/`.
 5. When working with multiple sites in one command, optionally confirm whether to run them in parallel (recommended, if resources allow) or sequentially to avoid overload.
 
 ## Guiding Principles
@@ -119,7 +119,7 @@ For scroll-dependent elements:
 
 ### 8. Spec Files Are the Source of Truth
 
-Every component gets a specification file in `docs/research/components/` BEFORE any builder is dispatched. This file is the contract between your extraction work and the builder agent. The builder receives the spec file contents inline in its prompt — the file also persists as an auditable artifact that the user (or you) can review if something looks wrong.
+Every component gets a specification file in `product/research/components/` BEFORE any builder is dispatched. This file is the contract between your extraction work and the builder agent. The builder receives the spec file contents inline in its prompt — the file also persists as a product-owned auditable artifact that the user (or you) can review if something looks wrong.
 
 The spec file is not optional. It is not a nice-to-have. If you dispatch a builder without first writing a spec file, you are shipping incomplete instructions based on whatever you can remember from a browser MCP session, and the builder will guess to fill gaps.
 
@@ -133,7 +133,7 @@ Navigate to the target URL with browser MCP.
 
 ### Screenshots
 - Take **full-page screenshots** at desktop (1440px) and mobile (390px) viewports
-- Save to `docs/design-references/` with descriptive names
+- Save to `product/research/design-references/` with descriptive names
 - These are your master reference — builders will receive section-specific crops/screenshots later
 
 ### Global Extraction
@@ -173,7 +173,7 @@ This is a dedicated pass AFTER screenshots and BEFORE anything else. Its purpose
 - Mobile: 390px
 - At each width, note which sections change layout (column → stack, sidebar disappears, etc.) and at approximately which breakpoint the change occurs.
 
-Save all findings to `docs/research/BEHAVIORS.md`. This is your behavior bible — reference it when writing every component spec.
+Save all findings to `product/research/BEHAVIORS.md`. This is your behavior bible — reference it when writing every component spec.
 
 ### Page Topology
 Map out every distinct section of the page from top to bottom. Give each a working name. Document:
@@ -183,7 +183,7 @@ Map out every distinct section of the page from top to bottom. Give each a worki
 - Dependencies between sections (e.g., a floating nav that overlays everything)
 - **The interaction model** of each section (static, click-driven, scroll-driven, time-driven)
 
-Save this as `docs/research/PAGE_TOPOLOGY.md` — it becomes your assembly blueprint.
+Save this as `product/research/PAGE_TOPOLOGY.md` — it becomes your assembly blueprint.
 
 ## Phase 2: Foundation Build
 
@@ -244,7 +244,7 @@ This is the core loop. For each section in your page topology (top to bottom), y
 
 For each section, use browser MCP to extract everything:
 
-1. **Screenshot** the section in isolation (scroll to it, screenshot the viewport). Save to `docs/design-references/`.
+1. **Screenshot** the section in isolation (scroll to it, screenshot the viewport). Save to `product/research/design-references/`.
 
 2. **Extract CSS** for every element in the section. Use the extraction script below — don't hand-measure individual properties. Run it once per component container and capture the full output:
 
@@ -311,9 +311,9 @@ Record the diff explicitly: "Property X changes from VALUE_A to VALUE_B, trigger
 
 ### Step 2: Write the Component Spec File
 
-For each section (or sub-component, if you're breaking it up), create a spec file in `docs/research/components/`. This is NOT optional — every builder must have a corresponding spec file.
+For each section (or sub-component, if you're breaking it up), create a spec file in `product/research/components/`. This is NOT optional — every builder must have a corresponding spec file.
 
-**File path:** `docs/research/components/<component-name>.spec.md`
+**File path:** `product/research/components/<component-name>.spec.md`
 
 **Template:**
 
@@ -322,7 +322,7 @@ For each section (or sub-component, if you're breaking it up), create a spec fil
 
 ## Overview
 - **Target file:** `src/components/<ComponentName>.tsx`
-- **Screenshot:** `docs/design-references/<screenshot-name>.png`
+- **Screenshot:** `product/research/design-references/<screenshot-name>.png`
 - **Interaction model:** <static | click-driven | scroll-driven | time-driven>
 
 ## DOM Structure
@@ -394,7 +394,7 @@ Based on complexity, dispatch builder agent(s) in worktree(s):
 
 **What every builder agent receives:**
 - The full contents of its component spec file (inline in the prompt — don't say "go read the spec file")
-- Path to the section screenshot in `docs/design-references/`
+- Path to the section screenshot in `product/research/design-references/`
 - Which shared components to import (`icons.tsx`, `cn()`, shadcn primitives)
 - The target file path (e.g., `src/components/HeroSection.tsx`)
 - Instruction to verify with `npx tsc --noEmit` before finishing
@@ -442,7 +442,7 @@ Only after this visual QA pass is the clone complete.
 
 Before dispatching ANY builder agent, verify you can check every box. If you can't, go back and extract more.
 
-- [ ] Spec file written to `docs/research/components/<name>.spec.md` with ALL sections filled
+- [ ] Spec file written to `product/research/components/<name>.spec.md` with ALL sections filled
 - [ ] Every CSS value in the spec is from `getComputedStyle()`, not estimated
 - [ ] Interaction model is identified and documented (static / click / scroll / time)
 - [ ] For stateful components: every state's content and styles are captured
@@ -479,7 +479,7 @@ After the pixel-perfect clone is verified (Phase 5), replace the cloned site's c
 
 ### 6.1 Content Mapping
 
-Create a mapping document `docs/research/CONTENT_MAP.md` that pairs each section of the cloned page with the corresponding content from the user's brief:
+Create a mapping document `product/research/CONTENT_MAP.md` that pairs each section of the cloned page with the corresponding content from the user's brief:
 
 ```markdown
 | Clone Section | Original Content | New Content (from brief) |
@@ -498,7 +498,14 @@ Rules for mapping:
 
 ### 6.2 Apply Content
 
-For each component file, replace the hardcoded text strings with the mapped content. Do NOT change:
+Apply the mapped product identity to `product/brand.json`, homepage order to
+`product/home.json`, localized UI/home copy to `product/messages/`, and any
+public tool/model definitions and long-form content to `product/catalog/` plus
+`product/marketing/`. Custom Blocks may read static Paraglide messages and pass
+content props to cloned Components; Components remain pure-props UI.
+
+For each component file, replace only content that genuinely belongs to the
+custom visual structure. Do NOT change:
 - CSS classes or Tailwind utilities
 - Component structure or nesting
 - Image dimensions or layout
@@ -530,21 +537,22 @@ The clone replaces the original site's branding with the user's product, so the
 original site's downloaded favicon/logo (from the Foundation "Favicons & Meta" step)
 must not ship. Replace them with the user's product mark.
 
-The ShipAny template ships **placeholder** `public/logo.svg` + `public/favicon.svg`
-(a single letter on a rounded square), already wired: `app_logo` defaults to `/logo.svg`
-(`src/config/index.ts`) and the root route head (`src/routes/__root.tsx`) links the
-favicon → `/favicon.svg`. There is no committed `logo.png`/`favicon.ico`.
+The Agent SaaS template ships `public/logo.png` + `public/favicon.ico`. The logo
+default is owned by `product/brand.json`; the favicon link lives in
+`src/routes/__root.tsx`.
 
-- **User provided a logo/favicon** → drop their files into `public/`, point `app_logo` +
-  the `__root.tsx` head favicon link at them, and skip generation.
+- **User provided a logo/favicon** → drop their files into `public/`, point
+  `product/brand.json` plus the `__root.tsx` head favicon link at them, and skip
+  generation.
 - **Otherwise, generate a letter mark from the product name** — overwrite the two
   placeholder files (no code change needed):
   1. **Letter** = first character of the product name, uppercased (`Acme` → `A`; CJK-only
      name → first character, or its English initial if one exists).
-  2. **Color** = the theme's primary color (read `--primary` from `src/app/globals.css`),
+  2. **Color** = the theme's primary color (read `--primary` from `src/styles/globals.css`),
      falling back to `#0a0a0a` bg + `#ffffff` letter. Ensure the letter contrasts.
-  3. Write `public/logo.svg` + `public/favicon.svg` (favicon uses a larger `font-size` so
-     the glyph reads at 16px):
+  3. Write `public/logo.svg` + `public/favicon.svg`, set
+     `product/brand.json.logo` to `/logo.svg`, and update the root favicon link
+     (favicon uses a larger `font-size` so the glyph reads at 16px):
 
      ```svg
      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
@@ -569,18 +577,17 @@ SVG favicons work in all modern browsers. For a classic `.ico`, convert with
 
 ## Completion
 
-If this clone runs inside a fresh ShipAny Next project (origin still points at
-`shipany-ai/shipany-tanstack`), rewire the git remotes:
+If this clone runs inside a fresh Agent SaaS template checkout, give the
+downstream product its own `origin` and keep this template as `template`:
 
 ```bash
-git remote get-url upstream 2>/dev/null \
-  || git remote add upstream git@github.com:shipany-ai/shipany-tanstack.git
+git remote rename origin template
+git remote add origin <product-repository-url>
 ```
 
-Then ask the user for their own repository URL and run
-`git remote set-url origin <their-repo-url>` (or include the command in the
-report if they haven't created the repo yet). `/sync-upstream` pulls future
-template updates, keeping their changes on conflict.
+If remotes are already configured, preserve them. Future upgrades merge
+`template/main` using the ownership rules in `docs/template-upgrades.md`. Push
+only when the user explicitly authorized publication to that repository.
 
 When done, report:
 - Total sections built
@@ -589,5 +596,5 @@ When done, report:
 - Total assets downloaded (images, videos, SVGs, fonts)
 - Build status (`pnpm build` result)
 - Visual QA results (any remaining discrepancies)
-- Git remotes wired (origin → user's repo, upstream → template) if applicable
+- Git remotes wired (`origin` → product repo, `template` → template repo) if applicable
 - Any known gaps or limitations
