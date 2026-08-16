@@ -928,7 +928,7 @@ pnpm marketing:publish-content-release -- --dry-run
 
 Worker gzip 体积只衡量服务端部署包，不能代替浏览器 route JS 和首屏资源预算。实现前记录首页与代表性详情页的 route client JS gzip、Lighthouse 和网络瀑布，再据此设定回归阈值；新增页面不得出现未解释的显著增长。
 
-使用 `pnpm bundle:report-routes` 解析 TanStack Start/Vite manifest，报告每类公开 route 的直接与传递 preload raw/gzip、最大客户端 JS 以及共享 messages chunk。当前最大单个客户端 JS 的 raw 预算为 500,000 bytes，Vite 只为客户端构建建立 `react-core`、`tanstack-router`、`tanstack-start`、`tanstack-query` 与 `lucide-icons` 缓存边界；`tanstack-start` 再以 450,000 bytes 为上限拆分，避免应用启动与 route manifest 聚合成超大包。集中 Lucide 只合并项目实际引用、已经 tree-shake 的图标，减少大量微小共享 chunk；不要改成导入图标库总入口，也不要仅提高 Vite warning limit 掩盖超限。
+使用 `pnpm bundle:report-routes` 解析 TanStack Start/Vite manifest，报告每类公开 route 的直接与传递 preload raw/gzip、最大客户端 JS 以及共享 messages chunk。当前最大单个客户端 JS 的 raw 预算为 500,000 bytes。Vite 客户端只建立两个单向叶子缓存边界：`react-core` 包含不会反向依赖应用代码的 React、ReactDOM 与 Scheduler，`lucide-icons` 合并项目实际使用且已 tree-shake 的图标；TanStack、认证、查询和应用模块继续使用 Rolldown 自动分包。不要为 Start/Router 等跨层运行时设置 `maxSize` 或额外 vendor groups：它们可能产生构建成功、浏览器初始化失败的循环 chunk。`pnpm client:check-chunk-graph` 在普通构建和 Cloudflare 构建后检查所有静态客户端 import，并以零循环为发布门槛。不要改成导入图标库总入口，也不要仅提高 Vite warning limit 掩盖超限。
 
 短 UI/metadata 使用静态 `m['key']()`。`src/routes`、`src/blocks`、`src/components` 和 `src/hooks` 的生产客户端源码禁止 import `tDynamic()`；固定枚举状态使用带类型的静态 message function map。公共营销 import graph 还禁止把 `m` cast 成动态 record、拼接 message key，或 import/glob `messages/marketing/**`。`src/core/i18n/static-message-usage.test.ts` 锁定该边界。营销长正文固定通过 server-only pinned release 进入 SSR，不生成页面专属 client chunk；没有同语言 release entry 时 404，不 fallback。
 

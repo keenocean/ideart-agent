@@ -11,14 +11,14 @@
       "/blog/$slug"
     ],
     "baselineGzipBytes": {
-      "__root__": 253084,
-      "/": 383613,
-      "/pricing": 351778,
-      "/(pages)": 269043,
-      "/tools/": 344075,
-      "/tools/$slug": 372465,
-      "/blog/": 344592,
-      "/blog/$slug": 344864
+      "__root__": 276844,
+      "/": 385568,
+      "/pricing": 354430,
+      "/(pages)": 286497,
+      "/tools/": 346996,
+      "/tools/$slug": 374496,
+      "/blog/": 347510,
+      "/blog/$slug": 347790
     },
     "explainedGzipIncreases": {},
     "explainIncreaseAboveGzipBytes": 102400,

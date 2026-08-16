@@ -118,24 +118,27 @@ bytes across 66 assets. A 266,825 raw / 80,193 gzip compiled messages chunk was
 preloaded by the root.
 
 Fixed message enums now use static Paraglide function maps instead of
-`tDynamic()`. The Vite client environment has explicit React, TanStack Router,
-TanStack Start, TanStack Query, and tree-shaken Lucide cache boundaries; the
-Start group has a 450,000-byte split ceiling. The repeatable report now also
-fails when any client JS exceeds the configured 500,000 raw-byte budget.
+`tDynamic()`. A first attempt at explicit React, TanStack Router, TanStack
+Start, TanStack Query, and Lucide groups produced a circular client chunk graph
+and failed during browser initialization. The safe baseline keeps only two
+one-way leaf boundaries: React/ReactDOM/Scheduler as `react-core` and the
+tree-shaken Lucide modules as `lucide-icons`; the remaining graph stays with
+Rolldown. The build now fails on any client chunk cycle as well as any client
+JS asset above the configured 500,000 raw-byte budget.
 
 | Route id       | Before gzip | Current gzip |   Delta | Current assets |
 | -------------- | ----------: | -----------: | ------: | -------------: |
-| `__root__`     |     291,228 |      253,084 | -38,144 |             16 |
-| `/`            |     405,323 |      383,613 | -21,710 |             52 |
-| `/pricing`     |     370,942 |      351,778 | -19,164 |             38 |
-| `/(pages)`     |     300,979 |      269,043 | -31,936 |             21 |
-| `/tools/`      |     363,709 |      344,075 | -19,634 |             36 |
-| `/tools/$slug` |     393,750 |      372,465 | -21,285 |             45 |
-| `/blog/`       |     364,246 |      344,592 | -19,654 |             36 |
-| `/blog/$slug`  |     364,408 |      344,864 | -19,544 |             36 |
+| `__root__`     |     291,228 |      276,844 | -14,384 |             13 |
+| `/`            |     405,323 |      385,568 | -19,755 |             46 |
+| `/pricing`     |     370,942 |      354,430 | -16,512 |             33 |
+| `/(pages)`     |     300,979 |      286,497 | -14,482 |             16 |
+| `/tools/`      |     363,709 |      346,996 | -16,713 |             30 |
+| `/tools/$slug` |     393,750 |      374,496 | -19,254 |             39 |
+| `/blog/`       |     364,246 |      347,510 | -16,736 |             30 |
+| `/blog/$slug`  |     364,408 |      347,790 | -16,618 |             30 |
 
-The largest client JS is now 411,360 raw / 127,547 gzip bytes. The final
-Cloudflare budget dry-run reports Worker gzip 2,234,182 / 2,516,582 bytes, 208 /
+The largest client JS is now 411,243 raw / 127,524 gzip bytes. The final
+Cloudflare budget dry-run reports Worker gzip 2,202,340 / 2,516,582 bytes, 199 /
 250 static assets, and a 4,731,048 / 26,214,400-byte largest static asset. The
 comparison is a dry-run and does not represent a production deployment.
 

@@ -124,7 +124,7 @@ export default defineConfig({
   },
   plugins: [
     {
-      name: 'client-code-splitting',
+      name: 'client-react-boundary',
       configEnvironment(name, _config, env) {
         if (env.command !== 'build' || env.isSsrBuild || name !== 'client') {
           return;
@@ -138,28 +138,10 @@ export default defineConfig({
                     {
                       name: 'react-core',
                       test: /node_modules[\\/](?:react|react-dom|scheduler)(?:[\\/]|$)/,
-                      priority: 30,
-                    },
-                    {
-                      name: 'tanstack-router',
-                      test: /node_modules[\\/]@tanstack[\\/](?:history|react-router|router-core)(?:[\\/]|$)/,
-                      priority: 25,
-                    },
-                    {
-                      name: 'tanstack-start',
-                      test: /node_modules[\\/]@tanstack[\\/]start-client-core(?:[\\/]|$)/,
-                      maxSize: 450_000,
-                      priority: 20,
                     },
                     {
                       name: 'lucide-icons',
                       test: /node_modules[\\/]lucide-react(?:[\\/]|$)/,
-                      priority: 15,
-                    },
-                    {
-                      name: 'tanstack-query',
-                      test: /node_modules[\\/]@tanstack[\\/](?:query-core|react-query)(?:[\\/]|$)/,
-                      priority: 10,
                     },
                   ],
                 },

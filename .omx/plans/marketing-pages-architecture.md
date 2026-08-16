@@ -379,7 +379,7 @@ R2 交付契约：
 
 ### 3.8 客户端性能预算
 
-Worker gzip 预算不能代替浏览器侧性能预算。阶段 0 必须通过 `bundle:report-routes` 记录首页和代表性详情页的传递 client JS gzip，通过固定 URL、viewport、节流参数和工具版本记录 Lighthouse 与首屏资源基线；阶段 8 对比新增路由，任何显著增长都要定位到具体 chunk、组件或媒体并记录理由。当前 CI 拒绝超过 500,000 raw bytes 的单个客户端 JS；Vite 客户端构建把 React、TanStack Router、TanStack Start、TanStack Query 和项目实际使用的 Lucide 图标设为稳定缓存边界，其中 Start 分组以 450,000 bytes 为拆分上限。已知 message key 必须静态调用，生产客户端 route/block/component/hook 不得 import `tDynamic()`，由回归测试锁定。门槛调整必须基于新的构建和网络证据，不能用提高 warning limit 代替优化。
+Worker gzip 预算不能代替浏览器侧性能预算。阶段 0 必须通过 `bundle:report-routes` 记录首页和代表性详情页的传递 client JS gzip，通过固定 URL、viewport、节流参数和工具版本记录 Lighthouse 与首屏资源基线；阶段 8 对比新增路由，任何显著增长都要定位到具体 chunk、组件或媒体并记录理由。当前 CI 拒绝超过 500,000 raw bytes 的单个客户端 JS；Vite 客户端只把不会反向依赖应用代码的 React、ReactDOM 和 Scheduler 放进 `react-core`，并把同样单向依赖 React 的已 tree-shake Lucide 图标放进 `lucide-icons`，其余 TanStack、认证、查询和应用模块交给 Rolldown 自动分包。禁止用 `maxSize` 或跨层 vendor groups 强拆 Start/Router 等相互关联的运行时模块；此类分组曾生成可构建但浏览器初始化失败的循环 chunk。`client:check-chunk-graph` 在普通构建和 Cloudflare 构建后拒绝任何客户端静态 chunk 循环。已知 message key 必须静态调用，生产客户端 route/block/component/hook 不得 import `tDynamic()`，由回归测试锁定。门槛调整必须基于新的构建和网络证据，不能用提高 warning limit 代替优化。
 
 - H1、主要说明、能力/限制和关键内链必须存在于 SSR HTML，不能依赖交互后才渲染。
 - Workbench 的上传器、案例画廊、Skill 面板和 below-fold 重交互可按路由或交互懒加载。
