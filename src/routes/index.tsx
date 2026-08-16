@@ -16,7 +16,6 @@ import { HomeFAQ } from '@/blocks/home-faq';
 import { HomeFeatures } from '@/blocks/home-features';
 import { HomeGallery } from '@/blocks/home-gallery';
 import { HomeHero } from '@/blocks/home-hero';
-import { HomeMediaMarquee } from '@/blocks/home-media-marquee';
 import { HowItWorks } from '@/blocks/how-it-works';
 import { SupportWidget } from '@/blocks/support-widget';
 import { UseCases } from '@/blocks/use-cases';
@@ -31,9 +30,8 @@ function HomePage() {
       <Header />
       <main className="flex flex-1 flex-col">
         <HomeHero />
-        <HomeMediaMarquee media={home.media.marquee} />
-        <HomeFeatures />
         <HomeGallery media={home.media.examples} />
+        <HomeFeatures />
         <UseCases media={home.media.useCases} />
         <HowItWorks />
         <FeaturedCatalog
