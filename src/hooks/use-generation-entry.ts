@@ -64,7 +64,7 @@ export type GenerationEntryController = {
   addFiles: (files: File[]) => Promise<void>;
   addLibraryMedia: (media: LibraryMedia[]) => Promise<void>;
   removeAttachment: (id: string) => void;
-  submit: () => void;
+  submit: (options?: { skillName?: string }) => void;
 };
 
 export function useGenerationEntry({
@@ -293,49 +293,53 @@ export function useGenerationEntry({
   const uploading = attachments.some((item) => item.status === 'uploading');
   const hasUploaded = attachments.some((item) => item.status === 'uploaded');
 
-  const submit = useCallback(() => {
-    const prompt = value.trim();
-    if ((!prompt && !hasUploaded) || uploading || submitting) return;
-    if (inputPolicy) {
-      const policyError = validateGenerationAttachments(
-        requestAttachments(attachments),
-        inputPolicy
-      );
-      if (policyError) {
-        toast.error(policyError);
-        return;
+  const submit = useCallback(
+    (options?: { skillName?: string }) => {
+      const prompt = value.trim();
+      if ((!prompt && !hasUploaded) || uploading || submitting) return;
+      if (inputPolicy) {
+        const policyError = validateGenerationAttachments(
+          requestAttachments(attachments),
+          inputPolicy
+        );
+        if (policyError) {
+          toast.error(policyError);
+          return;
+        }
       }
-    }
-    setSubmitting(true);
-    const sessionId = ensureSessionId();
-    try {
-      sessionStorage.setItem(
-        initialTurnStorageKey(sessionId),
-        serializeInitialTurnHandoff({
-          prompt,
-          settings,
-          skillName,
-          attachments,
-          entryContext,
-        })
-      );
-    } catch {
-      // The destination still opens; it simply cannot recover the initial turn.
-    }
-    router.push(`/chat/${sessionId}`);
-  }, [
-    attachments,
-    ensureSessionId,
-    entryContext,
-    hasUploaded,
-    inputPolicy,
-    router,
-    settings,
-    skillName,
-    submitting,
-    uploading,
-    value,
-  ]);
+      setSubmitting(true);
+      const sessionId = ensureSessionId();
+      const selectedSkillName = options?.skillName ?? skillName;
+      try {
+        sessionStorage.setItem(
+          initialTurnStorageKey(sessionId),
+          serializeInitialTurnHandoff({
+            prompt,
+            settings,
+            skillName: selectedSkillName,
+            attachments,
+            entryContext,
+          })
+        );
+      } catch {
+        // The destination still opens; it simply cannot recover the initial turn.
+      }
+      router.push(`/chat/${sessionId}`);
+    },
+    [
+      attachments,
+      ensureSessionId,
+      entryContext,
+      hasUploaded,
+      inputPolicy,
+      router,
+      settings,
+      skillName,
+      submitting,
+      uploading,
+      value,
+    ]
+  );
 
   return {
     value,

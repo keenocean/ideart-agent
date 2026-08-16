@@ -38,7 +38,6 @@ import { m } from '@/paraglide/messages.js';
 import {
   ComposerControls,
   ComposerModeSelector,
-  ComposerSkillSelect,
 } from '@/components/agent/composer-controls';
 import {
   ComposerImageModel,
@@ -176,8 +175,6 @@ export function ChatComposer({
   onRemoveAttachment,
   settings,
   onSettingsChange,
-  skillName,
-  onSkillNameChange,
   disabled = false,
   running = false,
   submitDisabled = false,
@@ -427,14 +424,6 @@ export function ChatComposer({
               : 'w-full flex-wrap sm:w-auto sm:flex-nowrap'
           )}
         >
-          {onSkillNameChange && (
-            <ComposerSkillSelect
-              skillName={skillName}
-              onChange={onSkillNameChange}
-              disabled={disabled}
-              compact={presentation === 'tool'}
-            />
-          )}
           {settings.mediaMode === 'image' ? (
             <>
               <ComposerImageModel

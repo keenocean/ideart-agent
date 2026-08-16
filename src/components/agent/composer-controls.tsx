@@ -1,11 +1,8 @@
-import { useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import {
   Check,
   ChevronDown,
   Film,
   ImageIcon,
-  Sparkles,
   WandSparkles,
 } from 'lucide-react';
 
@@ -19,12 +16,6 @@ import {
   type AgentMediaMode,
   type VideoGenerationKind,
 } from '@/lib/agent-settings';
-import {
-  normalizeAgentPromptSkills,
-  type AgentPromptSkill,
-  type AgentSkillResponseItem,
-} from '@/lib/agent-skills';
-import { apiGet } from '@/lib/api-client';
 import { m } from '@/paraglide/messages.js';
 import { ModelLogo } from '@/components/agent/model-logos';
 import { Button } from '@/components/ui/button';
@@ -150,102 +141,6 @@ export function ComposerControls({
               {model.label}
             </span>
             {settings.modelOption === model.value && (
-              <Check className="size-4 shrink-0" />
-            )}
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
-
-export function ComposerSkillSelect({
-  skillName,
-  onChange,
-  disabled,
-  compact = false,
-}: {
-  skillName?: string;
-  onChange: (skillName: string | undefined) => void;
-  disabled?: boolean;
-  compact?: boolean;
-}) {
-  const skillsQuery = useQuery({
-    queryKey: ['agent-skills'],
-    queryFn: () =>
-      apiGet<{ items: AgentSkillResponseItem[] }>('/api/agent/skills'),
-    staleTime: 5 * 60 * 1000,
-  });
-  const skills: AgentPromptSkill[] = normalizeAgentPromptSkills(
-    skillsQuery.data?.items ?? []
-  );
-  const selected = skills.find((skill) => skill.name === skillName);
-  const triggerLabel =
-    selected?.label ?? skillName ?? m['agent.composer.skill_none']();
-
-  useEffect(() => {
-    if (!skillName || !skillsQuery.isSuccess) return;
-    if (!selected) onChange(undefined);
-  }, [skillName, selected, skillsQuery.isSuccess, onChange]);
-
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        render={
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            disabled={disabled}
-            aria-label={compact ? triggerLabel : undefined}
-            title={compact ? triggerLabel : undefined}
-            className={
-              compact
-                ? 'bg-muted/70 text-foreground hover:bg-muted size-9 shrink-0 rounded-md p-0'
-                : 'bg-muted/70 text-foreground hover:bg-muted h-9 max-w-[180px] gap-1.5 rounded-md px-3 text-xs'
-            }
-          />
-        }
-      >
-        <Sparkles className="text-muted-foreground size-3.5 shrink-0" />
-        {!compact && (
-          <>
-            <span className="truncate">{triggerLabel}</span>
-            <ChevronDown className="text-muted-foreground size-3.5" />
-          </>
-        )}
-      </DropdownMenuTrigger>
-      <DropdownMenuContent
-        align="end"
-        className="max-h-[min(24rem,70dvh)] w-64 overflow-y-auto"
-      >
-        <div className="text-muted-foreground px-2 py-1.5 text-xs">
-          {m['agent.composer.skills']()}
-        </div>
-        <DropdownMenuItem
-          onClick={() => onChange(undefined)}
-          className="items-center gap-2.5"
-        >
-          <span className="min-w-0 flex-1 truncate text-sm">
-            {m['agent.composer.skill_none']()}
-          </span>
-          {!skillName && <Check className="size-4 shrink-0" />}
-        </DropdownMenuItem>
-        {skills.map((skill) => (
-          <DropdownMenuItem
-            key={skill.name}
-            onClick={() => onChange(skill.name)}
-            className="items-center gap-2.5"
-          >
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-sm">{skill.label}</span>
-              {skill.description && (
-                <span className="text-muted-foreground block truncate text-xs">
-                  {skill.description}
-                </span>
-              )}
-            </span>
-            {selected?.name === skill.name && (
               <Check className="size-4 shrink-0" />
             )}
           </DropdownMenuItem>

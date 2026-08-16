@@ -1,8 +1,17 @@
 import { useRef, useState } from 'react';
-import { FileVideo2, Play, WandSparkles } from 'lucide-react';
+import {
+  FileVideo2,
+  GraduationCap,
+  ImageIcon,
+  Play,
+  Search,
+  Sparkles,
+  WandSparkles,
+} from 'lucide-react';
 import { toast } from 'sonner';
 
 import { useSession } from '@/core/auth/client';
+import { Link } from '@/core/i18n/navigation';
 import {
   isLocalChatMediaUrl,
   publishChatMediaSources,
@@ -52,12 +61,14 @@ export function PromptLauncher({
   textareaClassName,
   showHeading = true,
   showExamples = true,
+  showQuickActions = true,
 }: {
   className?: string;
   workbenchClassName?: string;
   textareaClassName?: string;
   showHeading?: boolean;
   showExamples?: boolean;
+  showQuickActions?: boolean;
 }) {
   const { data: session } = useSession();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -273,7 +284,7 @@ export function PromptLauncher({
     <div className={cn('w-full', className)}>
       {showHeading && (
         <h1 className="text-foreground mx-auto max-w-3xl text-center font-serif text-3xl font-normal tracking-[-0.01em] sm:text-4xl">
-          {m['landing.hero.headline_1']()}
+          {m['agent.home.headline']()}
         </h1>
       )}
 
@@ -300,6 +311,51 @@ export function PromptLauncher({
         disabled={submitting}
         submitDisabled={(!value.trim() && !hasUploaded) || uploading}
       />
+
+      {showQuickActions && (
+        <nav
+          aria-label={m['agent.quick_actions.label']()}
+          className="mx-auto mt-5 flex max-w-full items-center gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
+          <Link
+            href="/skills"
+            className="border-border text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-primary flex h-10 shrink-0 items-center gap-2 rounded-full border px-4 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none"
+          >
+            <Sparkles aria-hidden="true" className="size-4" />
+            {m['agent.quick_actions.skills']()}
+          </Link>
+          <QuickAction
+            icon={Play}
+            label={m['agent.quick_actions.video_ads']()}
+            onClick={() => {
+              setComposerSettings({ ...composerSettings, mediaMode: 'video' });
+              textareaRef.current?.focus();
+            }}
+          />
+          <QuickAction
+            icon={ImageIcon}
+            label={m['agent.quick_actions.image_ads']()}
+            onClick={() => {
+              setComposerSettings({ ...composerSettings, mediaMode: 'image' });
+              textareaRef.current?.focus();
+            }}
+          />
+          <QuickAction
+            icon={Search}
+            label={m['agent.quick_actions.competitor_research']()}
+            onClick={() =>
+              fillPrompt(m['agent.quick_actions.competitor_prompt']())
+            }
+          />
+          <QuickAction
+            icon={GraduationCap}
+            label={m['agent.quick_actions.watch_tutorial']()}
+            onClick={() => {
+              if (examples.length > 0) setPreviewIndex(0);
+            }}
+          />
+        </nav>
+      )}
 
       {showExamples && (
         <section className="mx-auto mt-14 max-w-3xl">
@@ -343,7 +399,7 @@ export function PromptLauncher({
         </section>
       )}
 
-      {showExamples && (
+      {(showExamples || showQuickActions) && (
         <VideoPreviewDialog
           open={preview !== null}
           item={
@@ -393,5 +449,26 @@ export function PromptLauncher({
         />
       )}
     </div>
+  );
+}
+
+function QuickAction({
+  icon: Icon,
+  label,
+  onClick,
+}: {
+  icon: typeof Sparkles;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="border-border text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-primary flex h-10 shrink-0 items-center gap-2 rounded-full border px-4 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none"
+    >
+      <Icon aria-hidden="true" className="size-4" />
+      {label}
+    </button>
   );
 }

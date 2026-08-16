@@ -7,6 +7,7 @@ import {
   MoreHorizontal,
   Pencil,
   Plus,
+  Sparkles,
   Trash2,
 } from 'lucide-react';
 
@@ -154,6 +155,17 @@ export function ChatsSidebar() {
                   >
                     <Clapperboard />
                     <span>{m['agent.nav.library']()}</span>
+                  </SidebarMenuButton>
+                </Link>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <Link href="/skills">
+                  <SidebarMenuButton
+                    tooltip={m['agent.nav.skills']()}
+                    isActive={pathname.includes('/skills')}
+                  >
+                    <Sparkles />
+                    <span>{m['agent.nav.skills']()}</span>
                   </SidebarMenuButton>
                 </Link>
               </SidebarMenuItem>
