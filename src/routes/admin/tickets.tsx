@@ -8,7 +8,6 @@ import { createFileRoute } from '@tanstack/react-router';
 import { MessageSquare } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { tDynamic } from '@/core/i18n/dynamic';
 import { apiGet, apiPatch, apiPost, type PageResult } from '@/lib/api-client';
 import { formatDateTime } from '@/lib/time';
 import { cn } from '@/lib/utils';
@@ -97,6 +96,19 @@ const STATUS_BADGE: Record<TicketStatus, 'default' | 'secondary' | 'outline'> =
     replied: 'secondary',
     closed: 'outline',
   };
+
+const TAB_LABELS: Record<Tab, () => string> = {
+  all: m['admin.tickets.tab_all'],
+  open: m['admin.tickets.tab_open'],
+  replied: m['admin.tickets.tab_replied'],
+  closed: m['admin.tickets.tab_closed'],
+};
+
+const STATUS_LABELS: Record<TicketStatus, () => string> = {
+  open: m['admin.tickets.status_open'],
+  replied: m['admin.tickets.status_replied'],
+  closed: m['admin.tickets.status_closed'],
+};
 
 function AdminTicketsPage() {
   const queryClient = useQueryClient();
@@ -247,7 +259,7 @@ function AdminTicketsPage() {
       className: 'w-[120px]',
       cell: (r) => (
         <Badge variant={STATUS_BADGE[r.status]}>
-          {tDynamic(`admin.tickets.status_${r.status}`)}
+          {STATUS_LABELS[r.status]()}
         </Badge>
       ),
     },
@@ -288,7 +300,7 @@ function AdminTicketsPage() {
                 : 'text-muted-foreground hover:text-foreground border-transparent'
             )}
           >
-            {tDynamic(`admin.tickets.tab_${tb}`)}
+            {TAB_LABELS[tb]()}
           </button>
         ))}
       </div>
@@ -323,7 +335,7 @@ function AdminTicketsPage() {
               {activeTicket?.title}
               {activeTicket && (
                 <Badge variant={STATUS_BADGE[activeTicket.status]}>
-                  {tDynamic(`admin.tickets.status_${activeTicket.status}`)}
+                  {STATUS_LABELS[activeTicket.status]()}
                 </Badge>
               )}
             </DialogTitle>

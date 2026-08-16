@@ -19,6 +19,7 @@ import {
   CatalogMediaPreviewDialog,
   type CatalogMediaPreviewLabels,
 } from '@/components/catalog/catalog-media-preview-dialog';
+import { CatalogSection } from '@/components/catalog/catalog-section';
 import { CatalogSectionHeading } from '@/components/catalog/catalog-section-heading';
 import { buttonVariants } from '@/components/ui/button';
 
@@ -33,39 +34,32 @@ export function CatalogFeatureGrid({
   description,
   items,
   id,
-  className,
 }: {
   title: string;
   description?: string;
   items: readonly CatalogCopyItem[];
   id?: string;
-  className?: string;
 }) {
   return (
-    <section
-      id={id}
-      className={cn('scroll-mt-20 px-4 py-16 sm:px-6', className)}
-    >
-      <div className="mx-auto w-full max-w-5xl">
-        <CatalogSectionHeading title={title} description={description} />
-        <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {items.map((item) => (
-            <article
-              key={item.title}
-              className="border-border bg-card rounded-2xl border p-5"
-            >
-              {item.icon}
-              <h3 className="text-foreground mt-3 text-sm font-medium">
-                {item.title}
-              </h3>
-              <p className="text-muted-foreground mt-1.5 text-sm leading-relaxed">
-                {item.description}
-              </p>
-            </article>
-          ))}
-        </div>
+    <CatalogSection id={id} width="narrow">
+      <CatalogSectionHeading title={title} description={description} />
+      <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        {items.map((item) => (
+          <article
+            key={item.title}
+            className="border-border bg-card rounded-2xl border p-5"
+          >
+            {item.icon}
+            <h3 className="text-foreground mt-3 text-sm font-medium">
+              {item.title}
+            </h3>
+            <p className="text-muted-foreground mt-1.5 text-sm leading-relaxed">
+              {item.description}
+            </p>
+          </article>
+        ))}
       </div>
-    </section>
+    </CatalogSection>
   );
 }
 
@@ -79,39 +73,37 @@ export function CatalogExploreSection({
   }[];
 }) {
   return (
-    <section id="explore" className="scroll-mt-20 px-4 py-16 sm:px-6">
-      <div className="mx-auto w-full max-w-6xl space-y-16">
-        {groups.map((group) => (
-          <div key={group.title}>
-            <CatalogSectionHeading
-              title={group.title}
-              description={group.description}
-            />
-            <div
-              className={cn(
-                'mt-8 grid gap-5 sm:grid-cols-2',
-                group.items.length >= 4 ? 'lg:grid-cols-4' : 'lg:grid-cols-3'
-              )}
-            >
-              {group.items.map((item) => (
-                <article
-                  key={item.title}
-                  className="border-border bg-card rounded-2xl border p-5"
-                >
-                  {item.icon}
-                  <h3 className="text-foreground mt-4 font-medium">
-                    {item.title}
-                  </h3>
-                  <p className="text-muted-foreground mt-2 text-sm leading-6">
-                    {item.description}
-                  </p>
-                </article>
-              ))}
-            </div>
+    <CatalogSection id="explore" containerClassName="space-y-16">
+      {groups.map((group) => (
+        <div key={group.title}>
+          <CatalogSectionHeading
+            title={group.title}
+            description={group.description}
+          />
+          <div
+            className={cn(
+              'mt-8 grid gap-5 sm:grid-cols-2',
+              group.items.length >= 4 ? 'lg:grid-cols-4' : 'lg:grid-cols-3'
+            )}
+          >
+            {group.items.map((item) => (
+              <article
+                key={item.title}
+                className="border-border bg-card rounded-2xl border p-5"
+              >
+                {item.icon}
+                <h3 className="text-foreground mt-4 font-medium">
+                  {item.title}
+                </h3>
+                <p className="text-muted-foreground mt-2 text-sm leading-6">
+                  {item.description}
+                </p>
+              </article>
+            ))}
           </div>
-        ))}
-      </div>
-    </section>
+        </div>
+      ))}
+    </CatalogSection>
   );
 }
 
@@ -127,37 +119,32 @@ export function CatalogSteps({
   id?: string;
 }) {
   return (
-    <section
-      id={id}
-      className="bg-muted/35 border-border scroll-mt-20 border-y px-4 py-16 sm:px-6"
-    >
-      <div className="mx-auto max-w-6xl">
-        <CatalogSectionHeading title={title} description={description} />
-        <div
-          className={cn(
-            'mt-10 grid grid-cols-1 gap-4 md:grid-cols-2',
-            items.length >= 4 ? 'lg:grid-cols-4' : 'lg:grid-cols-3'
-          )}
-        >
-          {items.map((item, index) => (
-            <article
-              key={item.title}
-              className="border-border bg-card grid h-full grid-rows-[auto_auto_1fr] rounded-[1.375rem] border p-6 sm:p-7"
-            >
-              <span className="border-primary/30 bg-primary/10 text-primary flex size-9 items-center justify-center rounded-full border text-sm font-semibold">
-                {index + 1}
-              </span>
-              <h3 className="text-foreground mt-4 text-base leading-6 font-medium">
-                {item.title}
-              </h3>
-              <p className="text-muted-foreground mt-3 text-sm leading-6">
-                {item.description}
-              </p>
-            </article>
-          ))}
-        </div>
+    <CatalogSection id={id}>
+      <CatalogSectionHeading title={title} description={description} />
+      <div
+        className={cn(
+          'mt-10 grid grid-cols-1 gap-4 md:grid-cols-2',
+          items.length >= 4 ? 'lg:grid-cols-4' : 'lg:grid-cols-3'
+        )}
+      >
+        {items.map((item, index) => (
+          <article
+            key={item.title}
+            className="border-border bg-card grid h-full grid-rows-[auto_auto_1fr] rounded-[1.375rem] border p-6 sm:p-7"
+          >
+            <span className="border-primary/30 bg-primary/10 text-primary flex size-9 items-center justify-center rounded-full border text-sm font-semibold">
+              {index + 1}
+            </span>
+            <h3 className="text-foreground mt-4 text-base leading-6 font-medium">
+              {item.title}
+            </h3>
+            <p className="text-muted-foreground mt-3 text-sm leading-6">
+              {item.description}
+            </p>
+          </article>
+        ))}
       </div>
-    </section>
+    </CatalogSection>
   );
 }
 
@@ -216,8 +203,8 @@ export function CatalogLimitations({
   items: readonly string[];
 }) {
   return (
-    <section className="px-4 py-16 sm:px-6">
-      <div className="mx-auto grid max-w-6xl gap-10 lg:grid-cols-[0.8fr_1.2fr]">
+    <CatalogSection>
+      <div className="grid gap-10 lg:grid-cols-[0.8fr_1.2fr]">
         <CatalogSectionHeading
           title={title}
           description={description}
@@ -238,7 +225,7 @@ export function CatalogLimitations({
           ))}
         </ul>
       </div>
-    </section>
+    </CatalogSection>
   );
 }
 
@@ -252,26 +239,24 @@ export function CatalogFaq({
   items: readonly { question: string; answer: string }[];
 }) {
   return (
-    <section id="faq" className="scroll-mt-20 px-4 py-16 sm:px-6">
-      <div className="mx-auto w-full max-w-5xl">
-        <CatalogSectionHeading title={title} description={description} />
-        <div className="mt-10 space-y-3">
-          {items.map((item) => (
-            <details
-              key={item.question}
-              className="border-border bg-card group rounded-2xl border px-5 py-4"
-            >
-              <summary className="focus-visible:ring-ring cursor-pointer list-none rounded-md font-medium focus-visible:ring-2 focus-visible:outline-none">
-                {item.question}
-              </summary>
-              <p className="text-muted-foreground mt-3 max-w-3xl text-sm leading-6">
-                {item.answer}
-              </p>
-            </details>
-          ))}
-        </div>
+    <CatalogSection id="faq" width="narrow">
+      <CatalogSectionHeading title={title} description={description} />
+      <div className="mt-10 space-y-3">
+        {items.map((item) => (
+          <details
+            key={item.question}
+            className="border-border bg-card group rounded-2xl border px-5 py-4"
+          >
+            <summary className="focus-visible:ring-ring cursor-pointer list-none rounded-md font-medium focus-visible:ring-2 focus-visible:outline-none">
+              {item.question}
+            </summary>
+            <p className="text-muted-foreground mt-3 max-w-3xl text-sm leading-6">
+              {item.answer}
+            </p>
+          </details>
+        ))}
       </div>
-    </section>
+    </CatalogSection>
   );
 }
 
@@ -282,7 +267,6 @@ export function CatalogFinalCta({
   secondaryLabel,
   primaryHref = '#generator',
   secondaryHref = '/pricing',
-  wide = false,
 }: {
   title: string;
   description: string;
@@ -290,16 +274,10 @@ export function CatalogFinalCta({
   secondaryLabel: string;
   primaryHref?: string;
   secondaryHref?: string;
-  wide?: boolean;
 }) {
   return (
-    <section className="px-4 py-16 sm:px-6">
-      <div
-        className={cn(
-          'border-border bg-card mx-auto w-full rounded-[2rem] border px-6 py-12 text-center shadow-sm sm:py-14',
-          wide ? 'max-w-7xl' : 'max-w-5xl'
-        )}
-      >
+    <CatalogSection width="narrow">
+      <div className="border-border bg-card w-full rounded-[2rem] border px-6 py-12 text-center shadow-sm sm:py-14">
         <h2 className="text-foreground font-serif text-3xl font-normal tracking-[-0.01em] sm:text-4xl">
           {title}
         </h2>
@@ -319,7 +297,7 @@ export function CatalogFinalCta({
           </Link>
         </div>
       </div>
-    </section>
+    </CatalogSection>
   );
 }
 
@@ -339,33 +317,31 @@ export function CatalogMediaExplainer({
   media: CatalogMediaAsset;
 }) {
   return (
-    <section className="bg-muted/35 border-border border-y px-4 py-20 sm:px-6 sm:py-28">
-      <div className="mx-auto max-w-7xl">
-        <CatalogSectionHeading
-          title={title}
-          description={description}
-          size="editorial"
-        />
-        <div className="border-border bg-card mt-14 grid overflow-hidden rounded-[1.75rem] border sm:grid-cols-[minmax(0,0.78fr)_minmax(0,1.22fr)]">
-          <div className="bg-muted/55 flex min-h-80 flex-col p-6 sm:p-10 lg:min-h-[28rem] lg:p-12">
-            {eyebrow && (
-              <p className="text-primary text-xs font-semibold tracking-[0.14em] uppercase">
-                {eyebrow}
-              </p>
-            )}
-            <p className="text-foreground mt-8 text-lg leading-8">{copy}</p>
-            {footnote && (
-              <p className="text-muted-foreground mt-auto pt-10 text-xs leading-5">
-                {footnote}
-              </p>
-            )}
-          </div>
-          <div className="bg-muted relative min-h-80 lg:min-h-[28rem]">
-            <CatalogMedia asset={media} />
-          </div>
+    <CatalogSection width="wide" surface="muted">
+      <CatalogSectionHeading
+        title={title}
+        description={description}
+        size="editorial"
+      />
+      <div className="border-border bg-card mt-14 grid overflow-hidden rounded-[1.75rem] border sm:grid-cols-[minmax(0,0.78fr)_minmax(0,1.22fr)]">
+        <div className="bg-muted/55 flex min-h-80 flex-col p-6 sm:p-10 lg:min-h-[28rem] lg:p-12">
+          {eyebrow && (
+            <p className="text-primary text-xs font-semibold tracking-[0.14em] uppercase">
+              {eyebrow}
+            </p>
+          )}
+          <p className="text-foreground mt-8 text-lg leading-8">{copy}</p>
+          {footnote && (
+            <p className="text-muted-foreground mt-auto pt-10 text-xs leading-5">
+              {footnote}
+            </p>
+          )}
+        </div>
+        <div className="bg-muted relative min-h-80 lg:min-h-[28rem]">
+          <CatalogMedia asset={media} />
         </div>
       </div>
-    </section>
+    </CatalogSection>
   );
 }
 
@@ -419,7 +395,7 @@ export function CatalogMediaCarousel({
   return (
     <section
       id="prompt-examples"
-      className="text-foreground w-full scroll-mt-20 py-20 sm:py-28"
+      className="text-foreground w-full scroll-mt-20 py-16"
     >
       <div className="mx-auto max-w-5xl px-6 text-center">
         <h2 className="text-foreground font-serif text-4xl leading-[1.08] font-normal tracking-[-0.02em] text-balance sm:text-5xl">

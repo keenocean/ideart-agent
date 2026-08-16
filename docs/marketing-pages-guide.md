@@ -100,6 +100,7 @@ src/
 │   ├── catalog-media-feature-list.tsx
 │   ├── catalog-media-preview-dialog.tsx
 │   ├── catalog-media.tsx
+│   ├── catalog-section.tsx
 │   ├── catalog-section-heading.tsx
 │   ├── catalog-showcase-card-grid.tsx
 │   └── tool-detail-shell.tsx
@@ -484,11 +485,25 @@ type ToolArchetype =
 
 `HomeHero`、`ToolDetail`、`ModelDetail` 是三个独立 Block。它们可以共用 Workbench、卡片、Gallery 和 section primitives，但不能合并成一个带大量 boolean props、动态 component name 或任意 section 数组的万能 `MarketingPage`。
 
+#### 统一 Marketing section 视觉契约
+
+首页、工具目录/详情和未来模型目录/详情统一使用 `CatalogSection` 作为 durable section frame，不允许普通 Block 再各自硬编码页面级背景、宽度和上下间距：
+
+- 默认 section：`px-4 py-16 sm:px-6`，透明叠在页面的 `bg-background` 上。
+- 默认内容宽度：`standard = max-w-6xl`；FAQ、紧凑 CTA 等使用 `narrow = max-w-5xl`；只有明确的宽媒体叙事使用 `wide = max-w-7xl`。
+- 默认 surface 为 `plain`；`muted` 只能作为有语义的命名 variant 通过 durable component 使用，不能由首页或某个工具 Block 临时添加 `bg-muted/*`。
+- 普通 section 使用 compact `CatalogSectionHeading`；editorial heading 只保留给 Hero 或明确的媒体叙事组件。
+- 卡片统一使用 theme token 驱动的 `bg-card + border-border + rounded-2xl`；媒体容器使用 `bg-muted`。不在营销组件中硬编码品牌颜色。
+- `CatalogMediaFeatureList` 的 `compact` 是首页、工具和模型页默认图文交错版式；`banded` 只改变媒体/正文密度，不改变页面背景系统。
+- Hero 仍按首页、工具、模型的任务各自实现，但共享 section rhythm、`max-w-3xl` 核心文案/输入宽度和 compact 标题层级；首页允许额外的大媒体证据。
+
+该契约的完整设计依据记录在根目录 `DESIGN.md`。新增工具 archetype、首个模型页或其他公开营销页时，应先组合 `CatalogSection` 与现有 Catalog primitives；只有出现至少两个无法由现有 named variant 表达的真实消费者时，才扩展 durable component。
+
 当前首页没有第二套纯展示组件。新增文件都在 Block 层，只负责把静态 `landing.*` 与 loader 返回的媒体/卡片数据映射到既有纯组件：
 
 | 首页 Block        | 复用的 durable component                                       |
 | ----------------- | -------------------------------------------------------------- |
-| `HomeHero`        | `PromptLauncher` + `CatalogMedia`                              |
+| `HomeHero`        | `CatalogSection` + `PromptLauncher` + `CatalogMedia`           |
 | `HomeFeatures`    | `CatalogFeatureGrid`                                           |
 | `HomeGallery`     | `CatalogMasonryGallery` + `CatalogMediaPreviewDialog`          |
 | `UseCases`        | `CatalogMediaFeatureList`                                      |
@@ -913,7 +928,9 @@ pnpm marketing:publish-content-release -- --dry-run
 
 Worker gzip 体积只衡量服务端部署包，不能代替浏览器 route JS 和首屏资源预算。实现前记录首页与代表性详情页的 route client JS gzip、Lighthouse 和网络瀑布，再据此设定回归阈值；新增页面不得出现未解释的显著增长。
 
-使用 `pnpm bundle:report-routes` 解析 TanStack Start/Vite manifest，报告每类公开 route 的直接与传递 preload raw/gzip，并单独列出共享 messages chunk。短 UI/metadata 使用静态 `m['key']()`；公共营销 import graph 禁止 `tDynamic()`、把 `m` cast 成动态 record、拼接 message key，或 import/glob `messages/marketing/**`。营销长正文固定通过 server-only pinned release 进入 SSR，不生成页面专属 client chunk；没有同语言 release entry 时 404，不 fallback。
+使用 `pnpm bundle:report-routes` 解析 TanStack Start/Vite manifest，报告每类公开 route 的直接与传递 preload raw/gzip、最大客户端 JS 以及共享 messages chunk。当前最大单个客户端 JS 的 raw 预算为 500,000 bytes，Vite 只为客户端构建建立 `react-core`、`tanstack-router`、`tanstack-start`、`tanstack-query` 与 `lucide-icons` 缓存边界；`tanstack-start` 再以 450,000 bytes 为上限拆分，避免应用启动与 route manifest 聚合成超大包。集中 Lucide 只合并项目实际引用、已经 tree-shake 的图标，减少大量微小共享 chunk；不要改成导入图标库总入口，也不要仅提高 Vite warning limit 掩盖超限。
+
+短 UI/metadata 使用静态 `m['key']()`。`src/routes`、`src/blocks`、`src/components` 和 `src/hooks` 的生产客户端源码禁止 import `tDynamic()`；固定枚举状态使用带类型的静态 message function map。公共营销 import graph 还禁止把 `m` cast 成动态 record、拼接 message key，或 import/glob `messages/marketing/**`。`src/core/i18n/static-message-usage.test.ts` 锁定该边界。营销长正文固定通过 server-only pinned release 进入 SSR，不生成页面专属 client chunk；没有同语言 release entry 时 404，不 fallback。
 
 - H1、核心正文、能力/限制和关键内链必须出现在 SSR HTML。
 - 上传器、案例画廊、Skill 面板和 below-fold 重交互按路由或交互懒加载。

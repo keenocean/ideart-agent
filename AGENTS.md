@@ -64,7 +64,7 @@ src/
 ├── core/                        # Infrastructure — every project uses this
 │   ├── db/                      # Multi-DB (PostgreSQL, MySQL, SQLite, D1)
 │   ├── auth/                    # better-auth (server + client) + RBAC
-│   ├── i18n/                    # navigation.tsx (locale-aware Link/router) + dynamic.ts (tDynamic)
+│   ├── i18n/                    # navigation.tsx + deprecated dynamic.ts compatibility escape hatch
 │   ├── payment/                 # Payment providers (Stripe, PayPal, Creem)
 │   ├── email/                   # Email providers (Resend)
 │   ├── storage/                 # Storage providers (S3, R2)
@@ -167,7 +167,7 @@ export function MyButton() {
 
 - With params: `m['common.table.total']({ count })`
 - Explicit locale (e.g. in a loader): `m['landing.pricing.title']({}, { locale })`
-- Runtime-built keys (tab labels, keyed lists): `tDynamic(key)` from `@/core/i18n/dynamic`. Prefer static `m['ns.key']()` whenever the key is known — dynamic access opts the bundle out of tree-shaking.
+- Runtime-built client message keys are forbidden because they opt the bundle out of tree-shaking. Use static `m['ns.key']()` calls or an explicit static message-function map for finite tabs, statuses, and keyed lists. `@/core/i18n/dynamic` remains only as a deprecated compatibility escape hatch; client routes, blocks, components, and hooks must not import it without an explicit bundle-reviewed exception.
 
 **Adding a translation:** add the key to every `messages/<locale>.json` registered in `project.inlang/settings.json`, then call `m['the.key']()`. No per-namespace folders or `localeMessagesPaths` registration. `pnpm i18n:check` reads the registered locale set and rejects key drift.
 
@@ -464,7 +464,7 @@ All functionality is self-contained — no external packages needed.
 | `@/paraglide/messages.js` | `m` — compiled message functions (`m['ns.key']()`)                                                  |
 | `@/paraglide/runtime.js`  | `getLocale`, `setLocale`, `localizeHref`, `localizeUrl`, `locales`, `baseLocale`                    |
 | `@/core/i18n/navigation`  | `Link`, `useRouter`, `usePathname` (locale-aware)                                                   |
-| `@/core/i18n/dynamic`     | `tDynamic` (runtime-built message keys)                                                             |
+| `@/core/i18n/dynamic`     | Deprecated `tDynamic` compatibility escape hatch; forbidden in ordinary client code                 |
 
 ## Database Schema (21 tables)
 

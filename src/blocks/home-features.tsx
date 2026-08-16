@@ -7,7 +7,6 @@ export function HomeFeatures() {
   return (
     <CatalogFeatureGrid
       id="features"
-      className="bg-muted/35 border-border border-y py-20 sm:py-28"
       title={m['landing.features.title']()}
       description={m['landing.features.description']()}
       items={[

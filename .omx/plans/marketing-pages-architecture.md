@@ -320,6 +320,8 @@ type DeploymentReadiness = {
 
 `HomeHero`、`ToolDetail`、`ModelDetail` 继续是独立 Block；它们可以共享 Workbench、卡片、Gallery 和 section primitives，但不能合并成带大量 boolean props 的万能 `MarketingPage`。首页负责产品定位，工具页负责完成任务，模型页负责能力评估，三类页面的内容、loader 和 SEO 意图必须保持独立。
 
+三类页面的视觉底盘由 `src/components/catalog/catalog-section.tsx` 统一：普通 section 固定 `px-4 py-16 sm:px-6`，宽度只能选择 `narrow/max-w-5xl`、`standard/max-w-6xl`、`wide/max-w-7xl`，surface 只能选择默认 `plain` 或显式语义化 `muted`。首页、工具和未来模型 Block 不再自行增加 `bg-muted/*`、`py-20/28` 或普通 section 的 `max-w-7xl`。共享 card、heading、FAQ、CTA、gallery 和 media-feature primitives 全部组合该 frame；Hero 仍按页面意图独立，但核心文案/Workbench 使用紧凑层级和 `max-w-3xl`，首页只额外保留媒体证据。完整视觉、响应式和可访问性约束以根目录 `DESIGN.md` 为准。
+
 普通详情页可把约 70% 公共骨架、30% 内容与变体作为内部设计启发，不把比例当作硬性验收指标；重点 SEO 页面允许增加专属 Block。工具页已经采用“共享底盘 + 工具类型模板 + 页面独有内容”三层：
 
 ```ts
@@ -377,7 +379,7 @@ R2 交付契约：
 
 ### 3.8 客户端性能预算
 
-Worker gzip 预算不能代替浏览器侧性能预算。阶段 0 必须通过 `bundle:report-routes` 记录首页和代表性详情页的传递 client JS gzip，通过固定 URL、viewport、节流参数和工具版本记录 Lighthouse 与首屏资源基线；阶段 8 对比新增路由，任何显著增长都要定位到具体 chunk、组件或媒体并记录理由。固定数值门槛在基线测量后确定，避免脱离现状拍脑袋设限。
+Worker gzip 预算不能代替浏览器侧性能预算。阶段 0 必须通过 `bundle:report-routes` 记录首页和代表性详情页的传递 client JS gzip，通过固定 URL、viewport、节流参数和工具版本记录 Lighthouse 与首屏资源基线；阶段 8 对比新增路由，任何显著增长都要定位到具体 chunk、组件或媒体并记录理由。当前 CI 拒绝超过 500,000 raw bytes 的单个客户端 JS；Vite 客户端构建把 React、TanStack Router、TanStack Start、TanStack Query 和项目实际使用的 Lucide 图标设为稳定缓存边界，其中 Start 分组以 450,000 bytes 为拆分上限。已知 message key 必须静态调用，生产客户端 route/block/component/hook 不得 import `tDynamic()`，由回归测试锁定。门槛调整必须基于新的构建和网络证据，不能用提高 warning limit 代替优化。
 
 - H1、主要说明、能力/限制和关键内链必须存在于 SSR HTML，不能依赖交互后才渲染。
 - Workbench 的上传器、案例画廊、Skill 面板和 below-fold 重交互可按路由或交互懒加载。

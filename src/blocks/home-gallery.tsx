@@ -4,6 +4,7 @@ import {
   type CatalogGalleryItem,
 } from '@/components/catalog/catalog-masonry-gallery';
 import type { CatalogMediaAsset } from '@/components/catalog/catalog-media';
+import { CatalogSection } from '@/components/catalog/catalog-section';
 import { CatalogSectionHeading } from '@/components/catalog/catalog-section-heading';
 
 export function HomeGallery({
@@ -41,32 +42,28 @@ export function HomeGallery({
   );
 
   return (
-    <section id="gallery" className="scroll-mt-20 px-4 py-20 sm:px-6 sm:py-28">
-      <div className="mx-auto max-w-7xl">
-        <CatalogSectionHeading
-          title={m['landing.gallery.title']()}
-          description={m['landing.gallery.description']()}
-          size="editorial"
+    <CatalogSection id="gallery">
+      <CatalogSectionHeading
+        title={m['landing.gallery.title']()}
+        description={m['landing.gallery.description']()}
+      />
+      <div className="mt-10">
+        <CatalogMasonryGallery
+          items={items}
+          collapsedHeight={1120}
+          labels={{
+            image: m['showcase.dialog.image'](),
+            video: m['showcase.dialog.video'](),
+            prompt: m['showcase.dialog.prompt'](),
+            download: m['showcase.dialog.download'](),
+            previous: m['showcase.dialog.previous'](),
+            next: m['showcase.dialog.next'](),
+            close: m['showcase.dialog.close'](),
+            usePrompt: m['showcase.dialog.use_prompt'](),
+            expand: m['landing.gallery.expand'](),
+          }}
         />
-        <div className="mt-12">
-          <CatalogMasonryGallery
-            items={items}
-            variant="dense"
-            collapsedHeight={1120}
-            labels={{
-              image: m['showcase.dialog.image'](),
-              video: m['showcase.dialog.video'](),
-              prompt: m['showcase.dialog.prompt'](),
-              download: m['showcase.dialog.download'](),
-              previous: m['showcase.dialog.previous'](),
-              next: m['showcase.dialog.next'](),
-              close: m['showcase.dialog.close'](),
-              usePrompt: m['showcase.dialog.use_prompt'](),
-              expand: m['landing.gallery.expand'](),
-            }}
-          />
-        </div>
       </div>
-    </section>
+    </CatalogSection>
   );
 }

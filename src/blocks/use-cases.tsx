@@ -6,7 +6,6 @@ export function UseCases({ media }: { media: readonly CatalogMediaAsset[] }) {
   return (
     <CatalogMediaFeatureList
       id="use-cases"
-      variant="banded"
       title={m['landing.use_cases.title']()}
       description={m['landing.use_cases.description']()}
       items={[

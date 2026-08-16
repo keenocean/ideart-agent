@@ -11,17 +11,18 @@
       "/blog/$slug"
     ],
     "baselineGzipBytes": {
-      "__root__": 291006,
-      "/": 393454,
-      "/pricing": 370563,
-      "/(pages)": 300755,
-      "/tools/": 363008,
-      "/tools/$slug": 382230,
-      "/blog/": 363868,
-      "/blog/$slug": 364024
+      "__root__": 253084,
+      "/": 383613,
+      "/pricing": 351778,
+      "/(pages)": 269043,
+      "/tools/": 344075,
+      "/tools/$slug": 372465,
+      "/blog/": 344592,
+      "/blog/$slug": 344864
     },
     "explainedGzipIncreases": {},
-    "explainIncreaseAboveGzipBytes": 102400
+    "explainIncreaseAboveGzipBytes": 102400,
+    "maxClientJsRawBytes": 500000
   },
   "publicAssets": {
     "baselineFileCount": 48,

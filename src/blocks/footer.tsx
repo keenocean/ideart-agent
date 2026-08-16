@@ -10,25 +10,39 @@ import {
 export function Footer() {
   const columns: FooterColumn[] = [
     {
-      title: m['landing.footer.features'](),
+      title: m['landing.footer.products'](),
       links: [
         { label: m['landing.nav.create'](), href: '/chat' },
         { label: m['landing.nav.tools'](), href: '/tools' },
+        {
+          label: m['landing.footer.ai_image_generator'](),
+          href: '/tools/ai-image-generator',
+        },
         { label: m['landing.footer.gallery'](), href: '/library' },
       ],
     },
     {
-      title: m['landing.footer.products'](),
+      title: m['landing.footer.features'](),
       links: [
-        // Sibling products, not this one — a footer that links to the site
-        // you are already on is just noise.
-        { label: 'ShipAny', href: 'https://shipany.ai' },
-        { label: 'ImgAny', href: 'https://imgany.ai' },
+        { label: m['landing.nav.features'](), href: '/#features' },
+        { label: m['landing.nav.gallery'](), href: '/#gallery' },
+        { label: m['landing.footer.use_cases'](), href: '/#use-cases' },
+        {
+          label: m['landing.footer.how_it_works'](),
+          href: '/#how-it-works',
+        },
       ],
     },
     {
       title: m['landing.footer.resources'](),
-      links: [{ label: m['landing.footer.blog'](), href: '/blog' }],
+      links: [
+        { label: m['landing.nav.pricing'](), href: '/pricing' },
+        { label: m['landing.footer.blog'](), href: '/blog' },
+        {
+          label: m['landing.footer.support'](),
+          href: '/settings/tickets',
+        },
+      ],
     },
     {
       title: m['landing.footer.legal'](),
@@ -52,6 +66,7 @@ export function Footer() {
       tagline={m['landing.footer.tagline']()}
       columns={columns}
       socials={socials}
+      showBuiltWithShipAny={false}
     />
   );
 }

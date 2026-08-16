@@ -106,6 +106,29 @@ for (const report of reports) {
 }
 
 const allAssets = readdirSync(path.join(publicDir, 'assets'));
+const clientJs = allAssets
+  .filter((file) => file.endsWith('.js'))
+  .map((file) => {
+    const body = readFileSync(path.join(publicDir, 'assets', file));
+    return {
+      asset: `/assets/${file}`,
+      rawBytes: body.byteLength,
+      gzipBytes: gzipSync(body).byteLength,
+    };
+  })
+  .sort((left, right) => right.rawBytes - left.rawBytes);
+const largestClientJs = clientJs[0];
+const maxClientJsRawBytes = config.routeBundle.maxClientJsRawBytes;
+if (!Number.isFinite(maxClientJsRawBytes)) {
+  routeFailures.push('missing routeBundle.maxClientJsRawBytes budget');
+} else if (!largestClientJs) {
+  routeFailures.push('no client JS assets were found');
+} else if (largestClientJs.rawBytes > maxClientJsRawBytes) {
+  routeFailures.push(
+    `${largestClientJs.asset}: client JS is ${largestClientJs.rawBytes} raw bytes; budget is ${maxClientJsRawBytes}`
+  );
+}
+
 const messages = allAssets
   .filter((file) => /^messages-.*\.js$/.test(file))
   .map((file) => {
@@ -123,6 +146,8 @@ const messages = allAssets
 const result = {
   generatedFrom: path.relative(cwd, path.join(serverDir, manifestFile)),
   routes: reports,
+  largestClientJs,
+  maxClientJsRawBytes,
   messages,
 };
 
@@ -139,6 +164,11 @@ if (process.argv.includes('--json')) {
       `${report.routeId}: ${report.rawBytes} / ${report.gzipBytes} / ${report.assets.length}${
         delta === undefined ? '' : ` / delta=${delta}`
       }`
+    );
+  }
+  if (largestClientJs) {
+    console.log(
+      `largest client JS: ${largestClientJs.asset} / ${largestClientJs.rawBytes} / ${largestClientJs.gzipBytes} / budget=${maxClientJsRawBytes}`
     );
   }
   for (const message of messages) {

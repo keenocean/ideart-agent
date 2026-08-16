@@ -18,6 +18,7 @@ import {
   type CatalogMediaComparisonItem,
 } from '@/components/catalog/catalog-media-comparison-grid';
 import { CatalogMediaFeatureList } from '@/components/catalog/catalog-media-feature-list';
+import { CatalogSection } from '@/components/catalog/catalog-section';
 import { CatalogSectionHeading } from '@/components/catalog/catalog-section-heading';
 import { CatalogShowcaseCardGrid } from '@/components/catalog/catalog-showcase-card-grid';
 import {
@@ -194,22 +195,20 @@ function ImageGeneratorToolTemplate(props: ToolDetailTemplateProps) {
     >
       <ToolTemplateIntro content={content} />
       <CatalogShowcaseCardGrid {...props.showcase} />
-      <section id="showcase" className="scroll-mt-20 px-4 py-16 sm:px-6">
-        <div className="mx-auto w-full max-w-6xl">
-          <CatalogSectionHeading
-            title={content.examples.title}
-            description={content.examples.description}
+      <CatalogSection id="showcase">
+        <CatalogSectionHeading
+          title={content.examples.title}
+          description={content.examples.description}
+        />
+        <div className="mt-10">
+          <CatalogMasonryGallery
+            items={items}
+            labels={content.examples.labels}
+            collapsedHeight={items.length > 12 ? 1120 : undefined}
+            onUsePrompt={(item) => props.onUsePrompt(item.prompt)}
           />
-          <div className="mt-10">
-            <CatalogMasonryGallery
-              items={items}
-              labels={content.examples.labels}
-              collapsedHeight={items.length > 12 ? 1120 : undefined}
-              onUsePrompt={(item) => props.onUsePrompt(item.prompt)}
-            />
-          </div>
         </div>
-      </section>
+      </CatalogSection>
       <ToolTemplateGuidance content={content} />
       <ToolTemplateUseCases content={content} />
       <CatalogLimitations {...content.limitations} />
@@ -255,23 +254,21 @@ function ComparisonToolTemplate<
     <ToolTemplateFrame {...props} content={content}>
       <ToolTemplateIntro content={content} />
       <CatalogShowcaseCardGrid {...props.showcase} />
-      <section id="showcase" className="scroll-mt-20 px-4 py-16 sm:px-6">
-        <div className="mx-auto w-full max-w-6xl">
-          <CatalogSectionHeading
-            title={content.comparisons.title}
-            description={content.comparisons.description}
+      <CatalogSection id="showcase">
+        <CatalogSectionHeading
+          title={content.comparisons.title}
+          description={content.comparisons.description}
+        />
+        <div className="mt-10">
+          <CatalogMediaComparisonGrid
+            items={items}
+            sourceLabel={content.comparisons.sourceLabel}
+            resultLabel={content.comparisons.resultLabel}
+            usePromptLabel={content.comparisons.usePromptLabel}
+            onUsePrompt={(item) => props.onUsePrompt(item.prompt)}
           />
-          <div className="mt-10">
-            <CatalogMediaComparisonGrid
-              items={items}
-              sourceLabel={content.comparisons.sourceLabel}
-              resultLabel={content.comparisons.resultLabel}
-              usePromptLabel={content.comparisons.usePromptLabel}
-              onUsePrompt={(item) => props.onUsePrompt(item.prompt)}
-            />
-          </div>
         </div>
-      </section>
+      </CatalogSection>
       <ToolTemplateGuidance content={content} />
       <ToolTemplateUseCases
         content={content}

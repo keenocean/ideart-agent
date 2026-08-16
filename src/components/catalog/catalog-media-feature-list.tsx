@@ -5,6 +5,7 @@ import {
   CatalogMedia,
   type CatalogMediaAsset,
 } from '@/components/catalog/catalog-media';
+import { CatalogSection } from '@/components/catalog/catalog-section';
 import { CatalogSectionHeading } from '@/components/catalog/catalog-section-heading';
 
 export type CatalogMediaFeatureItem = {
@@ -31,52 +32,27 @@ export function CatalogMediaFeatureList({
   items: readonly CatalogMediaFeatureItem[];
   variant?: 'compact' | 'banded';
 }) {
-  if (variant === 'banded') {
-    return (
-      <section id={id} className="scroll-mt-20">
-        <div className="px-4 pt-20 pb-10 sm:px-6 sm:pt-28 sm:pb-14">
-          <CatalogSectionHeading
-            title={title}
-            description={description}
-            size="editorial"
-            className="max-w-5xl"
-          />
-        </div>
+  return (
+    <CatalogSection id={id} width={variant === 'banded' ? 'wide' : 'standard'}>
+      <CatalogSectionHeading title={title} description={description} />
+      <div className="mt-12">
         {items.map((item, index) => (
           <article
             key={item.id}
-            className={cn(index % 2 === 1 && 'bg-muted/45')}
+            className={cn(
+              'grid items-center md:grid-cols-2',
+              variant === 'banded'
+                ? 'gap-10 md:gap-20 lg:gap-28'
+                : 'gap-8 md:gap-14',
+              index < items.length - 1 && 'mb-16 sm:mb-20 lg:mb-24'
+            )}
           >
-            <div className="mx-auto grid max-w-7xl grid-cols-1 items-center gap-10 px-6 py-12 md:grid-cols-2 md:gap-20 md:py-20 lg:gap-28">
-              <MediaFeatureMedia item={item} variant="banded" />
-              <MediaFeatureCopy item={item} variant="banded" />
-            </div>
+            <MediaFeatureMedia item={item} variant={variant} />
+            <MediaFeatureCopy item={item} variant={variant} />
           </article>
         ))}
-      </section>
-    );
-  }
-
-  return (
-    <section id={id} className="scroll-mt-20 px-4 py-16 sm:px-6">
-      <div className="mx-auto w-full max-w-6xl">
-        <CatalogSectionHeading title={title} description={description} />
-        <div className="mt-12">
-          {items.map((item, index) => (
-            <article
-              key={item.id}
-              className={cn(
-                'grid items-center gap-8 md:grid-cols-2 md:gap-14',
-                index < items.length - 1 && 'mb-16 sm:mb-20 lg:mb-24'
-              )}
-            >
-              <MediaFeatureMedia item={item} variant="compact" />
-              <MediaFeatureCopy item={item} variant="compact" />
-            </article>
-          ))}
-        </div>
       </div>
-    </section>
+    </CatalogSection>
   );
 }
 

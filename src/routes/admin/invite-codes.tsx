@@ -11,7 +11,6 @@ import { Copy, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { z } from 'zod';
 
-import { tDynamic } from '@/core/i18n/dynamic';
 import { apiDelete, apiGet, apiPost, type PageResult } from '@/lib/api-client';
 import { formatDateTime } from '@/lib/time';
 import { cn } from '@/lib/utils';
@@ -32,6 +31,11 @@ import { Label } from '@/components/ui/label';
 
 type Tab = 'all' | 'available' | 'used';
 const TABS: Tab[] = ['all', 'available', 'used'];
+const TAB_LABELS: Record<Tab, () => string> = {
+  all: m['admin.invite_codes.tab_all'],
+  available: m['admin.invite_codes.tab_available'],
+  used: m['admin.invite_codes.tab_used'],
+};
 
 interface InviteCodeRow {
   id: string;
@@ -252,7 +256,7 @@ function InviteCodesPage() {
                 : 'text-muted-foreground hover:text-foreground border-transparent'
             )}
           >
-            {tDynamic(`admin.invite_codes.tab_${tb}`)}
+            {TAB_LABELS[tb]()}
           </button>
         ))}
       </div>

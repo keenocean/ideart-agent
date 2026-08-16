@@ -3,7 +3,6 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
 import { ExternalLink } from 'lucide-react';
 
-import { tDynamic } from '@/core/i18n/dynamic';
 import { apiGet, type PageResult } from '@/lib/api-client';
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
@@ -28,6 +27,13 @@ type Order = {
 
 const TABS = ['all', 'one-time', 'subscription', 'renew'] as const;
 type Tab = (typeof TABS)[number];
+
+const TAB_LABELS: Record<Tab, () => string> = {
+  all: m['settings.payments.tab_all'],
+  'one-time': m['settings.payments.tab_one_time'],
+  subscription: m['settings.payments.tab_subscription'],
+  renew: m['settings.payments.tab_renew'],
+};
 
 const PAGE_SIZE = 20;
 
@@ -157,7 +163,7 @@ function PaymentsPage() {
                 : 'text-muted-foreground hover:text-foreground border-transparent'
             )}
           >
-            {tDynamic(`settings.payments.tab_${tb.replace('-', '_')}`)}
+            {TAB_LABELS[tb]()}
           </button>
         ))}
       </div>

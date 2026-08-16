@@ -123,6 +123,52 @@ export default defineConfig({
       : {},
   },
   plugins: [
+    {
+      name: 'client-code-splitting',
+      configEnvironment(name, _config, env) {
+        if (env.command !== 'build' || env.isSsrBuild || name !== 'client') {
+          return;
+        }
+        return {
+          build: {
+            rolldownOptions: {
+              output: {
+                codeSplitting: {
+                  groups: [
+                    {
+                      name: 'react-core',
+                      test: /node_modules[\\/](?:react|react-dom|scheduler)(?:[\\/]|$)/,
+                      priority: 30,
+                    },
+                    {
+                      name: 'tanstack-router',
+                      test: /node_modules[\\/]@tanstack[\\/](?:history|react-router|router-core)(?:[\\/]|$)/,
+                      priority: 25,
+                    },
+                    {
+                      name: 'tanstack-start',
+                      test: /node_modules[\\/]@tanstack[\\/]start-client-core(?:[\\/]|$)/,
+                      maxSize: 450_000,
+                      priority: 20,
+                    },
+                    {
+                      name: 'lucide-icons',
+                      test: /node_modules[\\/]lucide-react(?:[\\/]|$)/,
+                      priority: 15,
+                    },
+                    {
+                      name: 'tanstack-query',
+                      test: /node_modules[\\/]@tanstack[\\/](?:query-core|react-query)(?:[\\/]|$)/,
+                      priority: 10,
+                    },
+                  ],
+                },
+              },
+            },
+          },
+        };
+      },
+    },
     // MDX must run before the react plugin so JSX in compiled MDX gets transformed.
     { enforce: 'pre', ...mdx({ providerImportSource: '@mdx-js/react' }) },
     tailwindcss(),

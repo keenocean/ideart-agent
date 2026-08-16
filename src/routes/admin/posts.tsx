@@ -11,7 +11,6 @@ import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { z } from 'zod';
 
-import { tDynamic } from '@/core/i18n/dynamic';
 import { localeNames } from '@/config/locale';
 import {
   apiDelete,
@@ -87,6 +86,12 @@ interface CategoryOption {
 const PAGE_SIZE = 20;
 const TABS = ['all', 'published', 'draft'] as const;
 type Tab = (typeof TABS)[number];
+
+const TAB_LABELS: Record<Tab, () => string> = {
+  all: m['admin.posts.tab_all'],
+  published: m['admin.posts.tab_published'],
+  draft: m['admin.posts.tab_draft'],
+};
 
 const postSchema = z.object({
   slug: z.string().min(1),
@@ -541,7 +546,7 @@ function PostsPage() {
                   : 'text-muted-foreground hover:text-foreground border-transparent'
               )}
             >
-              {tDynamic(`admin.posts.tab_${tb}`)}
+              {TAB_LABELS[tb]()}
             </button>
           ))}
         </div>
