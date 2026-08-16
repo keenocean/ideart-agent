@@ -10,6 +10,9 @@ import {
   AGENT_IMAGE_ASPECT_RATIOS,
   imageModelOptionFor,
   modelOptionFor,
+  videoModelMaximumForType,
+  videoOperationsForModel,
+  type VideoGenerationKind,
 } from '@/lib/agent-settings';
 import { m } from '@/paraglide/messages.js';
 import { useGenerationEntry } from '@/hooks/use-generation-entry';
@@ -55,6 +58,7 @@ function specValues(
     return [
       labels.image,
       labels.notApplicable,
+      labels.notApplicable,
       '1K, 2K, 4K',
       AGENT_IMAGE_ASPECT_RATIOS.join(', '),
       labels.notApplicable,
@@ -64,23 +68,42 @@ function specValues(
   const option = modelOptionFor(definition.runtimeModelKey)!;
   return [
     labels.video,
+    videoOperationsForModel(definition.runtimeModelKey)
+      .map(videoOperationLabel)
+      .join(', '),
     `${option.durationMin}–${option.durationMax}s`,
     option.resolutions.join(', '),
     option.aspectRatios.join(', '),
     option.audio ? labels.enabled : labels.disabled,
-    String(option.maxImages),
+    String(videoModelMaximumForType(definition.runtimeModelKey, 'image')),
   ];
 }
 
 function specLabels(labels: ModelDetailPageData['content']['specs']['labels']) {
   return [
     labels.modality,
+    m['models.specs.operations'](),
     labels.duration,
     labels.resolutions,
     labels.aspectRatios,
     labels.audio,
     labels.referenceImages,
   ];
+}
+
+function videoOperationLabel(operation: VideoGenerationKind): string {
+  switch (operation) {
+    case 'generate':
+      return m['models.operations.generate']();
+    case 'animate':
+      return m['models.operations.animate']();
+    case 'reference':
+      return m['models.operations.reference']();
+    case 'edit':
+      return m['models.operations.edit']();
+    case 'extend':
+      return m['models.operations.extend']();
+  }
 }
 
 export function ModelDetail({
@@ -173,6 +196,12 @@ export function ModelDetail({
               reference: m['models.workbench.reference'](),
             }}
             locks={preset.locks}
+            inputPolicy={entry.inputPolicy}
+            videoOperation={
+              preset.target.mediaMode === 'video'
+                ? preset.target.operation
+                : undefined
+            }
             value={entry.value}
             onValueChange={entry.setValue}
             onSubmit={entry.submit}

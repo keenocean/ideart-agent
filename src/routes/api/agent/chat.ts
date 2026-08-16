@@ -293,6 +293,7 @@ export async function POST({ request }: { request: Request }) {
       modelName: generationSettings.modelName,
       duration: generationSettings.duration,
       resolution: generationSettings.resolution,
+      operation: policy.lockedVideoOperation,
       imageResolution: generationSettings.imageResolution,
       imageQuality: generationSettings.imageQuality,
       balance: await getBalance(userId),

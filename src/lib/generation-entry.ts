@@ -16,9 +16,13 @@ import {
   normalizeImageAspectRatio,
   normalizeImageQuality,
   normalizeImageResolution,
+  settingsForModel,
+  videoOperationInputLimits,
+  videoOperationSupported,
   type AgentComposerSettings,
   type AgentImageModelOptionValue,
   type AgentModelOptionValue,
+  type VideoGenerationKind,
 } from '@/lib/agent-settings';
 
 export type GenerationEntryContext =
@@ -40,7 +44,11 @@ export type GenerationPreset = {
   target:
     | { mediaMode: 'auto'; modelKey?: never }
     | { mediaMode: 'image'; modelKey: AgentImageModelOptionValue }
-    | { mediaMode: 'video'; modelKey?: AgentModelOptionValue };
+    | {
+        mediaMode: 'video';
+        modelKey?: AgentModelOptionValue;
+        operation?: VideoGenerationKind;
+      };
   settings?: Omit<
     Partial<AgentComposerSettings>,
     'mediaMode' | 'modelOption' | 'imageModelOption'
@@ -68,6 +76,38 @@ export type GenerationRequestAttachment = {
   url: string;
   receipt?: string;
 };
+
+/** Apply the selected model's strict operation limits to a page projection. */
+export function resolveGenerationInputPolicy(
+  preset: GenerationPreset | undefined,
+  settings: AgentComposerSettings
+): GenerationInputPolicy | undefined {
+  const pagePolicy = preset?.inputPolicy;
+  if (
+    !preset ||
+    preset.target.mediaMode !== 'video' ||
+    !preset.target.operation
+  ) {
+    return pagePolicy;
+  }
+  const runtime = videoOperationInputLimits(
+    settings.modelOption,
+    preset.target.operation
+  );
+  if (!runtime) {
+    return { minimum: 0, maximum: 0, accepts: [] };
+  }
+  return {
+    minimum: Math.max(pagePolicy?.minimum ?? 0, runtime.minimum),
+    maximum: Math.min(
+      pagePolicy?.maximum ?? Number.POSITIVE_INFINITY,
+      runtime.maximum
+    ),
+    accepts: runtime.accepts.filter(
+      (mediaType) => !pagePolicy || pagePolicy.accepts.includes(mediaType)
+    ),
+  };
+}
 
 function own(value: object | undefined, key: PropertyKey): boolean {
   return !!value && Object.prototype.hasOwnProperty.call(value, key);
@@ -198,6 +238,19 @@ export function applyGenerationPreset(
   ) {
     draft = { ...draft, modelOption: preset.target.modelKey };
     sources.modelOption = 'page-lock';
+  }
+
+  if (
+    preset.target.mediaMode === 'video' &&
+    preset.target.operation &&
+    !videoOperationSupported(draft.modelOption, preset.target.operation) &&
+    preset.target.modelKey
+  ) {
+    draft = settingsForModel(draft, preset.target.modelKey);
+    sources.modelOption = 'page-default';
+    sources.duration = 'page-default';
+    sources.aspectRatio = 'page-default';
+    sources.resolution = 'page-default';
   }
 
   return { settings: normalizeComposerSettings(draft), sources };

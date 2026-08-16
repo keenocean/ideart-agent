@@ -5,6 +5,7 @@ import {
   applyGenerationPreset,
   generationEntrySource,
   normalizeGenerationEntryContext,
+  resolveGenerationInputPolicy,
   validateGenerationAttachments,
   type GenerationPreset,
 } from './generation-entry';
@@ -66,6 +67,48 @@ describe('generation entry presets', () => {
     expect(applied.settings.duration).toBe(10);
     expect(applied.settings.imageQuality).toBe('high');
     expect(applied.sources.duration).toBe('page-default');
+  });
+
+  it('replaces an incompatible persisted model on an operation-specific page', () => {
+    const applied = applyGenerationPreset(
+      { ...defaultComposerSettings(), modelOption: 'minimax-h3' },
+      {
+        target: {
+          mediaMode: 'video',
+          modelKey: 'seedance-2-5',
+          operation: 'reference',
+        },
+        locks: { mediaMode: true, model: false },
+      }
+    );
+
+    expect(applied.settings.modelOption).toBe('seedance-2-5');
+    expect(applied.settings.resolution).toBe('720p');
+    expect(applied.sources.modelOption).toBe('page-default');
+  });
+
+  it('narrows a tool-page union to the selected model operation limits', () => {
+    const preset: GenerationPreset = {
+      target: {
+        mediaMode: 'video',
+        modelKey: 'seedance-2-5',
+        operation: 'reference',
+      },
+      inputPolicy: {
+        minimum: 1,
+        maximum: 50,
+        accepts: ['image', 'video', 'audio'],
+      },
+    };
+    const settings = {
+      ...defaultComposerSettings(),
+      modelOption: 'seedance-2-0' as const,
+    };
+    expect(resolveGenerationInputPolicy(preset, settings)).toEqual({
+      minimum: 1,
+      maximum: 15,
+      accepts: ['image', 'video', 'audio'],
+    });
   });
 });
 

@@ -140,6 +140,12 @@ export function ToolDetail({
               reference: m['tools.workbench.reference_image'](),
             }}
             locks={preset.locks}
+            inputPolicy={entry.inputPolicy}
+            videoOperation={
+              preset.target.mediaMode === 'video'
+                ? preset.target.operation
+                : undefined
+            }
             value={entry.value}
             onValueChange={entry.setValue}
             onSubmit={entry.submit}

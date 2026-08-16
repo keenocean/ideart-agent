@@ -8,12 +8,17 @@ import { isSupportedLocale, type AppLocale } from '@/config/locale';
 import { splitAttachedImages } from '@/lib/agent-chat';
 import {
   imageModelOptionFor,
-  modelOptionFor,
   normalizeClientGenerationSettings,
+  videoModelAttachmentPolicy,
+  videoModelMaximumForType,
+  videoOperationAttachmentPolicy,
+  videoOperationInputLimits,
+  videoOperationSupported,
   type AgentGenerationSettings,
   type AgentImageModelOptionValue,
   type AgentMediaMode,
   type AgentModelOptionValue,
+  type VideoGenerationKind,
 } from '@/lib/agent-settings';
 import {
   generationEntrySource,
@@ -25,7 +30,7 @@ import {
 
 import { resolveReferenceImage } from './media';
 
-const MAX_RUNTIME_ATTACHMENTS = 16;
+const MAX_RUNTIME_ATTACHMENTS = 50;
 const ALL_ATTACHMENT_TYPES = ['image', 'video', 'audio'] as const;
 
 export type EffectiveGenerationPolicy = {
@@ -34,6 +39,7 @@ export type EffectiveGenerationPolicy = {
   lockedMediaMode?: Exclude<AgentMediaMode, 'auto'>;
   lockedVideoModel?: AgentModelOptionValue;
   lockedImageModel?: AgentImageModelOptionValue;
+  lockedVideoOperation?: VideoGenerationKind;
   inputPolicy: GenerationInputPolicy;
   /** Bound by the API after message/payload validation, before tool creation. */
   requestAttachments?: readonly GenerationRequestAttachment[];
@@ -65,10 +71,10 @@ function localePageExists(
 }
 
 function modelInputPolicy(definition: ModelDefinition): GenerationInputPolicy {
-  const maximum =
-    definition.modality === 'image'
-      ? imageModelOptionFor(definition.runtimeModelKey)?.maxImages
-      : modelOptionFor(definition.runtimeModelKey)?.maxImages;
+  if (definition.modality === 'video') {
+    return videoModelAttachmentPolicy(definition.runtimeModelKey);
+  }
+  const maximum = imageModelOptionFor(definition.runtimeModelKey)?.maxImages;
   return {
     minimum: 0,
     maximum: Math.min(
@@ -118,14 +124,22 @@ export function resolveEffectiveGenerationPolicy(
         'Generation entry execution is unsupported.'
       );
     }
+    const inputPolicy =
+      execution.mediaMode === 'video'
+        ? (execution.inputPolicy ??
+          videoOperationAttachmentPolicy(execution.videoOperation))
+        : execution.inputPolicy;
     return {
       entryContext: context,
       source: generationEntrySource(context),
       lockedMediaMode: execution.mediaMode,
+      ...(execution.mediaMode === 'video'
+        ? { lockedVideoOperation: execution.videoOperation }
+        : {}),
       inputPolicy: {
-        ...execution.inputPolicy,
+        ...inputPolicy,
         maximum: Math.min(
-          execution.inputPolicy.maximum ?? MAX_RUNTIME_ATTACHMENTS,
+          inputPolicy.maximum ?? MAX_RUNTIME_ATTACHMENTS,
           MAX_RUNTIME_ATTACHMENTS
         ),
       },
@@ -164,6 +178,14 @@ export function applyEffectiveGenerationPolicy(
   });
   if (!locked) {
     throw new GenerationEntryPolicyError('Generation policy is unsupported.');
+  }
+  if (
+    policy.lockedVideoOperation &&
+    !videoOperationSupported(locked.modelName, policy.lockedVideoOperation)
+  ) {
+    throw new GenerationEntryPolicyError(
+      'The selected model does not support this tool operation.'
+    );
   }
   return locked;
 }
@@ -283,7 +305,12 @@ export function validateRequestAttachments(params: {
     params.settings.mediaMode === 'image'
       ? imageModelOptionFor(params.settings.imageModelName)?.maxImages
       : params.settings.mediaMode === 'video'
-        ? modelOptionFor(params.settings.modelName)?.maxImages
+        ? params.policy.lockedVideoOperation
+          ? (videoOperationInputLimits(
+              params.settings.modelName,
+              params.policy.lockedVideoOperation
+            )?.maximumByType.image ?? 0)
+          : videoModelMaximumForType(params.settings.modelName, 'image')
         : MAX_RUNTIME_ATTACHMENTS;
   if (runtimeImageMaximum !== undefined && imageCount > runtimeImageMaximum) {
     return `The selected model accepts at most ${runtimeImageMaximum} image attachment${runtimeImageMaximum === 1 ? '' : 's'}.`;

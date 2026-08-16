@@ -2,6 +2,59 @@
 export type VideoProviderName = 'evolink' | 'grouter' | 'fal' | 'replicate';
 export type ImageProviderName = 'evolink' | 'grouter' | 'fal' | 'replicate';
 
+export const VIDEO_GENERATION_KINDS = [
+  'generate',
+  'animate',
+  'reference',
+  'edit',
+  'extend',
+] as const;
+export type VideoGenerationKind = (typeof VIDEO_GENERATION_KINDS)[number];
+export type VideoAttachmentType = 'image' | 'audio' | 'video';
+export type VideoOperationInputLimits = {
+  minimum: number;
+  maximum: number;
+  accepts: readonly VideoAttachmentType[];
+  maximumByType: Partial<Record<VideoAttachmentType, number>>;
+};
+
+type VideoOperationConfig = {
+  input: Omit<VideoOperationInputLimits, 'accepts'>;
+  /** Reserved for provider/model modes whose upstream price differs. */
+  creditMultiplier: number;
+};
+
+type VideoProviderRoute =
+  | string
+  | {
+      default: string;
+      byResolution?: Readonly<Record<string, string>>;
+    };
+
+type VideoProviderRoutes = Partial<
+  Record<VideoGenerationKind, VideoProviderRoute>
+>;
+
+type AgentVideoModelOption = {
+  value: string;
+  label: string;
+  creditsPerSecond: number;
+  autoBillingSeconds: number;
+  resolutionCreditMultipliers: Readonly<Record<string, number>>;
+  durations: readonly number[];
+  defaultDuration: number;
+  durationMin: number;
+  durationMax: number;
+  supportsAutoDuration: boolean;
+  resolutions: readonly string[];
+  defaultResolution: string;
+  aspectRatios: readonly string[];
+  defaultAspectRatio: string;
+  audio: boolean;
+  operations: Partial<Record<VideoGenerationKind, VideoOperationConfig>>;
+  providers: Record<VideoProviderName, VideoProviderRoutes | null>;
+};
+
 export interface AgentGenerationSettings {
   /** Explicit output-medium choice from the composer. */
   mediaMode?: AgentMediaMode;
@@ -56,20 +109,43 @@ export const AGENT_MODEL_OPTIONS = [
     aspectRatios: ['adaptive', '21:9', '16:9', '4:3', '1:1', '3:4', '9:16'],
     defaultAspectRatio: 'adaptive',
     audio: false,
-    maxImages: 1,
+    operations: {
+      generate: {
+        input: { minimum: 0, maximum: 0, maximumByType: {} },
+        creditMultiplier: 1,
+      },
+      animate: {
+        input: {
+          minimum: 1,
+          maximum: 1,
+          maximumByType: { image: 1 },
+        },
+        creditMultiplier: 1,
+      },
+    },
     providers: {
       evolink: null,
       grouter: {
-        model: 'minimax-h3',
-        imageModel: 'minimax-h3',
+        generate: 'minimax-h3',
+        animate: 'minimax-h3',
       },
       fal: {
-        model: 'fal-ai/minimax/hailuo-2.3/standard/text-to-video',
-        imageModel: 'fal-ai/minimax/hailuo-2.3/standard/image-to-video',
+        generate: {
+          default: 'fal-ai/minimax/hailuo-2.3/pro/text-to-video',
+          byResolution: {
+            '768P': 'fal-ai/minimax/hailuo-2.3/standard/text-to-video',
+          },
+        },
+        animate: {
+          default: 'fal-ai/minimax/hailuo-2.3/pro/image-to-video',
+          byResolution: {
+            '768P': 'fal-ai/minimax/hailuo-2.3/standard/image-to-video',
+          },
+        },
       },
       replicate: {
-        model: 'minimax/hailuo-2.3',
-        imageModel: 'minimax/hailuo-2.3',
+        generate: 'minimax/hailuo-2.3',
+        animate: 'minimax/hailuo-2.3',
       },
     },
   },
@@ -95,19 +171,60 @@ export const AGENT_MODEL_OPTIONS = [
     aspectRatios: ['auto', '21:9', '16:9', '4:3', '1:1', '3:4', '9:16'],
     defaultAspectRatio: 'auto',
     audio: true,
-    maxImages: 2,
+    operations: {
+      generate: {
+        input: { minimum: 0, maximum: 0, maximumByType: {} },
+        creditMultiplier: 1,
+      },
+      animate: {
+        input: {
+          minimum: 1,
+          maximum: 2,
+          maximumByType: { image: 2 },
+        },
+        creditMultiplier: 1,
+      },
+      reference: {
+        input: {
+          minimum: 1,
+          maximum: 50,
+          maximumByType: { image: 30, video: 10, audio: 10 },
+        },
+        creditMultiplier: 1,
+      },
+      edit: {
+        input: {
+          minimum: 1,
+          maximum: 1,
+          maximumByType: { video: 1 },
+        },
+        creditMultiplier: 1,
+      },
+      extend: {
+        input: {
+          minimum: 1,
+          maximum: 1,
+          maximumByType: { video: 1 },
+        },
+        creditMultiplier: 1,
+      },
+    },
     providers: {
       evolink: {
-        model: 'seedance-2.5-text-to-video',
-        imageModel: 'seedance-2.5-image-to-video',
+        generate: 'seedance-2.5-text-to-video',
+        animate: 'seedance-2.5-image-to-video',
+        reference: 'seedance-2.5-reference-to-video',
+        edit: 'seedance-2.5-video-edit',
+        extend: 'seedance-2.5-video-extend',
       },
       grouter: {
-        model: 'seedance-2.5',
-        imageModel: 'seedance-2.5',
+        generate: 'seedance-2.5',
+        animate: 'seedance-2.5',
+        reference: 'seedance-2.5',
       },
       fal: {
-        model: 'bytedance/seedance-2.5/text-to-video',
-        imageModel: 'bytedance/seedance-2.5/image-to-video',
+        generate: 'bytedance/seedance-2.5/text-to-video',
+        animate: 'bytedance/seedance-2.5/image-to-video',
       },
       // shipany-video-lite deliberately leaves this unsupported instead of
       // silently substituting an older Seedance model.
@@ -134,18 +251,40 @@ export const AGENT_MODEL_OPTIONS = [
     aspectRatios: ['adaptive', '21:9', '16:9', '4:3', '1:1', '3:4', '9:16'],
     defaultAspectRatio: 'adaptive',
     audio: true,
-    maxImages: 2,
+    operations: {
+      generate: {
+        input: { minimum: 0, maximum: 0, maximumByType: {} },
+        creditMultiplier: 1,
+      },
+      animate: {
+        input: {
+          minimum: 1,
+          maximum: 2,
+          maximumByType: { image: 2 },
+        },
+        creditMultiplier: 1,
+      },
+      reference: {
+        input: {
+          minimum: 1,
+          maximum: 15,
+          maximumByType: { image: 9, video: 3, audio: 3 },
+        },
+        creditMultiplier: 1,
+      },
+    },
     providers: {
       evolink: {
-        model: 'seedance-2.0-text-to-video',
-        imageModel: 'seedance-2.0-image-to-video',
+        generate: 'seedance-2.0-text-to-video',
+        animate: 'seedance-2.0-image-to-video',
+        reference: 'seedance-2.0-reference-to-video',
       },
       grouter: null,
       fal: null,
       replicate: null,
     },
   },
-] as const;
+] as const satisfies readonly AgentVideoModelOption[];
 
 /** Image models are separate from the video composer catalog. */
 export const AGENT_IMAGE_MODEL_OPTIONS = [
@@ -246,8 +385,12 @@ export function isAgentMediaMode(value: unknown): value is AgentMediaMode {
   return (AGENT_MEDIA_MODES as readonly unknown[]).includes(value);
 }
 
-export function modelOptionFor(value: string | undefined) {
-  return AGENT_MODEL_OPTIONS.find((item) => item.value === value);
+export function modelOptionFor(
+  value: string | undefined
+): (AgentVideoModelOption & { value: AgentModelOptionValue }) | undefined {
+  return AGENT_MODEL_OPTIONS.find((item) => item.value === value) as
+    | (AgentVideoModelOption & { value: AgentModelOptionValue })
+    | undefined;
 }
 
 export function imageModelOptionFor(value: string | undefined) {
@@ -555,7 +698,8 @@ export function normalizeClientGenerationSettings(
 export function creditsForGeneration(
   modelKey: string | undefined,
   durationSeconds?: number,
-  resolution?: string
+  resolution?: string,
+  operation: VideoGenerationKind = 'generate'
 ): number {
   const option = modelOptionFor(modelKey);
   const highestRate = Math.max(
@@ -572,7 +716,18 @@ export function creditsForGeneration(
         resolution ?? option.defaultResolution
       ] ?? 1)
     : 1;
-  return Math.ceil((rate * seconds * multiplier) / 10) * 10;
+  const operationMultiplier = option
+    ? (option.operations[operation]?.creditMultiplier ?? 1)
+    : 1;
+  return (
+    Math.ceil((rate * seconds * multiplier * operationMultiplier) / 10) * 10
+  );
+}
+
+function routeIds(route: VideoProviderRoute): string[] {
+  return typeof route === 'string'
+    ? [route]
+    : [route.default, ...Object.values(route.byResolution ?? {})];
 }
 
 /** Friendly name for a picker key or a provider id recorded on a task. */
@@ -588,12 +743,15 @@ export function labelForGeneratedModel(modelId: string): string {
   const option = AGENT_MODEL_OPTIONS.find(
     (item) =>
       item.value === modelId ||
-      Object.values(item.providers).some(
-        (ids) =>
-          ids !== null && (ids.model === modelId || ids.imageModel === modelId)
-      ) ||
-      (item.value === 'minimax-h3' &&
-        modelId.startsWith('fal-ai/minimax/hailuo-2.3/'))
+      Object.values(
+        item.providers as Record<VideoProviderName, VideoProviderRoutes | null>
+      ).some(
+        (routes) =>
+          routes !== null &&
+          (Object.values(routes) as VideoProviderRoute[]).some((route) =>
+            routeIds(route).includes(modelId)
+          )
+      )
   );
   return option?.label ?? modelId;
 }
@@ -606,17 +764,124 @@ export function labelForModelOption(value: string) {
 export function providerModelFor(
   modelKey: string | undefined,
   provider: VideoProviderName,
-  kind: 'generate' | 'animate',
+  kind: VideoGenerationKind,
   resolution?: string
 ): string | undefined {
   const option = modelOptionFor(modelKey);
   if (!option) return undefined;
-  if (provider === 'fal' && option.value === 'minimax-h3') {
-    const tier = resolution === '768P' ? 'standard' : 'pro';
-    const mode = kind === 'animate' ? 'image-to-video' : 'text-to-video';
-    return `fal-ai/minimax/hailuo-2.3/${tier}/${mode}`;
-  }
-  const ids = option.providers[provider];
-  if (!ids) return undefined;
-  return kind === 'animate' ? ids.imageModel : ids.model;
+  const route = option.providers[provider]?.[kind];
+  if (!route) return undefined;
+  return typeof route === 'string'
+    ? route
+    : (route.byResolution?.[resolution ?? ''] ?? route.default);
+}
+
+export function videoOperationSupported(
+  modelKey: string | undefined,
+  kind: VideoGenerationKind
+): boolean {
+  const option = modelOptionFor(modelKey);
+  return (
+    Boolean(option?.operations[kind]) &&
+    (['evolink', 'grouter', 'fal', 'replicate'] as const).some((provider) =>
+      Boolean(providerModelFor(modelKey, provider, kind))
+    )
+  );
+}
+
+export function videoOperationsForModel(
+  modelKey: string | undefined
+): VideoGenerationKind[] {
+  return VIDEO_GENERATION_KINDS.filter((kind) =>
+    videoOperationSupported(modelKey, kind)
+  );
+}
+
+export function defaultVideoModelForOperation(
+  operation: VideoGenerationKind
+): AgentModelOptionValue | undefined {
+  return AGENT_MODEL_OPTIONS.find((option) =>
+    videoOperationSupported(option.value, operation)
+  )?.value;
+}
+
+export function videoOperationInputLimits(
+  modelKey: string | undefined,
+  kind: VideoGenerationKind
+): VideoOperationInputLimits | null {
+  const option = modelOptionFor(modelKey);
+  if (!option || !videoOperationSupported(modelKey, kind)) return null;
+  const config = option.operations[kind];
+  if (!config) return null;
+  const accepts = (['image', 'video', 'audio'] as const).filter(
+    (mediaType) => (config.input.maximumByType[mediaType] ?? 0) > 0
+  );
+  return {
+    minimum: config.input.minimum,
+    maximum: config.input.maximum,
+    accepts,
+    maximumByType: config.input.maximumByType,
+  };
+}
+
+/** Union policy for the composer; the selected tool applies the stricter mode policy. */
+export function videoModelAttachmentPolicy(modelKey: string | undefined): {
+  minimum: 0;
+  maximum: number;
+  accepts: readonly VideoAttachmentType[];
+} {
+  const limits = VIDEO_GENERATION_KINDS.flatMap((kind) => {
+    const value = videoOperationInputLimits(modelKey, kind);
+    return value ? [value] : [];
+  });
+  const accepts = (['image', 'video', 'audio'] as const).filter((mediaType) =>
+    limits.some((limit) => limit.accepts.includes(mediaType))
+  );
+  return {
+    minimum: 0,
+    maximum: Math.max(0, ...limits.map((limit) => limit.maximum)),
+    accepts,
+  };
+}
+
+/** Union policy for a semantic tool page across every compatible model. */
+export function videoOperationAttachmentPolicy(
+  operation: VideoGenerationKind
+): VideoOperationInputLimits {
+  const limits = AGENT_MODEL_OPTIONS.flatMap((option) => {
+    const value = videoOperationInputLimits(option.value, operation);
+    return value ? [value] : [];
+  });
+  const accepts = (['image', 'video', 'audio'] as const).filter((mediaType) =>
+    limits.some((limit) => limit.accepts.includes(mediaType))
+  );
+  return {
+    minimum: limits.length
+      ? Math.min(...limits.map((limit) => limit.minimum))
+      : 0,
+    maximum: Math.max(0, ...limits.map((limit) => limit.maximum)),
+    accepts,
+    maximumByType: Object.fromEntries(
+      accepts.map((mediaType) => [
+        mediaType,
+        Math.max(
+          0,
+          ...limits.map((limit) => limit.maximumByType[mediaType] ?? 0)
+        ),
+      ])
+    ),
+  };
+}
+
+export function videoModelMaximumForType(
+  modelKey: string | undefined,
+  mediaType: VideoAttachmentType
+): number {
+  return Math.max(
+    0,
+    ...VIDEO_GENERATION_KINDS.map(
+      (kind) =>
+        videoOperationInputLimits(modelKey, kind)?.maximumByType[mediaType] ?? 0
+    )
+  );
 }

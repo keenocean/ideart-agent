@@ -4,9 +4,7 @@ import {
   createAgentTools,
   durationSeconds,
   guardGenerationRetries,
-  normalizeProviderAspectRatio,
   pickVideoProvider,
-  providerOptionsFor,
   resolveReferenceImage,
 } from './tools';
 
@@ -34,6 +32,121 @@ describe('createAgentTools', () => {
         settings: { mediaMode: 'video' },
       }).map((tool) => tool.name)
     ).toEqual(['generate_video', 'animate_image']);
+  });
+
+  it('keeps the upstream tool surface and narrows generate_video operations by model', () => {
+    const operationsFor = (
+      modelName: 'minimax-h3' | 'seedance-2-5' | 'seedance-2-0'
+    ) => {
+      const tools = createAgentTools({
+        userId: 'user-1',
+        sessionId: 'session-1',
+        settings: { mediaMode: 'video', modelName },
+      });
+      expect(tools.map((tool) => tool.name)).toEqual([
+        'generate_video',
+        'animate_image',
+      ]);
+      const generateVideo = tools.find(
+        (tool) => tool.name === 'generate_video'
+      )!;
+      return (
+        generateVideo.inputSchema as unknown as {
+          properties: { operation: { enum: string[] } };
+        }
+      ).properties.operation.enum;
+    };
+
+    expect(operationsFor('minimax-h3')).toEqual(['generate']);
+    expect(operationsFor('seedance-2-0')).toEqual(['generate', 'reference']);
+    expect(operationsFor('seedance-2-5')).toEqual([
+      'generate',
+      'reference',
+      'edit',
+      'extend',
+    ]);
+  });
+
+  it('narrows semantic tool pages to their locked video operation', async () => {
+    const animateTools = createAgentTools({
+      userId: 'user-1',
+      sessionId: 'session-1',
+      settings: { mediaMode: 'video', modelName: 'seedance-2-5' },
+      policy: {
+        entryContext: {
+          kind: 'tool',
+          entityId: 'image-to-video',
+          locale: 'en',
+        },
+        source: 'tool:image-to-video',
+        lockedMediaMode: 'video',
+        lockedVideoOperation: 'animate',
+        inputPolicy: { minimum: 1, maximum: 2, accepts: ['image'] },
+      },
+    });
+    expect(animateTools.map((tool) => tool.name)).toEqual(['animate_image']);
+
+    const referenceTool = createAgentTools({
+      userId: 'user-1',
+      sessionId: 'session-1',
+      settings: { mediaMode: 'video', modelName: 'seedance-2-5' },
+      policy: {
+        entryContext: {
+          kind: 'tool',
+          entityId: 'reference-to-video',
+          locale: 'en',
+        },
+        source: 'tool:reference-to-video',
+        lockedMediaMode: 'video',
+        lockedVideoOperation: 'reference',
+        inputPolicy: {
+          minimum: 1,
+          maximum: 50,
+          accepts: ['image', 'video', 'audio'],
+        },
+      },
+    })[0];
+    expect(referenceTool.name).toBe('generate_video');
+    expect(
+      (
+        referenceTool.inputSchema as unknown as {
+          properties: { operation: { enum: string[] } };
+        }
+      ).properties.operation.enum
+    ).toEqual(['reference']);
+    const inferred = await referenceTool.call(
+      { prompt: 'Follow the supplied materials' },
+      { cwd: '/' }
+    );
+    expect(inferred.content).toContain(
+      'This entry requires at least 1 attachment'
+    );
+
+    const conflictingTool = createAgentTools({
+      userId: 'user-1',
+      sessionId: 'session-1',
+      settings: { mediaMode: 'video', modelName: 'seedance-2-5' },
+      policy: {
+        entryContext: {
+          kind: 'tool',
+          entityId: 'reference-to-video',
+          locale: 'en',
+        },
+        source: 'tool:reference-to-video',
+        lockedMediaMode: 'video',
+        lockedVideoOperation: 'reference',
+        inputPolicy: {
+          minimum: 1,
+          maximum: 50,
+          accepts: ['image', 'video', 'audio'],
+        },
+      },
+    })[0];
+    const conflict = await conflictingTool.call(
+      { prompt: 'Ignore the page', operation: 'generate' },
+      { cwd: '/' }
+    );
+    expect(conflict.content).toContain('locked to the reference operation');
   });
 
   it('keeps the selected Skill reader alongside the medium tools', () => {
@@ -121,6 +234,108 @@ describe('createAgentTools', () => {
       { cwd: '/' }
     );
     expect(result.content).toContain('requires at least 1 attachment');
+  });
+
+  it('enforces operation-specific reference limits before provider selection', async () => {
+    const tools = createAgentTools({
+      userId: 'user-1',
+      sessionId: 'session-1',
+      settings: { mediaMode: 'video', modelName: 'seedance-2-5' },
+      policy: {
+        entryContext: {
+          kind: 'model',
+          entityId: 'seedance-2-5',
+          locale: 'en',
+        },
+        source: 'model:seedance-2-5',
+        lockedMediaMode: 'video',
+        lockedVideoModel: 'seedance-2-5',
+        inputPolicy: {
+          minimum: 0,
+          maximum: 50,
+          accepts: ['image', 'video', 'audio'],
+        },
+      },
+    });
+    const referenceTool = tools.find((tool) => tool.name === 'generate_video')!;
+    const noReferences = await referenceTool.call(
+      { prompt: 'Follow the reference', operation: 'reference' },
+      { cwd: '/' }
+    );
+    expect(noReferences.content).toContain(
+      'reference requires at least 1 source attachment'
+    );
+
+    const freshReferenceTool = createAgentTools({
+      userId: 'user-1',
+      sessionId: 'session-1',
+      settings: { mediaMode: 'video', modelName: 'seedance-2-5' },
+      policy: {
+        entryContext: {
+          kind: 'model',
+          entityId: 'seedance-2-5',
+          locale: 'en',
+        },
+        source: 'model:seedance-2-5',
+        lockedMediaMode: 'video',
+        lockedVideoModel: 'seedance-2-5',
+        inputPolicy: {
+          minimum: 0,
+          maximum: 50,
+          accepts: ['image', 'video', 'audio'],
+        },
+      },
+    }).find((tool) => tool.name === 'generate_video')!;
+    const tooManyVideos = await freshReferenceTool.call(
+      {
+        prompt: 'Follow the reference',
+        operation: 'reference',
+        reference_videos: Array.from(
+          { length: 11 },
+          (_, index) => `https://cdn.example.com/${index}.mp4`
+        ),
+      },
+      { cwd: '/' }
+    );
+    expect(tooManyVideos.content).toContain(
+      'reference accepts at most 10 video attachments'
+    );
+  });
+
+  it('preserves upstream reference inference when operation is omitted', async () => {
+    const generateVideo = createAgentTools({
+      userId: 'user-1',
+      sessionId: 'session-1',
+      settings: { mediaMode: 'video', modelName: 'minimax-h3' },
+    }).find((tool) => tool.name === 'generate_video')!;
+
+    const result = await generateVideo.call(
+      {
+        prompt: 'Follow this style',
+        reference_images: ['https://cdn.example.com/style.png'],
+      },
+      { cwd: '/' }
+    );
+    expect(result.content).toContain(
+      'MiniMax H3 does not support the reference operation'
+    );
+  });
+
+  it('requires one source video for edit and extend inside generate_video', async () => {
+    for (const operation of ['edit', 'extend'] as const) {
+      const generateVideo = createAgentTools({
+        userId: 'user-1',
+        sessionId: 'session-1',
+        settings: { mediaMode: 'video', modelName: 'seedance-2-5' },
+      }).find((tool) => tool.name === 'generate_video')!;
+      const result = await generateVideo.call(
+        { prompt: 'Continue the action', operation },
+        { cwd: '/' }
+      );
+      expect(result.content).toContain(
+        `${operation} requires at least 1 source attachment`
+      );
+    }
   });
 
   it('does not execute another generation after a same-turn failure', async () => {
@@ -216,17 +431,6 @@ describe('resolveReferenceImage', () => {
   });
 });
 
-describe('normalizeProviderAspectRatio', () => {
-  it('turns MiniMax adaptive mode into a concrete upstream ratio', () => {
-    expect(normalizeProviderAspectRatio('minimax-h3', 'adaptive')).toBe('16:9');
-  });
-
-  it('preserves concrete MiniMax and Seedance ratios', () => {
-    expect(normalizeProviderAspectRatio('minimax-h3', '9:16')).toBe('9:16');
-    expect(normalizeProviderAspectRatio('seedance-2-5', 'auto')).toBe('auto');
-  });
-});
-
 describe('durationSeconds', () => {
   it('prefers what the tool call asked for', () => {
     expect(durationSeconds(10, 5, 'minimax-h3')).toBe(10);
@@ -247,66 +451,6 @@ describe('durationSeconds', () => {
     expect(durationSeconds(99, undefined, 'minimax-h3')).toBe(15);
     expect(durationSeconds(99, undefined, 'seedance-2-5')).toBe(30);
     expect(durationSeconds(99, undefined, 'seedance-2-0')).toBe(15);
-  });
-});
-
-describe('providerOptionsFor', () => {
-  it('maps Seedance 2.0 image-to-video settings to EvoLink', () => {
-    expect(
-      providerOptionsFor({
-        provider: 'evolink',
-        modelKey: 'seedance-2-0',
-        kind: 'animate',
-        options: {
-          aspect_ratio: '16:9',
-          duration: 8,
-          resolution: '1080p',
-          image_input: [
-            'https://cdn.example.com/start.png',
-            'https://cdn.example.com/end.png',
-            'https://cdn.example.com/ignored.png',
-          ],
-        },
-      })
-    ).toEqual({
-      aspect_ratio: '16:9',
-      duration: 8,
-      quality: '1080p',
-      generate_audio: true,
-      image_input: [
-        'https://cdn.example.com/start.png',
-        'https://cdn.example.com/end.png',
-      ],
-    });
-  });
-
-  it('maps Seedance 2.5 adaptive and image inputs to EvoLink', () => {
-    expect(
-      providerOptionsFor({
-        provider: 'evolink',
-        modelKey: 'seedance-2-5',
-        kind: 'animate',
-        options: {
-          aspect_ratio: 'auto',
-          duration: 30,
-          resolution: '720p',
-          image_input: [
-            'https://cdn.example.com/start.png',
-            'https://cdn.example.com/end.png',
-            'https://cdn.example.com/ignored.png',
-          ],
-        },
-      })
-    ).toEqual({
-      aspect_ratio: 'adaptive',
-      duration: 30,
-      quality: '720p',
-      generate_audio: true,
-      image_input: [
-        'https://cdn.example.com/start.png',
-        'https://cdn.example.com/end.png',
-      ],
-    });
   });
 });
 

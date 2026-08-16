@@ -1,12 +1,14 @@
 import {
   AGENT_IMAGE_MODEL_OPTIONS,
   AGENT_MODEL_OPTIONS,
+  videoOperationAttachmentPolicy,
+  type VideoGenerationKind,
 } from '@/lib/agent-settings';
 import { locales } from '@/paraglide/runtime.js';
 
 import type { LegacyCatalogRoute } from './legacy-routes';
 import { catalogRouteSegment } from './paths';
-import type { CatalogDefinition } from './types';
+import type { CatalogDefinition, ToolArchetype } from './types';
 
 function assertOrder(value: number, label: string): void {
   if (!Number.isInteger(value) || value < 0) {
@@ -108,7 +110,15 @@ export function validateCatalog(
       );
     }
     if (entry.kind === 'tool') {
-      const { minimum, maximum, accepts } = entry.execution.inputPolicy;
+      const runtimeVideoPolicy =
+        entry.execution.mediaMode === 'video'
+          ? videoOperationAttachmentPolicy(entry.execution.videoOperation)
+          : null;
+      const inputPolicy = entry.execution.inputPolicy ?? runtimeVideoPolicy;
+      if (!inputPolicy) {
+        throw new Error(`Missing tool input policy: ${entry.entityId}`);
+      }
+      const { minimum, maximum, accepts } = inputPolicy;
       const expectsImageOutput =
         entry.archetype === 'image-generator' ||
         entry.archetype === 'image-editor' ||
@@ -121,6 +131,24 @@ export function validateCatalog(
           `Tool archetype/media mode mismatch: ${entry.entityId}`
         );
       }
+      if (entry.execution.mediaMode === 'video') {
+        const operationByArchetype: Partial<
+          Record<ToolArchetype, VideoGenerationKind>
+        > = {
+          'text-to-video': 'generate',
+          'image-to-video': 'animate',
+          'reference-to-video': 'reference',
+        };
+        const expectedOperation = operationByArchetype[entry.archetype];
+        if (
+          expectedOperation &&
+          entry.execution.videoOperation !== expectedOperation
+        ) {
+          throw new Error(
+            `Tool archetype/video operation mismatch: ${entry.entityId}`
+          );
+        }
+      }
       assertOrder(minimum, `${entry.entityId} input minimum`);
       if (maximum !== undefined) {
         assertOrder(maximum, `${entry.entityId} input maximum`);
@@ -128,8 +156,23 @@ export function validateCatalog(
           throw new Error(`Invalid input range: ${entry.entityId}`);
         }
       }
-      if (accepts.length === 0 || new Set(accepts).size !== accepts.length) {
+      if (
+        (accepts.length === 0 && maximum !== 0) ||
+        new Set(accepts).size !== accepts.length
+      ) {
         throw new Error(`Invalid accepted media list: ${entry.entityId}`);
+      }
+      if (
+        runtimeVideoPolicy &&
+        entry.execution.inputPolicy &&
+        (minimum < runtimeVideoPolicy.minimum ||
+          maximum === undefined ||
+          maximum > runtimeVideoPolicy.maximum ||
+          accepts.some(
+            (mediaType) => !runtimeVideoPolicy.accepts.includes(mediaType)
+          ))
+      ) {
+        throw new Error(`Tool input policy widens runtime: ${entry.entityId}`);
       }
     }
     if (entry.kind === 'model') {

@@ -3,6 +3,7 @@ import {
   creditsForImageGeneration,
   DEFAULT_IMAGE_MODEL,
   type AgentMediaMode,
+  type VideoGenerationKind,
 } from '@/lib/agent-settings';
 
 /**
@@ -26,6 +27,8 @@ export function checkCredits(params: {
   duration?: number;
   /** Model-specific resolution multipliers match shipany-video-lite. */
   resolution?: string;
+  /** Exact operation when a semantic tool page locks it. */
+  operation?: VideoGenerationKind;
   imageResolution?: string;
   imageQuality?: string;
   balance: number;
@@ -33,7 +36,8 @@ export function checkCredits(params: {
   const videoRequired = creditsForGeneration(
     params.modelName,
     params.duration,
-    params.resolution
+    params.resolution,
+    params.operation
   );
   const imageRequired = creditsForImageGeneration(
     DEFAULT_IMAGE_MODEL,

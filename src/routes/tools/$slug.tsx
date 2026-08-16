@@ -8,8 +8,8 @@ import { Footer } from '@/blocks/footer';
 import { Header } from '@/blocks/header';
 import { ToolDetail } from '@/blocks/tool-detail';
 import {
-  getImageToolReadinessFn,
   getToolDetailRouteDataFn,
+  getToolReadinessFn,
 } from '@/content/tools/server';
 
 export const Route = createFileRoute('/tools/$slug')({
@@ -20,7 +20,7 @@ export const Route = createFileRoute('/tools/$slug')({
     });
     if (!routeData) throw notFound();
     const { page, directory } = routeData;
-    const readiness = await getImageToolReadinessFn({
+    const readiness = await getToolReadinessFn({
       data: { entityId: page.entityId },
     });
     return {

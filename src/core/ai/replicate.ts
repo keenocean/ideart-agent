@@ -28,6 +28,35 @@ export interface ReplicateConfigs extends AIConfigs {
   uuid?: UuidFunction;
 }
 
+/** Map normalized MiniMax options to Replicate's prediction input. */
+export function formatReplicateVideoOptions(
+  model: string,
+  rawOptions: unknown
+): Record<string, unknown> {
+  const options =
+    rawOptions && typeof rawOptions === 'object' && !Array.isArray(rawOptions)
+      ? (rawOptions as Record<string, unknown>)
+      : {};
+  if (!model.startsWith('minimax/hailuo-2.3')) return { ...options };
+
+  const imageInput = Array.isArray(options.image_input)
+    ? options.image_input
+        .map(String)
+        .map((item) => item.trim())
+        .filter(Boolean)
+    : [];
+  return {
+    ...(options.duration !== undefined
+      ? { duration: Number(options.duration) }
+      : {}),
+    ...(typeof options.resolution === 'string' && options.resolution
+      ? { resolution: options.resolution }
+      : {}),
+    prompt_optimizer: true,
+    ...(imageInput[0] ? { first_frame_image: imageInput[0] } : {}),
+  };
+}
+
 /**
  * Replicate provider
  * @docs https://replicate.com/
@@ -268,6 +297,13 @@ export class ReplicateProvider implements AIProvider {
 
     if (!options) {
       return input;
+    }
+
+    if (
+      mediaType === AIMediaType.VIDEO &&
+      model.startsWith('minimax/hailuo-2.3')
+    ) {
+      return { prompt, ...formatReplicateVideoOptions(model, options) };
     }
 
     input = { ...input, ...options };

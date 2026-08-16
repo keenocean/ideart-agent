@@ -14,8 +14,10 @@ import {
   AGENT_MODEL_OPTIONS,
   labelForModelOption,
   settingsForModel,
+  videoOperationSupported,
   type AgentComposerSettings,
   type AgentMediaMode,
+  type VideoGenerationKind,
 } from '@/lib/agent-settings';
 import {
   normalizeAgentPromptSkills,
@@ -102,11 +104,18 @@ export function ComposerControls({
   settings,
   onChange,
   disabled,
+  operation,
 }: {
   settings: AgentComposerSettings;
   onChange: (settings: AgentComposerSettings) => void;
   disabled?: boolean;
+  operation?: VideoGenerationKind;
 }) {
+  const models = operation
+    ? AGENT_MODEL_OPTIONS.filter((model) =>
+        videoOperationSupported(model.value, operation)
+      )
+    : AGENT_MODEL_OPTIONS;
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
@@ -130,7 +139,7 @@ export function ComposerControls({
         <div className="text-muted-foreground px-2 py-1.5 text-xs">
           {m['agent.composer.video_models']()}
         </div>
-        {AGENT_MODEL_OPTIONS.map((model) => (
+        {models.map((model) => (
           <DropdownMenuItem
             key={model.value}
             onClick={() => onChange(settingsForModel(settings, model.value))}

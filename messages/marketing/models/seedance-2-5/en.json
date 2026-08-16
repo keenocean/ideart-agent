@@ -7,20 +7,20 @@
     "template": "video-model",
     "seo": {
       "title": "Seedance 2.5 AI Video Generator | UGC Mind",
-      "description": "Create text-to-video and image-to-video drafts with Seedance 2.5 in a model-locked UGC Mind workflow."
+      "description": "Create, reference, edit, and extend AI videos with Seedance 2.5 in a model-locked UGC Mind Agent workflow."
     },
     "directory": {
       "title": "Seedance 2.5",
-      "description": "A video model for text-led and reference-image generation with generated audio and flexible clip settings."
+      "description": "Five routed video operations for text, frames, mixed references, editing, and extension, with generated audio where supported."
     },
     "hero": {
       "eyebrow": "Video model",
       "title": "Create with Seedance 2.5",
-      "description": "Turn a written direction or up to two reference images into a video draft, then keep refining it in the same private agent conversation."
+      "description": "Describe the result and let the Agent choose text-to-video, image-to-video, mixed-reference generation, video editing, or video extension in the same private conversation."
     },
     "workbench": {
       "title": "Seedance 2.5 workspace",
-      "description": "The media mode and model are locked while duration, resolution, aspect ratio, and references remain available within the supported runtime contract.",
+      "description": "The media mode and model are locked while the Agent selects the matching Seedance 2.5 operation from your instruction and verified source media.",
       "placeholder": "Describe the subject, action, setting, camera movement, pacing, and sound you want..."
     },
     "specs": {
@@ -32,7 +32,7 @@
         "resolutions": "Resolutions",
         "aspectRatios": "Aspect ratios",
         "audio": "Generated audio",
-        "referenceImages": "Reference images",
+        "referenceImages": "Images per reference operation",
         "enabled": "Supported",
         "disabled": "Not supported",
         "image": "Image",
@@ -128,7 +128,19 @@
         },
         {
           "title": "Image-to-video",
-          "description": "Attach one or two images to guide the opening and visual direction."
+          "description": "Use one or two images as literal opening or ending frames for a moving shot."
+        },
+        {
+          "title": "Reference-to-video",
+          "description": "Guide identity, style, motion, rhythm, or sound with up to 30 images, 10 videos, and 10 audio files, 50 references total."
+        },
+        {
+          "title": "Video editing",
+          "description": "Apply a focused change to one existing video while keeping that clip as the editing context."
+        },
+        {
+          "title": "Video extension",
+          "description": "Continue one source clip forward or backward with newly generated connected footage."
         },
         {
           "title": "Generated audio",
@@ -145,8 +157,8 @@
           "description": "State the subject, action, environment, camera behavior, pacing, and desired sound."
         },
         {
-          "title": "Add references when useful",
-          "description": "Use up to two images when composition or visual identity matters more than open exploration."
+          "title": "Assign source roles in plain language",
+          "description": "Say whether media should be a frame, a creative reference, the clip to edit, or the clip to extend; the Agent selects the corresponding route."
         },
         {
           "title": "Choose delivery settings",
@@ -241,7 +253,7 @@
       "description": "Generative video is probabilistic. Inspect every result instead of assuming the prompt was reconstructed exactly.",
       "items": [
         "Faces, hands, fine text, repeated objects, and reflections may drift across frames.",
-        "A reference image guides the result but does not guarantee pixel-level identity or composition.",
+        "Reference media guides the result but does not guarantee pixel-level identity, timing, or composition.",
         "Longer, denser prompts can introduce competing actions; simplify the shot before adding detail.",
         "Generated audio should be reviewed for timing, intelligibility, brand safety, and usage context."
       ]
@@ -250,12 +262,12 @@
       "title": "Seedance 2.5 questions",
       "items": [
         {
-          "question": "Can I use Seedance 2.5 for text-to-video and image-to-video?",
-          "answer": "Yes. UGC Mind has explicit runtime routes for both modes. Attaching images switches the request to the image-to-video route."
+          "question": "Which Seedance 2.5 modes can the Agent use?",
+          "answer": "UGC Mind maps five explicit routes: text-to-video, image-to-video, reference-to-video, video edit, and video extend. The Agent chooses from your instruction; an attachment alone does not determine its role."
         },
         {
           "question": "Which settings are supported here?",
-          "answer": "The current workspace exposes 4–30 second durations, 480p and 720p resolution, the listed aspect ratios, generated audio, and up to two reference images."
+          "answer": "The workspace exposes 4–30 second durations, 480p and 720p resolution, the listed aspect ratios, generated audio, one or two frame images for image-to-video, and mixed reference input up to 30 images, 10 videos, and 10 audio files with a 50-file total. Edit and extend each require one source video."
         },
         {
           "question": "Are the gallery clips verified Seedance 2.5 outputs?",

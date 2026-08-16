@@ -24,12 +24,16 @@ describe('Agent message metadata decoder', () => {
     expect(
       parseAgentMessageMetadata({
         ...userMetadata,
+        generationEntrySource: 'tool:reference-to-video',
+        generationVideoOperation: 'reference',
         media: [
           { mediaType: 'image', url: 'https://cdn.example.com/input.png' },
         ],
       })
     ).toMatchObject({
       kind: 'user',
+      generationEntrySource: 'tool:reference-to-video',
+      generationVideoOperation: 'reference',
       media: [{ mediaType: 'image', url: 'https://cdn.example.com/input.png' }],
     });
     expect(
@@ -60,6 +64,8 @@ describe('Agent message metadata decoder', () => {
       ...userMetadata,
       media: [{ mediaType: 'video', url: '' }],
     },
+    { ...userMetadata, generationEntrySource: '' },
+    { ...userMetadata, generationVideoOperation: 'remix' },
     {
       schemaVersion: 1,
       kind: 'assistant',

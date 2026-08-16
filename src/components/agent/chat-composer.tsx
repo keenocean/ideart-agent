@@ -26,8 +26,12 @@ import {
   mediaTypeForAttachment,
   type PendingAttachment,
 } from '@/lib/agent';
-import { type AgentComposerSettings } from '@/lib/agent-settings';
+import type {
+  AgentComposerSettings,
+  VideoGenerationKind,
+} from '@/lib/agent-settings';
 import { apiGet } from '@/lib/api-client';
+import type { GenerationInputPolicy } from '@/lib/generation-entry';
 import { isVideoUrl } from '@/lib/media';
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
@@ -86,6 +90,10 @@ export interface ChatComposerProps {
   submitDisabled?: boolean;
   modeLocked?: boolean;
   modelLocked?: boolean;
+  /** Restrict the video model picker on semantic tool pages. */
+  videoOperation?: VideoGenerationKind;
+  /** Hide upload affordances that the current entry cannot accept. */
+  inputPolicy?: GenerationInputPolicy;
   /** `lg` on the start screens, `sm` for the follow-up box in a session. */
   size?: 'sm' | 'lg';
   /** Rendered next to the "+" menu (e.g. the selected example category). */
@@ -104,6 +112,50 @@ export interface ChatComposerProps {
 interface LibraryData {
   images?: LibraryMedia[];
   nextCursor?: string;
+}
+
+const FILE_ACCEPT_BY_MEDIA_TYPE = {
+  image: [
+    'image/jpeg',
+    'image/png',
+    'image/webp',
+    '.jpg',
+    '.jpeg',
+    '.png',
+    '.webp',
+  ],
+  audio: [
+    'audio/mpeg',
+    'audio/mp4',
+    'audio/ogg',
+    'audio/wav',
+    'audio/webm',
+    '.mp3',
+    '.m4a',
+    '.wav',
+    '.ogg',
+  ],
+  video: [
+    'video/mp4',
+    'video/quicktime',
+    'video/webm',
+    '.mp4',
+    '.mov',
+    '.m4v',
+    '.webm',
+  ],
+} as const;
+
+const ALL_MEDIA_FILE_ACCEPT = Object.values(FILE_ACCEPT_BY_MEDIA_TYPE)
+  .flat()
+  .join(',');
+
+function fileAcceptFor(policy: GenerationInputPolicy | undefined): string {
+  return policy
+    ? policy.accepts
+        .flatMap((mediaType) => FILE_ACCEPT_BY_MEDIA_TYPE[mediaType])
+        .join(',')
+    : ALL_MEDIA_FILE_ACCEPT;
 }
 
 /**
@@ -131,6 +183,8 @@ export function ChatComposer({
   submitDisabled = false,
   modeLocked = false,
   modelLocked = false,
+  videoOperation,
+  inputPolicy,
   size = 'lg',
   toolbarExtra,
   presentation = 'default',
@@ -143,6 +197,11 @@ export function ChatComposer({
   const [libraryOpen, setLibraryOpen] = useState(false);
   const uploading = attachments.some((item) => item.status === 'uploading');
   const cannotSubmit = disabled || submitDisabled || uploading;
+  const canAttach =
+    !inputPolicy ||
+    ((inputPolicy.maximum ?? Number.POSITIVE_INFINITY) > 0 &&
+      inputPolicy.accepts.length > 0);
+  const fileAccept = fileAcceptFor(inputPolicy);
 
   const attachmentLabels = {
     image: m['agent.composer.media_image'](),
@@ -182,21 +241,23 @@ export function ChatComposer({
             <Type aria-hidden="true" className="size-3.5" />
             {inputModeLabels.prompt}
           </button>
-          <button
-            type="button"
-            aria-pressed={attachments.length > 0}
-            onClick={() => fileInputRef.current?.click()}
-            disabled={disabled || uploading}
-            className={cn(
-              'flex h-8 items-center gap-1.5 rounded-t-[10px] px-3 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50',
-              attachments.length > 0
-                ? 'bg-card text-foreground font-medium'
-                : 'text-muted-foreground hover:text-foreground'
-            )}
-          >
-            <ImagePlus aria-hidden="true" className="size-3.5" />
-            {inputModeLabels.reference}
-          </button>
+          {canAttach && (
+            <button
+              type="button"
+              aria-pressed={attachments.length > 0}
+              onClick={() => fileInputRef.current?.click()}
+              disabled={disabled || uploading}
+              className={cn(
+                'flex h-8 items-center gap-1.5 rounded-t-[10px] px-3 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50',
+                attachments.length > 0
+                  ? 'bg-card text-foreground font-medium'
+                  : 'text-muted-foreground hover:text-foreground'
+              )}
+            >
+              <ImagePlus aria-hidden="true" className="size-3.5" />
+              {inputModeLabels.reference}
+            </button>
+          )}
         </div>
       )}
 
@@ -293,55 +354,59 @@ export function ChatComposer({
           submit is wider than a 390px viewport. */}
       <div className="flex flex-wrap items-center justify-between gap-2 px-3 pb-3">
         <div className="flex min-w-0 items-center gap-1.5">
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              render={
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  disabled={disabled}
-                  aria-label={m['agent.home.attach']()}
-                  className="text-muted-foreground size-8 rounded-full"
-                />
-              }
-            >
-              {uploading ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <Plus className="size-4" />
-              )}
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-56">
-              <DropdownMenuItem
-                disabled={uploading}
-                onClick={() => fileInputRef.current?.click()}
-                className="gap-2.5"
+          {canAttach && (
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    disabled={disabled}
+                    aria-label={m['agent.home.attach']()}
+                    className="text-muted-foreground size-8 rounded-full"
+                  />
+                }
               >
-                <Paperclip className="size-4" />
-                {m['landing.hero.upload_local']()}
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => setLibraryOpen(true)}
-                className="gap-2.5"
-              >
-                <Images className="size-4" />
-                {m['agent.composer.add_from_library']()}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/jpeg,image/png,image/webp,audio/mpeg,audio/mp4,audio/ogg,audio/wav,audio/webm,.mp3,.m4a,.wav,.ogg,video/mp4,video/quicktime,video/webm,.mp4,.mov,.m4v"
-            multiple
-            aria-label={m['landing.hero.upload_local']()}
-            className="sr-only"
-            onChange={(event) => {
-              onAddFiles(Array.from(event.currentTarget.files ?? []));
-              event.currentTarget.value = '';
-            }}
-          />
+                {uploading ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Plus className="size-4" />
+                )}
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-56">
+                <DropdownMenuItem
+                  disabled={uploading}
+                  onClick={() => fileInputRef.current?.click()}
+                  className="gap-2.5"
+                >
+                  <Paperclip className="size-4" />
+                  {m['landing.hero.upload_local']()}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setLibraryOpen(true)}
+                  className="gap-2.5"
+                >
+                  <Images className="size-4" />
+                  {m['agent.composer.add_from_library']()}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+          {canAttach && (
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept={fileAccept}
+              multiple
+              aria-label={m['landing.hero.upload_local']()}
+              className="sr-only"
+              onChange={(event) => {
+                onAddFiles(Array.from(event.currentTarget.files ?? []));
+                event.currentTarget.value = '';
+              }}
+            />
+          )}
           {!(presentation === 'tool' && modeLocked) && (
             <ComposerModeSelector
               settings={settings}
@@ -390,6 +455,7 @@ export function ChatComposer({
                 settings={settings}
                 onChange={onSettingsChange}
                 disabled={disabled || modelLocked}
+                operation={videoOperation}
               />
               <ComposerSettings
                 settings={settings}
@@ -419,14 +485,16 @@ export function ChatComposer({
           </Button>
         </div>
       </div>
-      <LibraryPicker
-        open={libraryOpen}
-        onOpenChange={setLibraryOpen}
-        onAdd={(media) => {
-          onAddLibraryMedia(media);
-          setLibraryOpen(false);
-        }}
-      />
+      {canAttach && (
+        <LibraryPicker
+          open={libraryOpen}
+          onOpenChange={setLibraryOpen}
+          onAdd={(media) => {
+            onAddLibraryMedia(media);
+            setLibraryOpen(false);
+          }}
+        />
+      )}
     </form>
   );
 }

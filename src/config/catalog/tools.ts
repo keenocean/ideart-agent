@@ -63,7 +63,7 @@ export const toolCatalog = [
     execution: {
       kind: 'agent-preset',
       mediaMode: 'video',
-      inputPolicy: { minimum: 0, maximum: 2, accepts: ['image'] },
+      videoOperation: 'generate',
     },
   },
   {
@@ -81,7 +81,7 @@ export const toolCatalog = [
     execution: {
       kind: 'agent-preset',
       mediaMode: 'video',
-      inputPolicy: { minimum: 1, maximum: 2, accepts: ['image'] },
+      videoOperation: 'animate',
     },
   },
   {
@@ -96,11 +96,7 @@ export const toolCatalog = [
     execution: {
       kind: 'agent-preset',
       mediaMode: 'video',
-      inputPolicy: {
-        minimum: 1,
-        maximum: 8,
-        accepts: ['image', 'video', 'audio'],
-      },
+      videoOperation: 'reference',
     },
   },
   {

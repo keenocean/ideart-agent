@@ -19,6 +19,11 @@ import {
   resolutionsForModel,
   resolveGenerationSettings,
   settingsForModel,
+  VIDEO_GENERATION_KINDS,
+  videoModelAttachmentPolicy,
+  videoOperationAttachmentPolicy,
+  videoOperationInputLimits,
+  videoOperationSupported,
 } from './agent-settings';
 
 function expectedCredits(rate: number, seconds: number, multiplier = 1) {
@@ -341,6 +346,18 @@ describe('providerModelFor', () => {
     expect(providerModelFor('seedance-2-5', 'evolink', 'animate', '720p')).toBe(
       'seedance-2.5-image-to-video'
     );
+    expect(
+      providerModelFor('seedance-2-5', 'evolink', 'reference', '720p')
+    ).toBe('seedance-2.5-reference-to-video');
+    expect(providerModelFor('seedance-2-5', 'evolink', 'edit', '720p')).toBe(
+      'seedance-2.5-video-edit'
+    );
+    expect(providerModelFor('seedance-2-5', 'evolink', 'extend', '720p')).toBe(
+      'seedance-2.5-video-extend'
+    );
+    expect(
+      providerModelFor('seedance-2-0', 'evolink', 'reference', '720p')
+    ).toBe('seedance-2.0-reference-to-video');
   });
 
   it('does not downgrade Seedance on Replicate', () => {
@@ -359,10 +376,27 @@ describe('labelForGeneratedModel', () => {
   it('names picker and provider ids', () => {
     for (const option of AGENT_MODEL_OPTIONS) {
       expect(labelForGeneratedModel(option.value)).toBe(option.label);
-      for (const ids of Object.values(option.providers)) {
-        if (!ids) continue;
-        expect(labelForGeneratedModel(ids.model)).toBe(option.label);
-        expect(labelForGeneratedModel(ids.imageModel)).toBe(option.label);
+      for (const provider of [
+        'evolink',
+        'grouter',
+        'fal',
+        'replicate',
+      ] as const) {
+        for (const operation of VIDEO_GENERATION_KINDS) {
+          for (const resolution of option.resolutions) {
+            const providerModelId = providerModelFor(
+              option.value,
+              provider,
+              operation,
+              resolution
+            );
+            if (providerModelId) {
+              expect(labelForGeneratedModel(providerModelId)).toBe(
+                option.label
+              );
+            }
+          }
+        }
       }
     }
     expect(
@@ -378,5 +412,47 @@ describe('labelForGeneratedModel', () => {
     expect(labelForGeneratedModel('retired/video-model')).toBe(
       'retired/video-model'
     );
+  });
+});
+
+describe('video operation capabilities', () => {
+  it('exposes only routes implemented by the selected model', () => {
+    expect(videoOperationSupported('minimax-h3', 'reference')).toBe(false);
+    expect(videoOperationSupported('seedance-2-0', 'reference')).toBe(true);
+    expect(videoOperationSupported('seedance-2-0', 'edit')).toBe(false);
+    expect(videoOperationSupported('seedance-2-5', 'edit')).toBe(true);
+    expect(videoOperationSupported('seedance-2-5', 'extend')).toBe(true);
+  });
+
+  it('keeps operation-specific source limits separate from the composer union', () => {
+    expect(videoOperationInputLimits('seedance-2-5', 'reference')).toEqual({
+      minimum: 1,
+      maximum: 50,
+      accepts: ['image', 'video', 'audio'],
+      maximumByType: { image: 30, video: 10, audio: 10 },
+    });
+    expect(videoOperationInputLimits('seedance-2-5', 'edit')).toEqual({
+      minimum: 1,
+      maximum: 1,
+      accepts: ['video'],
+      maximumByType: { video: 1 },
+    });
+    expect(videoModelAttachmentPolicy('seedance-2-5')).toEqual({
+      minimum: 0,
+      maximum: 50,
+      accepts: ['image', 'video', 'audio'],
+    });
+    expect(videoOperationAttachmentPolicy('animate')).toMatchObject({
+      minimum: 1,
+      maximum: 2,
+      accepts: ['image'],
+      maximumByType: { image: 2 },
+    });
+    expect(videoOperationAttachmentPolicy('reference')).toMatchObject({
+      minimum: 1,
+      maximum: 50,
+      accepts: ['image', 'video', 'audio'],
+      maximumByType: { image: 30, video: 10, audio: 10 },
+    });
   });
 });

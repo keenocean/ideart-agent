@@ -109,7 +109,9 @@ export class GRouterProvider implements AIProvider {
       model,
       prompt,
       ...(wantAsync ? { async: true } : {}),
-      ...(isVideo ? formatVideoOptions(options) : formatImageOptions(options)),
+      ...(isVideo
+        ? formatGRouterVideoOptions(model, options)
+        : formatImageOptions(options)),
     };
 
     const data = await this.fetchJson(
@@ -342,7 +344,10 @@ function formatImageOptions(options: any): Record<string, unknown> {
 }
 
 /** Map normalized video options to gRouter's video generation API. */
-function formatVideoOptions(options: any): Record<string, unknown> {
+export function formatGRouterVideoOptions(
+  model: string,
+  options: any
+): Record<string, unknown> {
   if (!options || typeof options !== 'object') return {};
   const out: Record<string, unknown> = {};
 
@@ -356,7 +361,11 @@ function formatVideoOptions(options: any): Record<string, unknown> {
     out.size = options.size;
   }
   if (typeof options.aspect_ratio === 'string' && options.aspect_ratio) {
-    out.aspect_ratio = options.aspect_ratio;
+    const aspectRatio =
+      model === 'minimax-h3' && options.aspect_ratio === 'adaptive'
+        ? '16:9'
+        : options.aspect_ratio;
+    if (aspectRatio !== 'auto') out.aspect_ratio = aspectRatio;
   }
   if (typeof options.resolution === 'string' && options.resolution) {
     out.resolution = options.resolution;

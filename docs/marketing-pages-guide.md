@@ -287,11 +287,13 @@ Catalog 不得成为以下信息的权威来源：
 
 这些信息应从 `src/lib/agent-settings.ts` 或服务端 Catalog 派生，并在服务端再次验证。模型引用按模态区分：图片使用 `AgentImageModelOptionValue`，视频使用 `AgentModelOptionValue`，不创建模糊两套约束的通用 key。
 
+视频模型的操作能力同样只在 Runtime 声明。`VideoGenerationKind` 统一为 `generate | animate | reference | edit | extend`；`AGENT_MODEL_OPTIONS[].operations` 按操作记录输入 minimum/maximum、分媒体上限和计费倍率，`providers[provider][operation]` 记录精确 route，任一侧缺失都代表该模型不支持该操作。公开工具面继续对齐 `shipany-video-agent` 上游：`generate_video` 保留原有文生与 `reference_*` 契约，并用可选 `operation` 增加 reference/edit/extend；`animate_image` 继续专门承接首尾帧图生视频。模型页 Workbench 使用全部支持操作的输入并集，工具调用时再执行操作级校验；工具页还必须在 Catalog 的 `execution.videoOperation` 声明唯一任务语义，其输入 policy 默认从所有兼容模型的该 operation 自动投影，只有确需收紧时才写可选 override，Catalog 校验拒绝放宽 Runtime。UI 据此隐藏无效上传入口、过滤不兼容模型，服务端从 `entryContext` 重建同一锁。agent 编排层只产生统一的 `aspect_ratio / resolution / duration / *_input / reference_*` 选项；字段名、枚举值和 endpoint 变体等 Provider 协议转换必须由 `src/core/ai/{evolink,grouter,fal,replicate}.ts` 各自的 adapter 完成，禁止在 `src/modules/agent/tools.ts` 增加 Provider 协议字段转换分支。新增模型不能只增加营销 JSON：必须先补 operation、Provider route、对应 adapter 输入映射、计费、能力测试和任务审计。
+
 ### 3.3 产品状态与部署就绪度分离
 
 `availability: 'live'` 表示产品契约已经发布，不保证当前部署已经配置好 Provider、模型路由和对象存储。Workbench 必须读取服务端派生的安全能力快照，只向客户端返回 `executable` 和可公开原因，不返回凭据或内部模型映射。
 
-- Reference-to-video 需要 gRouter、对应模型路由和对象存储。
+- Reference/edit/extend 等操作需要至少一个声明对应精确 route 的已配置 Provider 和对象存储；当前 Seedance 2.5 的五类精确 EvoLink route 已接入，gRouter 只作为其已声明操作的兼容路径。
 - 一般视频生成也需要至少一个受支持 Provider 和对象存储。
 - 瞬时就绪度只控制 Workbench，不改变 publication/indexing 或 Sitemap，避免 SEO URL 随配置或故障抖动。
 - 上线前，目标生产环境中每个 listed/live Workbench 都必须通过能力预检；未就绪则降级状态或阻止发布。

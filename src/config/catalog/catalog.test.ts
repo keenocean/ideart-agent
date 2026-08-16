@@ -155,6 +155,9 @@ describe('Catalog contract', () => {
     const imageModel = catalog.find(
       (entry) => entry.entityId === 'gpt-image-2'
     )!;
+    const referenceTool = catalog.find(
+      (entry) => entry.entityId === 'reference-to-video'
+    )!;
     expect(generationPresetFor(imageTool)).toMatchObject({
       target: { mediaMode: 'image', modelKey: 'gpt-image-2' },
       locks: { mediaMode: true, model: false },
@@ -163,6 +166,19 @@ describe('Catalog contract', () => {
     expect(generationPresetFor(imageModel)).toMatchObject({
       target: { mediaMode: 'image', modelKey: 'gpt-image-2' },
       locks: { mediaMode: true, model: true },
+    });
+    expect(generationPresetFor(referenceTool)).toMatchObject({
+      target: {
+        mediaMode: 'video',
+        modelKey: 'seedance-2-5',
+        operation: 'reference',
+      },
+      locks: { mediaMode: true, model: false },
+      inputPolicy: {
+        minimum: 1,
+        maximum: 50,
+        accepts: ['image', 'video', 'audio'],
+      },
     });
   });
 
@@ -226,10 +242,55 @@ describe('Catalog contract', () => {
         },
       },
       related: [],
-      execution: { ...base.execution, mediaMode: 'video' },
+      execution: {
+        ...base.execution,
+        mediaMode: 'video',
+        videoOperation: 'generate',
+      },
     } as CatalogDefinition;
     expect(() => validateCatalog([invalidArchetypeMode], [])).toThrow(
       /archetype\/media mode mismatch/
+    );
+
+    const textTool = catalog.find(
+      (entry) => entry.entityId === 'text-to-video'
+    )!;
+    const invalidOperation = {
+      ...textTool,
+      entityId: 'invalid-operation',
+      localePages: {
+        en: {
+          slug: catalogRouteSegment('invalid-operation'),
+          indexing: 'noindex',
+        },
+      },
+      related: [],
+      execution: { ...textTool.execution, videoOperation: 'extend' },
+    } as CatalogDefinition;
+    expect(() => validateCatalog([invalidOperation], [])).toThrow(
+      /archetype\/video operation mismatch/
+    );
+
+    const imageToVideo = catalog.find(
+      (entry) => entry.entityId === 'image-to-video'
+    )!;
+    const widenedInput = {
+      ...imageToVideo,
+      entityId: 'widened-input',
+      localePages: {
+        en: {
+          slug: catalogRouteSegment('widened-input'),
+          indexing: 'noindex',
+        },
+      },
+      related: [],
+      execution: {
+        ...imageToVideo.execution,
+        inputPolicy: { minimum: 0, maximum: 3, accepts: ['image'] },
+      },
+    } as CatalogDefinition;
+    expect(() => validateCatalog([widenedInput], [])).toThrow(
+      /input policy widens runtime/
     );
   });
 

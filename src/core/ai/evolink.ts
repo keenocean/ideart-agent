@@ -75,6 +75,76 @@ function taskCreatedAt(value: unknown): Date {
     : new Date();
 }
 
+function stringList(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.map(cleanString).filter((item): item is string => Boolean(item))
+    : [];
+}
+
+/** Map normalized video options to EvoLink's Seedance request contract. */
+export function formatEvoLinkVideoOptions(
+  model: string,
+  rawOptions: unknown
+): Record<string, unknown> {
+  const options = record(rawOptions);
+  if (!model.startsWith('seedance-2.')) return options;
+
+  // Preserve direct core/ai consumers that already pass EvoLink-native
+  // options. Agent calls use `resolution`; EvoLink-native calls use `quality`.
+  if (cleanString(options.quality) && !cleanString(options.resolution)) {
+    return options;
+  }
+
+  const resolution = cleanString(options.resolution);
+  const aspectRatio = cleanString(options.aspect_ratio);
+  const duration = Number(options.duration);
+  const imageInput = stringList(options.image_input);
+  const videoInput = stringList(options.video_input);
+  const referenceImages = stringList(options.reference_image_urls);
+  const referenceVideos = stringList(options.reference_video_urls);
+  const referenceAudios = stringList(options.reference_audio_urls);
+
+  if (model.endsWith('-video-edit')) {
+    return {
+      ...(resolution ? { quality: resolution } : {}),
+      ...(videoInput[0] ? { video_input: videoInput.slice(0, 1) } : {}),
+    };
+  }
+
+  if (model.endsWith('-video-extend')) {
+    return {
+      ...(Number.isFinite(duration) ? { duration } : {}),
+      ...(resolution ? { quality: resolution } : {}),
+      ...(videoInput[0] ? { video_input: videoInput.slice(0, 1) } : {}),
+    };
+  }
+
+  const normalizedAspectRatio =
+    model.startsWith('seedance-2.5-') && aspectRatio === 'auto'
+      ? 'adaptive'
+      : aspectRatio;
+
+  return {
+    ...(normalizedAspectRatio ? { aspect_ratio: normalizedAspectRatio } : {}),
+    ...(Number.isFinite(duration) ? { duration } : {}),
+    ...(resolution ? { quality: resolution } : {}),
+    generate_audio:
+      typeof options.generate_audio === 'boolean'
+        ? options.generate_audio
+        : true,
+    ...(model.endsWith('-image-to-video') && imageInput.length > 0
+      ? { image_input: imageInput.slice(0, 2) }
+      : {}),
+    ...(model.endsWith('-reference-to-video')
+      ? {
+          image_input: referenceImages,
+          video_input: referenceVideos,
+          audio_input: referenceAudios,
+        }
+      : {}),
+  };
+}
+
 /**
  * EvoLink image/video provider.
  *
@@ -139,7 +209,11 @@ export class EvoLinkProvider implements AIProvider {
   }
 
   private formatInput(params: AIGenerateParams): Record<string, unknown> {
-    const options = record(params.options);
+    const rawOptions = record(params.options);
+    const options =
+      params.mediaType === AIMediaType.VIDEO
+        ? formatEvoLinkVideoOptions(params.model ?? '', rawOptions)
+        : rawOptions;
     const input: Record<string, unknown> = { ...options };
     const imageInput = Array.isArray(options.image_input)
       ? options.image_input
@@ -151,14 +225,21 @@ export class EvoLinkProvider implements AIProvider {
       : Array.isArray(options.video_urls)
         ? options.video_urls
         : [];
+    const audioInput = Array.isArray(options.audio_input)
+      ? options.audio_input
+      : Array.isArray(options.audio_urls)
+        ? options.audio_urls
+        : [];
 
     delete input.image_input;
     delete input.video_input;
+    delete input.audio_input;
     delete input.model;
     delete input.prompt;
 
     if (imageInput.length > 0) input.image_urls = imageInput;
     if (videoInput.length > 0) input.video_urls = videoInput;
+    if (audioInput.length > 0) input.audio_urls = audioInput;
 
     if (params.mediaType === AIMediaType.IMAGE) {
       const aspectRatio = firstString(options.aspect_ratio);

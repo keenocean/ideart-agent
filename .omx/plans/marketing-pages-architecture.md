@@ -277,6 +277,8 @@ type ToolExecution =
 
 模型引用必须按模态验证：图片模型使用 `AgentImageModelOptionValue`，视频模型使用 `AgentModelOptionValue`，不能用一个未定义的通用 key 模糊两套运行时契约。
 
+视频执行保持两段式边界：`src/modules/agent/tools.ts` 只校验并生成统一的 `aspect_ratio / resolution / duration / *_input / reference_*` 选项，精确 route 仍由 Runtime 模型注册表选择；Provider 字段、枚举和 endpoint 变体的转换由 `src/core/ai/{evolink,grouter,fal,replicate}.ts` 内各自 adapter 负责。Provider 选择与实例化仍属于编排层，但禁止把协议字段转换分支重新放回 agent 工具层；新增 Provider 时必须在 adapter 内补映射与回归测试。
+
 ### 3.5 产品状态与部署就绪度分离
 
 Catalog 的 `availability: 'live'` 只表示代码和产品契约已经发布，不保证当前部署已经配置好所需 Provider、模型路由和对象存储。Workbench 是否可提交必须由服务端派生的安全能力快照决定：
@@ -292,7 +294,7 @@ type DeploymentReadiness = {
 ```
 
 - 客户端只能收到布尔状态和可公开的原因，不能收到 API key、Provider 配置或内部模型映射。
-- `reference-to-video` 只有在 gRouter、对应模型路由和对象存储就绪时可提交；一般视频生成也必须有受支持 Provider 和对象存储。
+- `reference/edit/extend` 只有在至少一个已配置 Provider 声明对应精确模型 route 且对象存储就绪时可执行；一般视频生成也必须有受支持 Provider 和对象存储。Seedance 2.5 当前以 EvoLink 五类 route 为完整实现，gRouter 只承接其明确声明的兼容操作。
 - 临时配置或服务故障不得让 SEO URL 在 sitemap 中反复进出；publication/indexing 保持稳定，Workbench 就地禁用并显示可行动说明。
 - 上线验收时，目标生产环境中的每个 `listed + live` Workbench 都必须实际通过一次能力预检；未就绪则降级状态或阻止发布。
 
@@ -421,11 +423,11 @@ type GenerationPreset = {
 
 - `default`：没有用户持久化选择时使用，适合首页。
 - `locked`：页面任务必须固定模式/模型时使用，适合工具和模型页；图片与视频 key 必须由联合类型在编译期匹配模态。
-- `inputPolicy` 只表达页面入口约束；`maximum` 只能收紧 runtime 上限，不能放宽。模型/operation 的真实输入上限仍从 runtime 派生并由服务端再次验证。
+- 视频工具的 input policy 默认从 `execution.videoOperation` 对所有兼容模型的 Runtime 输入约束自动投影；显式 `inputPolicy` 只表达页面入口的额外收紧，minimum/maximum/accepts 均不能放宽 Runtime。模型/operation 的真实输入上限仍由服务端按最终模型再次验证。
 - 页面预设必须经过现有 settings normalization。
 - 设置优先级固定为：runtime defaults → 合法持久化设置 → 页面 default 补缺 → 页面 locked 字段覆盖 → normalization。
 - 工具/模型页内的修改默认只影响本次 handoff，不写全局 `localStorage`；只有用户显式执行“保存为默认设置”时才持久化。
-- source tracking 只记录 `home | tool:<slug> | model:<slug>` 等来源信息，不参与权限、计费或工具选择。
+- source tracking 继续只记录 `home | tool:<slug> | model:<slug>` 等来源信息；工具选择所需的语义 operation 来自服务端 Catalog 的独立 `execution.videoOperation`，两者不能混用。
 
 阶段 2 已增加并贯通 `imageModelOption: AgentImageModelOptionValue`：composer state → normalization → session handoff → `AgentGenerationSettings.imageModelName` → API validation → Agent tool context。图片模型页仍必须使用 Catalog 中已登记且 Runtime 可解析的图片模型 key，不能用客户端字符串扩展模型 allowlist。
 
@@ -520,7 +522,7 @@ index route loader
 | `reference-to-video` | 多媒体参考视频             | listed/live | video，要求参考媒体 |
 | `background-remover` | GPT Image 2 生成式背景编辑 | listed/beta | image，要求图片     |
 
-表中的 live 是产品生命周期状态，不代表任意部署都已配置完成。`reference-to-video` 必须在服务端能力快照确认 gRouter、对应模型路由和对象存储就绪后才启用提交；其他 live 工具也必须通过各自的 Provider/存储预检。
+表中的 live 是产品生命周期状态，不代表任意部署都已配置完成。`reference-to-video` 必须在服务端能力快照确认至少一个兼容 Provider、对应模型 route 和对象存储就绪后才启用提交；其他 live 工具也必须通过各自的 Provider/存储预检。
 
 Background Remover 页面必须明确：
 
@@ -790,6 +792,7 @@ Google 当前指导同样要求优先修复站点自己链接或提交的 404，
 - 阶段 0/1 的 Catalog、resolver/selectors、SEO helper、固定公开路由、sitemap/llms 和 R2 检查底座已经落地；阶段 3 已为 `ai-image-generator` 增加真实同语言正文和路由，但工具/模型 locale route 当前仍全部保持 `noindex`。
 - 阶段 2 的共享生成入口安全链路及 2.5 收口已经完成：`PromptLauncher` 已成为复用 `useGenerationEntry` + `GenerationWorkbench` 的兼容 wrapper，图片模型状态已贯通；服务端会从 `entryContext` 与精确语言正文共同重建 policy，并在 API/tool 两层执行锁定、附件来源与媒体复用约束。Agent guard/认证页/邮箱验证保留原 session callback，402 拒绝不会提前消费首轮 stash。
 - 阶段 3 的首个工具纵向切片已经完成；阶段 4 的首个模型纵向切片也已落地。`/models`、`/models/$slug`、精确语言 release resolver、Catalog 双门禁、locked model Workbench、Runtime specs/comparison 和服务端 DeploymentReadiness 已存在；仅 `seedance-2-5` 有 en/zh 模型正文并可访问，其他模型继续 fail closed。工具与模型共用 `CatalogDetailShell`，模型新增的 specs/comparison 也是纯 props 组件；gallery、steps、feature grid、图文交错、limitations、FAQ 与 CTA 继续复用。案例视频明确标注为 R2 创作评估参考而非已验证 Seedance 2.5 输出，因此详情和目录继续 `noindex`。
+- Seedance 2.5 Runtime 已扩展为 `generate | animate | reference | edit | extend` 五种通用操作，同时保持 `shipany-video-agent` 上游的两个公开视频工具：`generate_video` 保留旧文生/参考参数并新增可选 operation，`animate_image` 继续承接首尾帧。`AGENT_MODEL_OPTIONS` 的每个模型在同一对象内声明 operation 输入、计费倍率和 Provider 精确 route；服务端锁定页面模型/工具 operation、动态收紧 schema、逐操作验证已签名附件并写入任务及 turn audit。视频工具页由 `execution.videoOperation` 固定任务语义，模型选择器仅显示兼容模型，纯文生页不再显示无效上传入口；模型页仍取支持操作的输入并集，调用时用操作级上限收紧。Seedance 2.0 允许 generate/animate/reference，MiniMax H3 仍只允许 generate/animate。
 - 阶段 5 首页重组已经完成：`src/routes/index.tsx` 显式组合 HomeHero、Gallery、Features、UseCases、HowItWorks、FeaturedCatalog、FAQ、Blog 与 CTA；正文仍来自静态 `landing.*`，媒体和精选 Catalog 卡片来自小型 home projection，未引入任意 JSON renderer。
 - Header/Footer 已接入 Tools/Models；`/tools` 与 `/models` 都是 Catalog directory 消费者，related selector 只输出具备同语言正文的目标。sitemap/llms 虽已接线，但首个工具与模型页面仍为 noindex，因此不进入 indexable discovery。
 - 2026-08-15 content release 迁移后全量 53 个测试文件/316 项测试、TypeScript、`pnpm build`、route bundle、100 页面 fixture、正文 bundle 扫描和 Cloudflare 构建/dry-run/预算门禁均通过；本地生产 SSR 已验证中英文图片工具页为 `200 + noindex,follow + self canonical`、未知工具为真实 404，故意移除已发布对象则为 `503 + Retry-After: 60`。2026-08-16 已把 release `7c68fb9fe0289c311a9ea46ff0af165d714e69f93223242c17937a54f7ff0c31` 上传并逐对象回读验证到私有 Bucket `ugcmind-marketing-content`，固定到 Worker 版本 `6a69e6cd-83d3-4ed2-b443-8ef00b24d262`；生产抓取确认 `/tools`、en/zh 图片工具页为 200，unknown en/zh slug 为 404，27 个公开媒体对象在线检查通过。旧 release 回滚部署演练、响应式浏览器复查、真实 OAuth/provider、浏览器生成 smoke、Lighthouse 与 Search Console 仍待执行，不能据此宣告阶段 4–9 已完成或开放索引。

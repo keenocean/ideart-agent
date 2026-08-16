@@ -99,6 +99,59 @@ describe('server generation entry policy', () => {
       mediaMode: 'image',
     });
   });
+
+  it('uses the union attachment policy on a multi-operation video model page', () => {
+    expect(
+      resolveEffectiveGenerationPolicy(
+        {
+          kind: 'model',
+          entityId: 'seedance-2-5',
+          locale: 'en',
+        },
+        (definition, locale) =>
+          definition.entityId === 'seedance-2-5' && locale === 'en'
+      )
+    ).toMatchObject({
+      lockedMediaMode: 'video',
+      lockedVideoModel: 'seedance-2-5',
+      inputPolicy: {
+        minimum: 0,
+        maximum: 50,
+        accepts: ['image', 'video', 'audio'],
+      },
+    });
+  });
+
+  it('rebuilds a video tool operation from the server Catalog', () => {
+    const policy = resolveEffectiveGenerationPolicy(
+      {
+        kind: 'tool',
+        entityId: 'reference-to-video',
+        locale: 'en',
+      },
+      (definition, locale) =>
+        definition.entityId === 'reference-to-video' && locale === 'en'
+    );
+    expect(policy).toMatchObject({
+      source: 'tool:reference-to-video',
+      lockedMediaMode: 'video',
+      lockedVideoOperation: 'reference',
+      inputPolicy: {
+        minimum: 1,
+        maximum: 50,
+        accepts: ['image', 'video', 'audio'],
+      },
+    });
+
+    const incompatible = normalizeClientGenerationSettings({
+      mediaMode: 'video',
+      modelName: 'minimax-h3',
+      imageModelName: 'gpt-image-2',
+    })!;
+    expect(() => applyEffectiveGenerationPolicy(incompatible, policy)).toThrow(
+      /does not support this tool operation/
+    );
+  });
 });
 
 describe('server generation attachment boundary', () => {

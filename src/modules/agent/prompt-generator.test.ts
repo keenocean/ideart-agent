@@ -59,10 +59,10 @@ describe('Agent Prompt generation', () => {
 
   it('measures and accepts the upstream Prompt as the structural baseline', () => {
     expect(measureAgentPrompt(DEFAULT_AGENT_SYSTEM_PROMPT)).toMatchObject({
-      words: 479,
-      characters: 2986,
-      lines: 19,
-      bullets: 16,
+      words: 547,
+      characters: 3456,
+      lines: 20,
+      bullets: 17,
     });
     expect(
       generatedPromptValidationErrors(DEFAULT_AGENT_SYSTEM_PROMPT)
@@ -86,7 +86,7 @@ describe('Agent Prompt generation', () => {
       expect.objectContaining({
         model: 'model-1',
         maxTokens: 1800,
-        system: expect.stringContaining('exactly 16 single-line rules'),
+        system: expect.stringContaining('exactly 17 single-line rules'),
         messages: [
           expect.objectContaining({
             role: 'user',

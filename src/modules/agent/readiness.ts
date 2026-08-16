@@ -7,9 +7,11 @@ import type {
 import { getAllConfigs } from '@/modules/config/service';
 import { isStorageConfigured } from '@/modules/storage/service';
 import {
+  AGENT_MODEL_OPTIONS,
   DEFAULT_IMAGE_MODEL,
   imageModelOptionFor,
   modelOptionFor,
+  videoOperationSupported,
 } from '@/lib/agent-settings';
 
 import {
@@ -20,11 +22,12 @@ import { isAgentConfigured } from './service';
 import { pickVideoProvider } from './tools';
 
 /**
- * Server-only deployment snapshot for the first image-tool slice. It returns
+ * Server-only deployment snapshot for a semantic tool entry. It returns
  * public booleans/reasons only; provider ids, routes, and credentials stay on
- * the server.
+ * the server. Video tools probe their Catalog operation instead of assuming
+ * every public tool is an image generator.
  */
-export async function getImageToolDeploymentReadiness(
+export async function getToolDeploymentReadiness(
   entityId: string
 ): Promise<DeploymentReadiness> {
   const definition = (catalog as readonly CatalogDefinition[]).find(
@@ -33,8 +36,7 @@ export async function getImageToolDeploymentReadiness(
   if (
     !definition ||
     definition.kind !== 'tool' ||
-    definition.publication === 'hidden' ||
-    definition.execution.mediaMode !== 'image'
+    definition.publication === 'hidden'
   ) {
     return { executable: false, reason: 'model-route-unavailable' };
   }
@@ -44,11 +46,34 @@ export async function getImageToolDeploymentReadiness(
     isAgentConfigured(),
     isStorageConfigured(),
   ]);
-  const providerConfigured =
-    agentConfigured && hasConfiguredImageProvider(configs);
-  const modelRouteAvailable =
-    Boolean(imageModelOptionFor(DEFAULT_IMAGE_MODEL)) &&
-    pickImageProvider(configs, DEFAULT_IMAGE_MODEL, 'generate') !== null;
+  let providerConfigured: boolean;
+  let modelRouteAvailable: boolean;
+  if (definition.execution.mediaMode === 'image') {
+    providerConfigured = agentConfigured && hasConfiguredImageProvider(configs);
+    modelRouteAvailable =
+      Boolean(imageModelOptionFor(DEFAULT_IMAGE_MODEL)) &&
+      pickImageProvider(configs, DEFAULT_IMAGE_MODEL, 'generate') !== null;
+  } else {
+    const operation = definition.execution.videoOperation;
+    providerConfigured =
+      agentConfigured &&
+      Boolean(
+        configs.evolink_api_key ||
+        (configs.grouter_api_key && configs.grouter_base_url) ||
+        configs.fal_api_key ||
+        configs.replicate_api_token
+      );
+    modelRouteAvailable = AGENT_MODEL_OPTIONS.some(
+      (option) =>
+        videoOperationSupported(option.value, operation) &&
+        pickVideoProvider(
+          configs,
+          option.value,
+          operation,
+          option.defaultResolution
+        ) !== null
+    );
+  }
 
   return deriveDeploymentReadiness({
     providerConfigured,
@@ -107,14 +132,15 @@ export async function getModelDeploymentReadiness(
         option.defaultResolution
       )
     : null;
-  const animateRoute = option?.maxImages
-    ? pickVideoProvider(
-        configs,
-        definition.runtimeModelKey,
-        'animate',
-        option.defaultResolution
-      )
-    : generateRoute;
+  const animateRoute =
+    option && videoOperationSupported(definition.runtimeModelKey, 'animate')
+      ? pickVideoProvider(
+          configs,
+          definition.runtimeModelKey,
+          'animate',
+          option.defaultResolution
+        )
+      : generateRoute;
   return deriveDeploymentReadiness({
     providerConfigured,
     modelRouteAvailable: Boolean(option && generateRoute && animateRoute),

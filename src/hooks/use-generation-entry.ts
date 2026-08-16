@@ -21,8 +21,10 @@ import type { AgentComposerSettings } from '@/lib/agent-settings';
 import {
   applyGenerationPreset,
   requestAttachments,
+  resolveGenerationInputPolicy,
   validateGenerationAttachments,
   type GenerationEntryContext,
+  type GenerationInputPolicy,
   type GenerationPreset,
   type GenerationSettingSources,
 } from '@/lib/generation-entry';
@@ -50,6 +52,7 @@ export type GenerationEntryController = {
   setAttachments: React.Dispatch<React.SetStateAction<PendingAttachment[]>>;
   settings: AgentComposerSettings;
   settingSources: GenerationSettingSources;
+  inputPolicy?: GenerationInputPolicy;
   setSettings: (settings: AgentComposerSettings) => void;
   saveSettingsAsDefault: () => void;
   skillName?: string;
@@ -82,6 +85,10 @@ export function useGenerationEntry({
   const [skillName, setSkillName] = useComposerSkill();
   const [submitting, setSubmitting] = useState(false);
   const pendingSessionId = useRef<string | null>(null);
+  const inputPolicy = useMemo(
+    () => resolveGenerationInputPolicy(preset, settings),
+    [preset, settings]
+  );
 
   const ensureSessionId = useCallback(() => {
     pendingSessionId.current ??= newAgentSessionId();
@@ -123,18 +130,18 @@ export function useGenerationEntry({
 
   const policyRemaining = useCallback(
     (candidateCount: number) => {
-      const maximum = preset?.inputPolicy?.maximum ?? 16;
+      const maximum = inputPolicy?.maximum ?? 16;
       return Math.max(
         0,
         Math.min(candidateCount, maximum - attachments.length)
       );
     },
-    [attachments.length, preset?.inputPolicy?.maximum]
+    [attachments.length, inputPolicy?.maximum]
   );
 
   const addFiles = useCallback(
     async (files: File[]) => {
-      const accepted = preset?.inputPolicy?.accepts;
+      const accepted = inputPolicy?.accepts;
       const selected = files
         .map((file) => ({ file, kind: mediaTypeForFile(file) }))
         .filter(
@@ -197,12 +204,7 @@ export function useGenerationEntry({
         );
       }
     },
-    [
-      ensureSessionId,
-      policyRemaining,
-      preset?.inputPolicy?.accepts,
-      session?.user,
-    ]
+    [ensureSessionId, policyRemaining, inputPolicy?.accepts, session?.user]
   );
 
   const addLibraryMedia = useCallback(
@@ -218,9 +220,7 @@ export function useGenerationEntry({
         .filter((item) => {
           const type =
             item.mediaType ?? (isVideoUrl(item.src) ? 'video' : 'image');
-          return (
-            !preset?.inputPolicy || preset.inputPolicy.accepts.includes(type)
-          );
+          return !inputPolicy || inputPolicy.accepts.includes(type);
         })
         .slice(0, policyRemaining(media.length));
       if (selected.length === 0) return;
@@ -278,13 +278,7 @@ export function useGenerationEntry({
         );
       }
     },
-    [
-      attachments,
-      ensureSessionId,
-      policyRemaining,
-      preset?.inputPolicy,
-      session?.user,
-    ]
+    [attachments, ensureSessionId, policyRemaining, inputPolicy, session?.user]
   );
 
   const removeAttachment = useCallback((id: string) => {
@@ -302,10 +296,10 @@ export function useGenerationEntry({
   const submit = useCallback(() => {
     const prompt = value.trim();
     if ((!prompt && !hasUploaded) || uploading || submitting) return;
-    if (preset?.inputPolicy) {
+    if (inputPolicy) {
       const policyError = validateGenerationAttachments(
         requestAttachments(attachments),
-        preset.inputPolicy
+        inputPolicy
       );
       if (policyError) {
         toast.error(policyError);
@@ -334,7 +328,7 @@ export function useGenerationEntry({
     ensureSessionId,
     entryContext,
     hasUploaded,
-    preset?.inputPolicy,
+    inputPolicy,
     router,
     settings,
     skillName,
@@ -350,6 +344,7 @@ export function useGenerationEntry({
     setAttachments,
     settings,
     settingSources,
+    inputPolicy,
     setSettings,
     saveSettingsAsDefault,
     skillName,

@@ -25,6 +25,83 @@ export interface FalConfigs extends AIConfigs {
   uuid?: UuidFunction;
 }
 
+function stringList(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value
+        .map(String)
+        .map((item) => item.trim())
+        .filter(Boolean)
+    : [];
+}
+
+/** Map normalized video options to the selected Fal endpoint schema. */
+export function formatFalVideoOptions(
+  model: string,
+  rawOptions: unknown
+): Record<string, unknown> {
+  const options =
+    rawOptions && typeof rawOptions === 'object' && !Array.isArray(rawOptions)
+      ? (rawOptions as Record<string, unknown>)
+      : {};
+  const imageInput = stringList(options.image_input);
+
+  if (model.startsWith('bytedance/seedance-2.5/')) {
+    const aspectRatio = String(options.aspect_ratio ?? '').trim();
+    return {
+      ...(aspectRatio && aspectRatio !== 'auto'
+        ? { aspect_ratio: aspectRatio }
+        : {}),
+      ...(options.duration !== undefined
+        ? { duration: String(options.duration) }
+        : {}),
+      ...(typeof options.resolution === 'string' && options.resolution
+        ? { resolution: options.resolution }
+        : {}),
+      ...(typeof options.generate_audio === 'boolean'
+        ? { generate_audio: options.generate_audio }
+        : {}),
+      ...(imageInput[0] ? { image_url: imageInput[0] } : {}),
+      ...(imageInput[1] ? { end_image_url: imageInput[1] } : {}),
+    };
+  }
+
+  if (model.startsWith('fal-ai/minimax/hailuo-2.3/')) {
+    return {
+      prompt_optimizer: true,
+      ...(model.includes('/standard/') && options.duration !== undefined
+        ? { duration: String(options.duration) }
+        : {}),
+      ...(model.endsWith('/image-to-video') && imageInput[0]
+        ? { image_url: imageInput[0] }
+        : {}),
+    };
+  }
+
+  const input: Record<string, unknown> = { ...options };
+  if (imageInput.length > 0) {
+    if (['fal-ai/kling-video/o1/video-to-video/edit'].includes(model)) {
+      input.input_images = imageInput;
+    } else if (model.endsWith('/edit') || imageInput.length > 1) {
+      input.image_urls = imageInput;
+    } else {
+      input.image_url = imageInput[0];
+    }
+    delete input.image_input;
+  }
+
+  const videoInput = stringList(options.video_input);
+  if (videoInput[0]) {
+    input.video_url = videoInput[0];
+    delete input.video_input;
+  }
+  if (options.duration !== undefined) {
+    input.duration = model.includes('/veo')
+      ? `${options.duration}s`
+      : String(options.duration);
+  }
+  return input;
+}
+
 /**
  * Fal provider
  * @docs https://fal.ai/
@@ -366,6 +443,10 @@ export class FalProvider implements AIProvider {
       return input;
     }
 
+    if (mediaType === AIMediaType.VIDEO) {
+      return { prompt, ...formatFalVideoOptions(model, options) };
+    }
+
     input = { ...input, ...options };
 
     if (options.image_input && Array.isArray(options.image_input)) {
@@ -384,14 +465,6 @@ export class FalProvider implements AIProvider {
     if (options.video_input && Array.isArray(options.video_input)) {
       input.video_url = options.video_input[0];
       delete input.video_input;
-    }
-
-    // fal's video endpoints take the clip length as a string of seconds;
-    // the Veo family spells it with the unit ("8s").
-    if (mediaType === AIMediaType.VIDEO && options.duration !== undefined) {
-      input.duration = model.includes('/veo')
-        ? `${options.duration}s`
-        : String(options.duration);
     }
 
     return input;

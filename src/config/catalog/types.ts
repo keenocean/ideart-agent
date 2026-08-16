@@ -2,6 +2,7 @@ import type { AppLocale } from '@/config/locale';
 import type {
   AgentImageModelOptionValue,
   AgentModelOptionValue,
+  VideoGenerationKind,
 } from '@/lib/agent-settings';
 
 export type CatalogKind = 'tool' | 'model';
@@ -114,15 +115,26 @@ type CatalogDefinitionCore = CatalogVisibility & {
   related?: readonly string[];
 };
 
-export type ToolExecution = {
-  kind: 'agent-preset';
-  mediaMode: 'image' | 'video';
-  inputPolicy: {
-    minimum: number;
-    maximum?: number;
-    accepts: readonly ('image' | 'video' | 'audio')[];
-  };
+type ToolInputPolicy = {
+  minimum: number;
+  maximum?: number;
+  accepts: readonly ('image' | 'video' | 'audio')[];
 };
+
+export type ToolExecution =
+  | {
+      kind: 'agent-preset';
+      mediaMode: 'image';
+      inputPolicy: ToolInputPolicy;
+    }
+  | {
+      kind: 'agent-preset';
+      mediaMode: 'video';
+      /** Semantic page intent; provider routes remain model-owned. */
+      videoOperation: VideoGenerationKind;
+      /** Optional page-level narrowing; runtime operation limits are default. */
+      inputPolicy?: ToolInputPolicy;
+    };
 
 export type ToolDefinition = CatalogDefinitionCore & {
   kind: 'tool';
