@@ -64,7 +64,7 @@ export function Gallery() {
                   </span>
                 </span>
                 <span className="bg-background/80 text-foreground absolute top-2 right-2 rounded-full px-2 py-0.5 text-[10px] font-medium backdrop-blur">
-                  5s
+                  {m['landing.gallery.duration']()}
                 </span>
               </div>
               <div className="p-4">

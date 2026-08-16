@@ -32,7 +32,7 @@ export function CTA() {
               <ArrowRight className="size-4" />
             </Link>
             <Link
-              href="#pricing"
+              href="/pricing"
               className={cn(
                 buttonVariants({ variant: 'outline', size: 'lg' }),
                 'rounded-full px-7'

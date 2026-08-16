@@ -38,11 +38,10 @@ export function Features() {
             {/* Mock chat bubbles */}
             <div className="border-border bg-background/60 mt-6 space-y-2 rounded-lg border p-3">
               <div className="bg-primary/10 text-foreground ml-auto inline-block max-w-[85%] rounded-md rounded-tr-sm px-3 py-2 text-xs">
-                Slow drone push over the cliff at golden hour
+                {m['landing.features.chat_user']()}
               </div>
               <div className="bg-secondary text-muted-foreground block max-w-[85%] rounded-md rounded-tl-sm px-3 py-2 text-xs">
-                Rendered a 5s clip on MiniMax H3. Want it longer, or a tighter
-                framing?
+                {m['landing.features.chat_agent']()}
               </div>
             </div>
           </div>
@@ -62,15 +61,15 @@ export function Features() {
             {/* Still → motion */}
             <div className="border-border bg-background/60 mt-6 flex items-center gap-3 rounded-lg border p-4">
               <div className="border-border bg-card text-muted-foreground flex-1 rounded-lg border p-3 text-center text-[10px] font-medium">
-                Your photo
+                {m['landing.features.canvas_input']()}
               </div>
               <ArrowRight className="text-muted-foreground/60 size-4 shrink-0" />
               <div className="border-border bg-card text-muted-foreground flex-1 rounded-lg border p-3 text-center text-[10px] font-medium">
-                Opening frame
+                {m['landing.features.canvas_frame']()}
               </div>
               <ArrowRight className="text-muted-foreground/60 size-4 shrink-0" />
               <div className="border-primary/40 bg-primary/10 text-primary flex-1 rounded-lg border p-3 text-center text-[10px] font-medium">
-                5s clip
+                {m['landing.features.canvas_clip']()}
               </div>
             </div>
           </div>
@@ -118,10 +117,10 @@ export function Features() {
             {/* Take history */}
             <ol className="mt-6 space-y-2">
               {[
-                'Take 1 · wide',
-                'Take 2 · slower push',
-                'Take 3 · 9:16',
-                'Take 4 · final',
+                m['landing.features.take_1'](),
+                m['landing.features.take_2'](),
+                m['landing.features.take_3'](),
+                m['landing.features.take_4'](),
               ].map((label, i) => (
                 <li
                   key={label}
@@ -131,7 +130,7 @@ export function Features() {
                   <span className="text-muted-foreground">{label}</span>
                   {i === 3 && (
                     <span className="bg-primary/10 text-primary ml-auto rounded-full px-2 py-0.5 text-[10px] font-medium">
-                      current
+                      {m['landing.features.current']()}
                     </span>
                   )}
                 </li>

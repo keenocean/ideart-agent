@@ -2,13 +2,15 @@ import { z } from 'zod';
 
 import homeConfigSource from '../../product/home.json';
 
+export const HOME_SCHEMA_VERSION = 2 as const;
+
 export const HOME_SECTION_IDS = [
   'hero',
+  'stats',
   'gallery',
   'features',
-  'useCases',
-  'howItWorks',
-  'featuredCatalog',
+  'models',
+  'pricing',
   'faq',
   'blog',
   'cta',
@@ -23,7 +25,7 @@ const homeSectionSchema = z
 
 export const homeConfigSchema = z
   .object({
-    schemaVersion: z.literal(1),
+    schemaVersion: z.literal(HOME_SCHEMA_VERSION),
     sections: z
       .array(homeSectionSchema)
       .length(HOME_SECTION_IDS.length)

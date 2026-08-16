@@ -68,10 +68,16 @@ supported variables supplied by the prompt builder.
 allowed values are deliberately finite. Add a new React block only when a
 product needs a genuinely new interaction or information architecture.
 
+Ideart's home schema is version 2. Its registered sections are `hero`, `stats`,
+`gallery`, `features`, `models`, `pricing`, `faq`, `blog`, and `cta`. Header,
+footer, the support widget, and the signed-in redirect remain route-owned shell
+behavior. The Blog loader uses `blogPostLimit` and skips its database query when
+Blog is disabled.
+
 Section copy lives under `landing.*` in `product/messages/<locale>.json`.
-Media and featured Catalog cards are compiled from the Product Pack into the
-small server-side home projection; homepage code never imports the global asset
-inventory into the browser bundle.
+The current Ideart blocks read that localized copy directly. Adding a section
+outside the registered set requires a typed Block and a registry update; JSON
+cannot import a component or define executable behavior.
 
 ### 3. Tools and models
 

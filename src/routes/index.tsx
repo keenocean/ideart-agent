@@ -1,14 +1,22 @@
-import { useLayoutEffect, useRef } from 'react';
+import { Fragment, useLayoutEffect, useRef, type ReactNode } from 'react';
 import { createFileRoute, redirect } from '@tanstack/react-router';
 
 import { useRouter } from '@/core/i18n/navigation';
 import { envConfigs } from '@/config';
+import { homeConfig, type HomeSectionId } from '@/config/home';
 import { m } from '@/paraglide/messages.js';
 import { getLocale, locales, localizeUrl } from '@/paraglide/runtime.js';
 import { Blog } from '@/blocks/blog';
+import { CTA } from '@/blocks/cta';
+import { FAQ } from '@/blocks/faq';
+import { Features } from '@/blocks/features';
 import { Footer } from '@/blocks/footer';
+import { Gallery } from '@/blocks/gallery';
 import { Header } from '@/blocks/header';
 import { Hero } from '@/blocks/hero';
+import { ModelsStrip } from '@/blocks/models-strip';
+import { Pricing } from '@/blocks/pricing';
+import { Stats } from '@/blocks/stats';
 import { SupportWidget } from '@/blocks/support-widget';
 import { getBlogPostsFn } from '@/content/posts/server';
 
@@ -31,6 +39,17 @@ function HomePage() {
   const router = useRouter();
   const redirected = useRef(false);
   const { posts } = Route.useLoaderData();
+  const sectionRegistry = {
+    hero: <Hero />,
+    stats: <Stats />,
+    gallery: <Gallery />,
+    features: <Features />,
+    models: <ModelsStrip />,
+    pricing: <Pricing />,
+    faq: <FAQ />,
+    blog: <Blog posts={posts} />,
+    cta: <CTA />,
+  } satisfies Record<HomeSectionId, ReactNode>;
 
   // Signed-in visitors get the app, not the pitch. Client-side (and at layout
   // time, before paint) so the landing page still renders — and indexes — for
@@ -45,8 +64,11 @@ function HomePage() {
     <div className="bg-background text-foreground flex min-h-screen flex-col">
       <Header />
       <main className="flex flex-1 flex-col">
-        <Hero />
-        <Blog posts={posts} />
+        {homeConfig.sections.map((section) =>
+          section.enabled ? (
+            <Fragment key={section.id}>{sectionRegistry[section.id]}</Fragment>
+          ) : null
+        )}
       </main>
       <Footer />
       <SupportWidget />
@@ -63,7 +85,14 @@ export const Route = createFileRoute('/')({
   },
   loader: async () => {
     const locale = getLocale();
-    const posts = await getBlogPostsFn({ data: { locale, limit: 3 } });
+    const blogEnabled = homeConfig.sections.some(
+      (section) => section.id === 'blog' && section.enabled
+    );
+    const posts = blogEnabled
+      ? await getBlogPostsFn({
+          data: { locale, limit: homeConfig.blogPostLimit },
+        })
+      : [];
     return { locale, posts };
   },
   head: ({ loaderData }) => {

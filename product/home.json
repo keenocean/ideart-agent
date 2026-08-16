@@ -1,12 +1,12 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "sections": [
     { "id": "hero", "enabled": true },
+    { "id": "stats", "enabled": false },
     { "id": "gallery", "enabled": false },
     { "id": "features", "enabled": false },
-    { "id": "useCases", "enabled": false },
-    { "id": "howItWorks", "enabled": false },
-    { "id": "featuredCatalog", "enabled": false },
+    { "id": "models", "enabled": false },
+    { "id": "pricing", "enabled": false },
     { "id": "faq", "enabled": false },
     { "id": "blog", "enabled": true },
     { "id": "cta", "enabled": false }
