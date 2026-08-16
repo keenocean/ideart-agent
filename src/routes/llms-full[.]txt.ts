@@ -14,6 +14,7 @@ import type { BlogPost } from '@/content/posts';
 const FIXED_PAGE_COPY = {
   home: { title: 'Home', description: 'AI image and video creation agent' },
   tools: { title: 'AI Tools', description: 'Focused AI creation tools' },
+  models: { title: 'AI Models', description: 'Published generation models' },
   pricing: { title: 'Pricing', description: 'Pricing plans' },
   'privacy-policy': {
     title: 'Privacy Policy',

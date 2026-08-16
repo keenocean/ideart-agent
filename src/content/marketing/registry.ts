@@ -8,10 +8,14 @@ import {
   MAX_MARKETING_PAGE_BYTES,
   MAX_MARKETING_PROJECTION_BYTES,
   parseHomeProjectionReleaseObject,
+  parseModelDirectoryReleaseObject,
+  parseModelPageReleaseObject,
   parseToolDirectoryReleaseObject,
   parseToolPageReleaseObject,
   type HomeProjectionReleaseObject,
   type MarketingContentManifest,
+  type ModelDirectoryReleaseObject,
+  type ModelPageReleaseObject,
   type ToolDirectoryReleaseObject,
   type ToolPageReleaseObject,
 } from './schema';
@@ -83,7 +87,7 @@ export function marketingManifestKey(releaseId: string): string {
 
 export function marketingPageObjectKey(
   releaseId: string,
-  kind: 'tool',
+  kind: 'tool' | 'model',
   entityId: string,
   locale: AppLocale
 ): string {
@@ -101,7 +105,7 @@ export function marketingPageObjectKey(
 
 export function marketingDirectoryObjectKey(
   releaseId: string,
-  kind: 'tools',
+  kind: 'tools' | 'models',
   locale: AppLocale
 ): string {
   if (!RELEASE_ID_PATTERN.test(releaseId) || !LOCALE_PATTERN.test(locale)) {
@@ -159,10 +163,13 @@ export function createMarketingContentRegistry(
   }
 
   let manifestPromise: Promise<MarketingContentManifest> | null = null;
-  const pagePromises = new Map<string, Promise<ToolPageReleaseObject>>();
+  const pagePromises = new Map<
+    string,
+    Promise<ToolPageReleaseObject | ModelPageReleaseObject>
+  >();
   const directoryPromises = new Map<
     string,
-    Promise<ToolDirectoryReleaseObject>
+    Promise<ToolDirectoryReleaseObject | ModelDirectoryReleaseObject>
   >();
   const homeProjectionPromises = new Map<
     string,
@@ -249,7 +256,7 @@ export function createMarketingContentRegistry(
     if (!entry) return null;
     const cacheKey = `tool:${entityId}:${locale}`;
     const cached = pagePromises.get(cacheKey);
-    if (cached) return cached;
+    if (cached) return cached as Promise<ToolPageReleaseObject>;
     const promise = (async () => {
       const value = await verifiedObject(
         marketingPageObjectKey(releaseId, 'tool', entityId, locale),
@@ -281,7 +288,68 @@ export function createMarketingContentRegistry(
       pagePromises.delete(cacheKey);
       throw error;
     });
-    return boundedRemember(pagePromises, cacheKey, promise, 128);
+    return boundedRemember(
+      pagePromises,
+      cacheKey,
+      promise as Promise<ToolPageReleaseObject | ModelPageReleaseObject>,
+      128
+    ) as Promise<ToolPageReleaseObject>;
+  }
+
+  async function getModelPage(
+    entityId: string,
+    locale: AppLocale
+  ): Promise<ModelPageReleaseObject | null> {
+    if (!ENTITY_ID_PATTERN.test(entityId) || !LOCALE_PATTERN.test(locale)) {
+      return null;
+    }
+    const manifest = await loadManifest();
+    const entry = manifest.pages.find(
+      (page) =>
+        page.kind === 'model' &&
+        page.entityId === entityId &&
+        page.locale === locale
+    );
+    if (!entry) return null;
+    const cacheKey = `model:${entityId}:${locale}`;
+    const cached = pagePromises.get(cacheKey);
+    if (cached) return cached as Promise<ModelPageReleaseObject>;
+    const promise = (async () => {
+      const value = await verifiedObject(
+        marketingPageObjectKey(releaseId, 'model', entityId, locale),
+        entry,
+        MAX_MARKETING_PAGE_BYTES,
+        `Marketing page "${cacheKey}"`
+      );
+      let page: ModelPageReleaseObject;
+      try {
+        page = parseModelPageReleaseObject(value);
+      } catch (error) {
+        throw new MarketingContentValidationError(
+          `Marketing page "${cacheKey}" failed schema validation`,
+          { cause: error }
+        );
+      }
+      if (
+        page.entityId !== entityId ||
+        page.locale !== locale ||
+        page.contentModifiedAt !== entry.contentModifiedAt
+      ) {
+        throw new MarketingContentValidationError(
+          `Marketing page "${cacheKey}" identity mismatch`
+        );
+      }
+      return page;
+    })().catch((error) => {
+      pagePromises.delete(cacheKey);
+      throw error;
+    });
+    return boundedRemember(
+      pagePromises,
+      cacheKey,
+      promise,
+      128
+    ) as Promise<ModelPageReleaseObject>;
   }
 
   async function getToolDirectory(
@@ -295,7 +363,7 @@ export function createMarketingContentRegistry(
     if (!entry) return null;
     const cacheKey = `tools:${locale}`;
     const cached = directoryPromises.get(cacheKey);
-    if (cached) return cached;
+    if (cached) return cached as Promise<ToolDirectoryReleaseObject>;
     const promise = (async () => {
       const value = await verifiedObject(
         marketingDirectoryObjectKey(releaseId, 'tools', locale),
@@ -326,7 +394,63 @@ export function createMarketingContentRegistry(
       directoryPromises.delete(cacheKey);
       throw error;
     });
-    return boundedRemember(directoryPromises, cacheKey, promise, 32);
+    return boundedRemember(
+      directoryPromises,
+      cacheKey,
+      promise as Promise<
+        ToolDirectoryReleaseObject | ModelDirectoryReleaseObject
+      >,
+      32
+    ) as Promise<ToolDirectoryReleaseObject>;
+  }
+
+  async function getModelDirectory(
+    locale: AppLocale
+  ): Promise<ModelDirectoryReleaseObject | null> {
+    if (!LOCALE_PATTERN.test(locale)) return null;
+    const manifest = await loadManifest();
+    const entry = manifest.directories.find(
+      (directory) => directory.kind === 'models' && directory.locale === locale
+    );
+    if (!entry) return null;
+    const cacheKey = `models:${locale}`;
+    const cached = directoryPromises.get(cacheKey);
+    if (cached) return cached as Promise<ModelDirectoryReleaseObject>;
+    const promise = (async () => {
+      const value = await verifiedObject(
+        marketingDirectoryObjectKey(releaseId, 'models', locale),
+        entry,
+        MAX_MARKETING_DIRECTORY_BYTES,
+        `Marketing directory "${cacheKey}"`
+      );
+      let directory: ModelDirectoryReleaseObject;
+      try {
+        directory = parseModelDirectoryReleaseObject(value);
+      } catch (error) {
+        throw new MarketingContentValidationError(
+          `Marketing directory "${cacheKey}" failed schema validation`,
+          { cause: error }
+        );
+      }
+      if (
+        directory.locale !== locale ||
+        directory.items.length !== entry.itemCount
+      ) {
+        throw new MarketingContentValidationError(
+          `Marketing directory "${cacheKey}" identity mismatch`
+        );
+      }
+      return directory;
+    })().catch((error) => {
+      directoryPromises.delete(cacheKey);
+      throw error;
+    });
+    return boundedRemember(
+      directoryPromises,
+      cacheKey,
+      promise,
+      32
+    ) as Promise<ModelDirectoryReleaseObject>;
   }
 
   async function getHomeProjection(
@@ -372,6 +496,8 @@ export function createMarketingContentRegistry(
 
   return {
     getHomeProjection,
+    getModelDirectory,
+    getModelPage,
     getToolPage,
     getToolDirectory,
     loadManifest,

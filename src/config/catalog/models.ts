@@ -1,9 +1,17 @@
 import { catalogRouteSegment } from './paths';
 import type { ModelDefinition } from './types';
 
-const localePages = (slug: string) => ({
-  en: { slug: catalogRouteSegment(slug), indexing: 'noindex' as const },
-  zh: { slug: catalogRouteSegment(slug), indexing: 'noindex' as const },
+const localePages = (slug: string, contentModifiedAt?: string) => ({
+  en: {
+    slug: catalogRouteSegment(slug),
+    indexing: 'noindex' as const,
+    ...(contentModifiedAt ? { contentModifiedAt } : {}),
+  },
+  zh: {
+    slug: catalogRouteSegment(slug),
+    indexing: 'noindex' as const,
+    ...(contentModifiedAt ? { contentModifiedAt } : {}),
+  },
 });
 
 export const modelCatalog = [
@@ -54,7 +62,7 @@ export const modelCatalog = [
     availability: 'live',
     modality: 'video',
     runtimeModelKey: 'seedance-2-5',
-    localePages: localePages('seedance-2-5'),
+    localePages: localePages('seedance-2-5', '2026-08-16'),
     placement: { directoryOrder: 30 },
     related: ['text-to-video', 'image-to-video', 'minimax-h3'],
     variant: {

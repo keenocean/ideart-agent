@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "seo": {
+    "title": "AI 视频与图片模型 | {appName}",
+    "description": "比较已经发布的 AI 生成模型，并打开锁定到具体模型的创作工作流。"
+  },
+  "hero": {
+    "title": "AI 生成模型",
+    "description": "查看来自真实运行时配置的模型规格、提示词方法，并直接使用锁定到所选模型的生成工作台。"
+  }
+}

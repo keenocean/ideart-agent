@@ -97,7 +97,10 @@ export const AGENT_MODEL_OPTIONS = [
     audio: true,
     maxImages: 2,
     providers: {
-      evolink: null,
+      evolink: {
+        model: 'seedance-2.5-text-to-video',
+        imageModel: 'seedance-2.5-image-to-video',
+      },
       grouter: {
         model: 'seedance-2.5',
         imageModel: 'seedance-2.5',

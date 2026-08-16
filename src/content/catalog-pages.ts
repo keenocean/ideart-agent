@@ -13,6 +13,9 @@ import type { AppLocale } from '@/config/locale';
 import type { SeoRouteRef } from '@/lib/seo';
 import { locales } from '@/paraglide/runtime.js';
 
+import { hasModelContent, loadModelContentOrNull } from './models/manifest';
+import type { ModelPageContent } from './models/types';
+import { validateModelPageContent } from './models/validate';
 import { hasToolContent, loadToolContentOrNull } from './tools/manifest';
 import type { ToolPageContent } from './tools/types';
 import { validateToolPageContent } from './tools/validate';
@@ -34,7 +37,7 @@ export function isCatalogPageContentAvailable(
     case 'tool':
       return hasToolContent(definition.entityId, locale);
     case 'model':
-      return false;
+      return hasModelContent(definition.entityId, locale);
   }
 }
 
@@ -50,8 +53,12 @@ async function isCatalogPageContentLoadable(
       validateToolPageContent(definition, content);
       return true;
     }
-    case 'model':
-      return false;
+    case 'model': {
+      const content = await loadModelContentOrNull(definition.entityId, locale);
+      if (!content) return false;
+      validateModelPageContent(definition, content);
+      return true;
+    }
   }
 }
 
@@ -59,14 +66,16 @@ async function loadCatalogLlmsCopy(
   definition: CatalogDefinition,
   locale: AppLocale
 ): Promise<{ title: string; summary: string } | null> {
-  let content: ToolPageContent | null = null;
+  let content: ToolPageContent | ModelPageContent | null = null;
   switch (definition.kind) {
     case 'tool':
       content = await loadToolContentOrNull(definition.entityId, locale);
       if (content) validateToolPageContent(definition, content);
       break;
     case 'model':
-      return null;
+      content = await loadModelContentOrNull(definition.entityId, locale);
+      if (content) validateModelPageContent(definition, content);
+      break;
   }
   if (!content) return null;
   return {

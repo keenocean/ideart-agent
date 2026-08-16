@@ -47,15 +47,18 @@ try {
     directories: unknown[];
     projections: unknown[];
   };
-  if (manifest.pages.length !== fixtureCount) {
+  if (manifest.pages.length < fixtureCount) {
     throw new Error(
-      `Expected ${fixtureCount} external page objects, found ${manifest.pages.length}`
+      `Expected at least ${fixtureCount} external page objects, found ${manifest.pages.length}`
     );
   }
   const jsonFiles = await countJsonFiles(root);
   if (
     jsonFiles !==
-    fixtureCount + manifest.directories.length + manifest.projections.length + 2
+    manifest.pages.length +
+      manifest.directories.length +
+      manifest.projections.length +
+      2
   ) {
     throw new Error(`Unexpected scale release file count: ${jsonFiles}`);
   }
@@ -66,7 +69,7 @@ try {
     throw new Error(`Runtime availability index is too large: ${indexBytes}`);
   }
   console.log(
-    `Marketing scale check passed: ${fixtureCount} page bodies stayed in external release objects; runtime index=${indexBytes} bytes.`
+    `Marketing scale check passed: ${manifest.pages.length} page bodies stayed in external release objects; runtime index=${indexBytes} bytes.`
   );
 } finally {
   await rm(root, { recursive: true, force: true });

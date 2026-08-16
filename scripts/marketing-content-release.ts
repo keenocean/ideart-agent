@@ -11,11 +11,16 @@ import {
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
+import { modelCatalog } from '@/config/catalog/models';
 import { catalog } from '@/config/catalog/registry';
 import { resolveCatalogRoute } from '@/config/catalog/resolver';
 import { selectHomeEntries } from '@/config/catalog/selectors';
 import { toolCatalog } from '@/config/catalog/tools';
-import type { MarketingAsset, ToolDefinition } from '@/config/catalog/types';
+import type {
+  MarketingAsset,
+  ModelDefinition,
+  ToolDefinition,
+} from '@/config/catalog/types';
 import type { AppLocale } from '@/config/locale';
 import {
   directorySourceFileSchema,
@@ -23,7 +28,11 @@ import {
   MARKETING_CONTENT_RELEASE_PREFIX,
   MARKETING_CONTENT_SCHEMA_VERSION,
   marketingAssetsSourceSchema,
+  modelDirectoryReleaseObjectSchema,
+  modelPageContentSchema,
+  modelPageReleaseObjectSchema,
   parseMarketingAsset,
+  parseModelPageSourceFile,
   parseToolPageSourceFile,
   toolDirectoryReleaseObjectSchema,
   toolPageContentSchema,
@@ -31,9 +40,18 @@ import {
   type HomeProjectionReleaseObject,
   type MarketingAssetsSource,
   type MarketingContentManifest,
+  type ModelDirectoryReleaseObject,
+  type ModelPageReleaseObject,
   type ToolDirectoryReleaseObject,
   type ToolPageReleaseObject,
 } from '@/content/marketing/schema';
+import type {
+  ModelMediaReference,
+  ModelMediaSourceReference,
+  ModelPageContent,
+  ModelPageSourceContent,
+} from '@/content/models/types';
+import { validateModelPageContent } from '@/content/models/validate';
 import type {
   ToolMediaReference,
   ToolMediaSourceReference,
@@ -41,6 +59,11 @@ import type {
   ToolPageSourceContent,
 } from '@/content/tools/types';
 import { validateToolPageContent } from '@/content/tools/validate';
+
+type PageReleaseObject = ToolPageReleaseObject | ModelPageReleaseObject;
+type DirectoryReleaseObject =
+  | ToolDirectoryReleaseObject
+  | ModelDirectoryReleaseObject;
 
 type Options = {
   source: string;
@@ -266,6 +289,38 @@ function resolveToolContent(
   return toolPageContentSchema.parse(resolved) as ToolPageContent;
 }
 
+function resolveModelContent(
+  source: ModelPageSourceContent,
+  assets: ReadonlyMap<string, MarketingAsset>
+): ModelPageContent {
+  const media = (reference: ModelMediaSourceReference): ModelMediaReference => {
+    const asset = assets.get(reference.assetId);
+    if (!asset) {
+      throw new Error(
+        `Unknown marketing asset ${reference.assetId} in ${source.entityId}:${source.locale}`
+      );
+    }
+    return { ...asset, alt: reference.alt };
+  };
+  return modelPageContentSchema.parse({
+    ...source,
+    examples: {
+      ...source.examples,
+      items: source.examples.items.map((item) => ({
+        ...item,
+        media: media(item.media),
+      })),
+    },
+    useCases: {
+      ...source.useCases,
+      items: source.useCases.items.map((item) => ({
+        ...item,
+        media: media(item.media),
+      })),
+    },
+  }) as ModelPageContent;
+}
+
 type LandingMessages = Record<string, unknown>;
 type ResolvedHomeMedia = MarketingAsset & { alt: string };
 
@@ -321,9 +376,14 @@ function homeCardMedia(
 async function buildHomeProjections(
   locales: ReadonlySet<string>,
   assets: ReadonlyMap<string, MarketingAsset>,
-  pages: readonly ToolPageReleaseObject[]
+  pages: readonly PageReleaseObject[]
 ): Promise<HomeProjectionReleaseObject[]> {
-  const pageByKey = new Map(
+  const toolPageByKey = new Map(
+    pages
+      .filter((page): page is ToolPageReleaseObject => page.kind === 'tool')
+      .map((page) => [`${page.entityId}:${page.locale}`, page] as const)
+  );
+  const modelPageByKey = new Map(
     pages.map((page) => [`${page.entityId}:${page.locale}`, page] as const)
   );
   const projections: HomeProjectionReleaseObject[] = [];
@@ -383,12 +443,12 @@ async function buildHomeProjections(
       toolCatalog,
       locale,
       (definition, targetLocale) =>
-        pageByKey.has(`${definition.entityId}:${targetLocale}`)
+        toolPageByKey.has(`${definition.entityId}:${targetLocale}`)
     ).flatMap((definition) => {
       if (definition.kind !== 'tool' || definition.publication !== 'listed') {
         return [];
       }
-      const page = pageByKey.get(`${definition.entityId}:${locale}`);
+      const page = toolPageByKey.get(`${definition.entityId}:${locale}`);
       const localePage = definition.localePages[locale];
       if (!page || !localePage) return [];
       return [
@@ -411,14 +471,54 @@ async function buildHomeProjections(
         media,
         featured: {
           tools: featuredTools,
-          // Model release resolvers fail closed today, so the homepage must not
-          // manufacture links to model pages that are not yet published.
-          models: [],
+          models: selectHomeEntries(
+            modelCatalog,
+            locale,
+            (definition, targetLocale) =>
+              modelPageByKey.has(`${definition.entityId}:${targetLocale}`)
+          ).flatMap((definition) => {
+            if (
+              definition.kind !== 'model' ||
+              definition.publication !== 'listed'
+            ) {
+              return [];
+            }
+            const page = modelPageByKey.get(`${definition.entityId}:${locale}`);
+            const localePage = definition.localePages[locale];
+            if (!page || page.kind !== 'model' || !localePage) return [];
+            const media = page.content.examples.items[0]?.media;
+            if (!media) return [];
+            return [
+              {
+                id: definition.entityId,
+                entityId: definition.entityId,
+                href: resolveCatalogRoute('model', locale, localePage.slug)
+                  .path,
+                title: page.content.directory.title,
+                description: page.content.directory.description,
+                media,
+              },
+            ];
+          }),
         },
       }) as HomeProjectionReleaseObject
     );
   }
   return projections;
+}
+
+function listedModel(entityId: string, locale: string): ModelDefinition {
+  const definition = modelCatalog.find((entry) => entry.entityId === entityId);
+  if (
+    !definition ||
+    definition.publication !== 'listed' ||
+    !definition.localePages[locale as AppLocale]
+  ) {
+    throw new Error(
+      `Marketing source has no listed model locale page: ${entityId}:${locale}`
+    );
+  }
+  return definition;
 }
 
 function listedTool(entityId: string, locale: string): ToolDefinition {
@@ -551,6 +651,88 @@ async function discoverToolPages(
   );
 }
 
+async function discoverModelPages(
+  sourceRoot: string,
+  locales: ReadonlySet<string>,
+  assets: ReadonlyMap<string, MarketingAsset>
+): Promise<ModelPageReleaseObject[]> {
+  const modelsRoot = path.join(sourceRoot, 'models');
+  const entities = await readdir(modelsRoot, { withFileTypes: true });
+  const pages: ModelPageReleaseObject[] = [];
+  for (const entityEntry of entities.sort((a, b) =>
+    a.name.localeCompare(b.name)
+  )) {
+    if (!entityEntry.isDirectory()) {
+      throw new Error(
+        `Model source entry must be a directory: ${entityEntry.name}`
+      );
+    }
+    const entityId = entityEntry.name;
+    const files = await readdir(path.join(modelsRoot, entityId), {
+      withFileTypes: true,
+    });
+    for (const fileEntry of files.sort((a, b) =>
+      a.name.localeCompare(b.name)
+    )) {
+      if (!fileEntry.isFile() || !fileEntry.name.endsWith('.json')) {
+        throw new Error(
+          `Model source must be JSON: ${entityId}/${fileEntry.name}`
+        );
+      }
+      const locale = fileEntry.name.slice(0, -5);
+      if (!locales.has(locale)) {
+        throw new Error(
+          `Unsupported model content locale: ${entityId}:${locale}`
+        );
+      }
+      const source = parseModelPageSourceFile(
+        await readJson(path.join(modelsRoot, entityId, fileEntry.name))
+      );
+      if (
+        source.content.entityId !== entityId ||
+        source.content.locale !== locale
+      ) {
+        throw new Error(
+          `Model source identity mismatch: ${entityId}:${locale}`
+        );
+      }
+      const definition = listedModel(entityId, locale);
+      const catalogModifiedAt =
+        definition.localePages?.[locale as AppLocale]?.contentModifiedAt;
+      if (catalogModifiedAt && catalogModifiedAt !== source.contentModifiedAt) {
+        throw new Error(
+          `contentModifiedAt mismatch for ${entityId}:${locale} (${source.contentModifiedAt} !== ${catalogModifiedAt})`
+        );
+      }
+      const content = resolveModelContent(source.content, assets);
+      validateModelPageContent(definition, content);
+      for (const relatedId of content.comparison.relatedModelIds) {
+        const target = modelCatalog.find(
+          (entry) => entry.entityId === relatedId
+        );
+        if (!target || target.modality !== definition.modality) {
+          throw new Error(
+            `Invalid comparison model in ${entityId}:${locale}: ${relatedId}`
+          );
+        }
+      }
+      pages.push(
+        modelPageReleaseObjectSchema.parse({
+          schemaVersion: MARKETING_CONTENT_SCHEMA_VERSION,
+          kind: 'model',
+          entityId,
+          locale,
+          contentModifiedAt: source.contentModifiedAt,
+          content,
+        }) as ModelPageReleaseObject
+      );
+    }
+  }
+  return pages.sort((a, b) =>
+    `${a.entityId}:${a.locale}`.localeCompare(`${b.entityId}:${b.locale}`)
+  );
+}
+
 function withScaleFixtures(
   pages: readonly ToolPageReleaseObject[],
   fixtureCount: number
@@ -621,13 +803,59 @@ async function buildDirectories(
   return directories;
 }
 
-function pageObjectKey(releaseId: string, page: ToolPageReleaseObject): string {
+async function buildModelDirectories(
+  sourceRoot: string,
+  pages: readonly ModelPageReleaseObject[]
+): Promise<ModelDirectoryReleaseObject[]> {
+  const locales = [...new Set(pages.map((page) => page.locale))].sort();
+  const directories: ModelDirectoryReleaseObject[] = [];
+  for (const locale of locales) {
+    const source = directorySourceFileSchema.parse(
+      await readJson(
+        path.join(sourceRoot, 'directories', 'models', `${locale}.json`)
+      )
+    );
+    const contentByEntity = new Map(
+      pages
+        .filter((page) => page.locale === locale)
+        .map((page) => [page.entityId, page.content] as const)
+    );
+    const items = modelCatalog.flatMap((definition) => {
+      if (definition.publication !== 'listed') return [];
+      const content = contentByEntity.get(definition.entityId);
+      const localePage = definition.localePages[locale];
+      if (!content || !localePage) return [];
+      return [
+        {
+          entityId: definition.entityId,
+          href: resolveCatalogRoute('model', locale, localePage.slug).path,
+          title: content.directory.title,
+          description: content.directory.description,
+          availability: definition.availability,
+        },
+      ];
+    });
+    directories.push(
+      modelDirectoryReleaseObjectSchema.parse({
+        schemaVersion: MARKETING_CONTENT_SCHEMA_VERSION,
+        kind: 'models',
+        locale,
+        seo: source.seo,
+        hero: source.hero,
+        items,
+      }) as ModelDirectoryReleaseObject
+    );
+  }
+  return directories;
+}
+
+function pageObjectKey(releaseId: string, page: PageReleaseObject): string {
   return `${MARKETING_CONTENT_RELEASE_PREFIX}/${releaseId}/pages/${page.kind}/${page.entityId}/${page.locale}.json`;
 }
 
 function directoryObjectKey(
   releaseId: string,
-  directory: ToolDirectoryReleaseObject
+  directory: DirectoryReleaseObject
 ): string {
   return `${MARKETING_CONTENT_RELEASE_PREFIX}/${releaseId}/directories/${directory.kind}/${directory.locale}.json`;
 }
@@ -644,8 +872,8 @@ function manifestKey(releaseId: string): string {
 }
 
 function indexText(
-  pages: readonly ToolPageReleaseObject[],
-  directories: readonly ToolDirectoryReleaseObject[],
+  pages: readonly PageReleaseObject[],
+  directories: readonly DirectoryReleaseObject[],
   homeProjections: readonly HomeProjectionReleaseObject[]
 ): string {
   const pageKeys = pages
@@ -725,14 +953,27 @@ async function buildRelease(options: Options) {
     await readJson(path.join(sourceRoot, 'assets.json'))
   ) as MarketingAssetsSource;
   const assets = resolveAssets(assetSource);
-  const realPages = await discoverToolPages(sourceRoot, locales, assets);
-  const directories = await buildDirectories(sourceRoot, realPages);
+  const toolPages = await discoverToolPages(sourceRoot, locales, assets);
+  const modelPages = await discoverModelPages(sourceRoot, locales, assets);
+  const realPages: PageReleaseObject[] = [...toolPages, ...modelPages].sort(
+    (a, b) =>
+      `${a.kind}:${a.entityId}:${a.locale}`.localeCompare(
+        `${b.kind}:${b.entityId}:${b.locale}`
+      )
+  );
+  const directories: DirectoryReleaseObject[] = [
+    ...(await buildDirectories(sourceRoot, toolPages)),
+    ...(await buildModelDirectories(sourceRoot, modelPages)),
+  ];
   const homeProjections = await buildHomeProjections(
     locales,
     assets,
     realPages
   );
-  const pages = withScaleFixtures(realPages, options.fixtures);
+  const pages: PageReleaseObject[] = [
+    ...withScaleFixtures(toolPages, options.fixtures),
+    ...modelPages,
+  ];
 
   const pageTexts = pages.map((page) => ({ page, text: jsonText(page) }));
   const directoryTexts = directories.map((directory) => ({

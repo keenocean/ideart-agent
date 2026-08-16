@@ -14,6 +14,7 @@ export function Footer() {
       links: [
         { label: m['landing.nav.create'](), href: '/chat' },
         { label: m['landing.nav.tools'](), href: '/tools' },
+        { label: m['landing.nav.models'](), href: '/models' },
         {
           label: m['landing.footer.ai_image_generator'](),
           href: '/tools/ai-image-generator',

@@ -784,14 +784,14 @@ Google 当前指导同样要求优先修复站点自己链接或提交的 404，
 - hash 对象可跨引用复用，替换/移除文章图片时不在交互请求内直接删 R2。当前未实现 reference-aware orphan GC；若存量需要治理，应另做全库引用扫描、保留期和 dry-run 后再删除，避免破坏其他语言文章或正文共享对象。
 - 本检查点不开放正文视频，也未在无凭据环境中写入真实 R2。自动验证覆盖图片字节解析、存储/Markdown round-trip、安全 SSR 和生产构建；上线前仍必须在目标 R2 配置下完成一次真实上传与 online asset check。
 
-#### 首页、工具页与模型页实施状态（2026-08-15）
+#### 首页、工具页与模型页实施状态（2026-08-16）
 
 - 100+ 页面内容底座已经迁移为 `messages/marketing/** → immutable content release → server-only loader`。首个工具页 en/zh 正文、工具目录文案与 27 个媒体对象 inventory 已进入 JSON 编辑源；运行时不再依赖 `src/content/tools/pages/**` 或 `src/config/catalog/assets.ts`，页面正文不生成 Vite/client chunk。
 - 阶段 0/1 的 Catalog、resolver/selectors、SEO helper、固定公开路由、sitemap/llms 和 R2 检查底座已经落地；阶段 3 已为 `ai-image-generator` 增加真实同语言正文和路由，但工具/模型 locale route 当前仍全部保持 `noindex`。
 - 阶段 2 的共享生成入口安全链路及 2.5 收口已经完成：`PromptLauncher` 已成为复用 `useGenerationEntry` + `GenerationWorkbench` 的兼容 wrapper，图片模型状态已贯通；服务端会从 `entryContext` 与精确语言正文共同重建 policy，并在 API/tool 两层执行锁定、附件来源与媒体复用约束。Agent guard/认证页/邮箱验证保留原 session callback，402 拒绝不会提前消费首轮 stash。
-- 阶段 3 的首个工具纵向切片已经完成：`/tools`、`/tools/$slug`、纯 props Catalog 组件、工具 Blocks、精确语言 release resolver 和服务端 DeploymentReadiness 已存在；仅 `ai-image-generator` 有 en/zh 正文并可访问。详情展示层已重构为 `ToolDetailShell` 共享底盘、Block-owned 六类语义模板注册表和逐页面 typed content 三层；图片生成器只渲染 15 张图片、图片 Prompt 与图片 Use cases，不再显示视频灵感。动态瀑布流、媒体预览、图文交错和工具/模型 show-card 网格继续复用；视频轮播与 12 个已验证 R2 视频对象保留给未来真正的视频模板。阶段 4 模型详情切片尚未开始，`src/routes/models/*` 与模型 release resolver 仍不存在；`messages/marketing/assets.json` 登记 15 张图片与 12 个带共享 poster 的视频，共 27 个此前经在线验证的 R2 对象。
-- 阶段 5 尚未开始：首页仍是旧的 `Header → Hero(PromptLauncher) → Blog → Footer → SupportWidget`，登录用户仍自动跳转 `/chat`。仓库中未接线的 `Features`、`ModelsStrip`、`Gallery`、`FAQ`、`CTA` 等旧/demo Blocks 不计为本计划首页实施，其中渐变 placeholder 不符合真实 R2 案例门禁。
-- Header/Footer 和首页尚未接入 Tools/Models；`/tools` 已成为首个 Catalog directory 消费者，related selector 只输出具备同语言正文的目标。sitemap/llms 虽已接线，但因为 Catalog locale pages 均为 noindex，不输出这些 URL。
+- 阶段 3 的首个工具纵向切片已经完成；阶段 4 的首个模型纵向切片也已落地。`/models`、`/models/$slug`、精确语言 release resolver、Catalog 双门禁、locked model Workbench、Runtime specs/comparison 和服务端 DeploymentReadiness 已存在；仅 `seedance-2-5` 有 en/zh 模型正文并可访问，其他模型继续 fail closed。工具与模型共用 `CatalogDetailShell`，模型新增的 specs/comparison 也是纯 props 组件；gallery、steps、feature grid、图文交错、limitations、FAQ 与 CTA 继续复用。案例视频明确标注为 R2 创作评估参考而非已验证 Seedance 2.5 输出，因此详情和目录继续 `noindex`。
+- 阶段 5 首页重组已经完成：`src/routes/index.tsx` 显式组合 HomeHero、Gallery、Features、UseCases、HowItWorks、FeaturedCatalog、FAQ、Blog 与 CTA；正文仍来自静态 `landing.*`，媒体和精选 Catalog 卡片来自小型 home projection，未引入任意 JSON renderer。
+- Header/Footer 已接入 Tools/Models；`/tools` 与 `/models` 都是 Catalog directory 消费者，related selector 只输出具备同语言正文的目标。sitemap/llms 虽已接线，但首个工具与模型页面仍为 noindex，因此不进入 indexable discovery。
 - 2026-08-15 content release 迁移后全量 53 个测试文件/316 项测试、TypeScript、`pnpm build`、route bundle、100 页面 fixture、正文 bundle 扫描和 Cloudflare 构建/dry-run/预算门禁均通过；本地生产 SSR 已验证中英文图片工具页为 `200 + noindex,follow + self canonical`、未知工具为真实 404，故意移除已发布对象则为 `503 + Retry-After: 60`。2026-08-16 已把 release `7c68fb9fe0289c311a9ea46ff0af165d714e69f93223242c17937a54f7ff0c31` 上传并逐对象回读验证到私有 Bucket `ugcmind-marketing-content`，固定到 Worker 版本 `6a69e6cd-83d3-4ed2-b443-8ef00b24d262`；生产抓取确认 `/tools`、en/zh 图片工具页为 200，unknown en/zh slug 为 404，27 个公开媒体对象在线检查通过。旧 release 回滚部署演练、响应式浏览器复查、真实 OAuth/provider、浏览器生成 smoke、Lighthouse 与 Search Console 仍待执行，不能据此宣告阶段 4–9 已完成或开放索引。
 
 ### 已完成：阶段 2 共享生成入口安全链路（2026-08-15）
@@ -849,12 +849,12 @@ Google 当前指导同样要求优先修复站点自己链接或提交的 404，
 5. **生产发布已完成（2026-08-16）**：目标 Cloudflare 账号已创建私有 Bucket `ugcmind-marketing-content`，release `7c68fb9fe0289c311a9ea46ff0af165d714e69f93223242c17937a54f7ff0c31` 已在远端逐对象验证后固定为 `MARKETING_CONTENT_RELEASE`，`MARKETING_CONTENT` binding 已随 Worker 版本 `6a69e6cd-83d3-4ed2-b443-8ef00b24d262` 生效。生产 SSR/SEO/404 smoke 与媒体在线检查通过；前一 release 回滚部署演练仍待执行。后续发布仍必须坚持先远端验证、再固定 release 变量、最后部署。
 6. **已完成**：删除运行时代码对 `src/content/tools/pages/**` 和全局 TS asset registry 的依赖；production bundle marker、100 页面 fixture、route bundle 与 CF budget 证明正文不生成 client chunks，Static Assets 不随页面 JSON 增长。
 
-### 阶段 4：第一个模型纵向切片与克制抽取
+### 已完成：阶段 4 第一个模型纵向切片与克制抽取（2026-08-16）
 
-1. 以已经作为 noindex 基础设施登记的 `gpt-image-2` 作为唯一开放切片；保留 `/models/index.tsx` 与 `/models/$slug.tsx`，实现运行时规格派生、安全 preset、DeploymentReadiness，并直接消费同一 pinned content release。其他模型保持不可发现，直到各自纵向切片完成。
-2. 消费阶段 2 已完成的 locked image model 链路，并在真实模型页再次验证页面 UI → handoff → API policy → Agent tool context；任一环节回归时模型页保持不可提交。
-3. 比较工具、图片模型两个真实消费者后，才抽取重复行为稳定的 SectionHeading、Steps、FeatureGrid、FAQList、FinalCTA 等；保留受控 variant/slot，不建设任意 JSON renderer 或巨型万能组件。
-4. 重跑 en/zh route inventory、SEO/head、404、资源与 route client JS 检查，确认新增模型内容没有进入工具页或根路由 preload。
+1. 以真实接入 EvoLink/gRouter/Fal 路由的 `seedance-2-5` 作为唯一开放模型切片；保留 `/models/index.tsx` 与 `/models/$slug.tsx`，运行时派生规格和比较值，正文直接消费同一 pinned content release。其他模型仍不可发现。
+2. Seedance 2.5 的 EvoLink route 使用 `seedance-2.5-text-to-video` / `seedance-2.5-image-to-video`；参数转换覆盖 adaptive 比例、时长、480p/720p、生成音频和最多两张参考图，并由 provider/model/tool tests 锁定。
+3. 工具与模型两个真实消费者共同使用 `CatalogDetailShell`；模型只新增可复用的 specs 和 comparison 纯展示组件，不建设任意 JSON renderer。模板 discriminant 限定为 image/video model，页面 section 顺序仍由 Block 控制。
+4. Seedance 2.5 en/zh 内容、模型目录和 R2 视频引用已进入 release compiler；Runtime facts 不复制到 JSON。现有视频只作为明确披露的创作评估参考，不冒充模型输出，因此保持 noindex，等待一方案例和真实浏览器生成 smoke 后再审查 index。
 
 ### 阶段 5：首页重组
 

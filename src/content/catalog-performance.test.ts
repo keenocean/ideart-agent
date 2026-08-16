@@ -130,7 +130,7 @@ describe('catalog first-fold performance policy', () => {
     const [rootSource, globalCss, shellSource] = await Promise.all([
       readFile('src/routes/__root.tsx', 'utf8'),
       readFile('src/styles/globals.css', 'utf8'),
-      readFile('src/components/catalog/tool-detail-shell.tsx', 'utf8'),
+      readFile('src/components/catalog/catalog-detail-shell.tsx', 'utf8'),
     ]);
     const criticalSource = `${rootSource}\n${globalCss}\n${shellSource}`;
 

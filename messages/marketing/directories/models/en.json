@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "seo": {
+    "title": "AI Video and Image Models | {appName}",
+    "description": "Compare published AI generation models and open a model-locked creative workflow."
+  },
+  "hero": {
+    "title": "AI generation models",
+    "description": "Explore models with runtime-backed specifications, prompt guidance, and a generation workspace locked to the model you chose."
+  }
+}

@@ -10,6 +10,8 @@ export const CATALOG_FIRST_FOLD_MAX_ITEMS = 3;
 /** Publishing a new catalog kind is blocked until it joins this policy set. */
 export const CATALOG_DETAIL_PERFORMANCE_POLICY_KINDS = new Set<CatalogKind>([
   'tool',
+  // Model pages keep all media below the text-and-workbench first fold.
+  'model',
 ]);
 
 type MediaItem = {

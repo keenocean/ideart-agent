@@ -1056,6 +1056,16 @@ Worker gzip 体积只衡量服务端部署包，不能代替浏览器 route JS �
 8. 验证统一 route head、Catalog + content 双门禁、正反向 resolver、服务端锁定模型 policy、Agent tool context、Workbench 支持参数和目标部署能力预检；图片模型还必须证明 `imageModelOption` 已全链路贯通。
 9. 构建、上传并验证不可变 content release，再部署固定该 releaseId 的 Worker；只有某个具体 locale 的内容与技术门槛全部通过后才切换为 index。运行 test/typecheck/format/build、正向 inventory、负向 fixtures、404/503、SSR/SEO、bundle/assets/Cloudflare 与视觉/性能检查，另一语言不自动跟随。
 
+当前首个实现是 `model:seedance-2-5`。可复用底盘分别位于：
+
+- `src/routes/models/{index,$slug}.tsx`：固定目录与动态详情 route，页面数增长不新增 route module。
+- `src/content/models/{types,validate,manifest,listing,server}.ts`：逐语言内容契约、release 读取、Catalog 双门禁和服务端 loader。
+- `src/blocks/model-{directory,detail}.tsx`：读取短 i18n、运行时规格、locked preset 与 readiness，并组合代码拥有的页面顺序。
+- `src/components/catalog/catalog-detail-shell.tsx`：工具和模型共用详情外壳；`catalog-model-{specs,comparison}.tsx` 是新增的纯 props 模型组件，其余继续复用 Catalog gallery、steps、feature grid、图文交错、limitations、FAQ 和 CTA。
+- `messages/marketing/models/<entityId>/<locale>.json`：页面独有正文和 locale alt；`messages/marketing/directories/models/<locale>.json`：目录文案；`messages/marketing/assets.json`：R2 inventory。
+
+模型 JSON 的 `template` 只能选择 schema 允许的 `image-model | video-model`，不能声明任意 sections/component。JSON 中的 `specs.labels` 只负责本地化标签；真实 modality、时长、分辨率、比例、音频与参考图上限由 `AGENT_{IMAGE_}MODEL_OPTIONS` 生成。`comparison.relatedModelIds` 只允许同模态 Runtime Model，比较值同样动态派生。案例不是已验证模型输出时，必须在可见 `examples.disclosure` 中明确其证据级别；这类页面保持 `noindex`。
+
 ## 12. 新项目复用流程
 
 新项目默认保留：

@@ -3,6 +3,7 @@ import type { AppLocale } from '@/config/locale';
 export type FixedRouteId =
   | 'home'
   | 'tools'
+  | 'models'
   | 'pricing'
   | 'privacy-policy'
   | 'terms-of-service';
@@ -40,6 +41,21 @@ export const fixedPublicRoutes = [
         path: '/tools',
         indexing: 'noindex',
         contentModifiedAt: '2026-08-15',
+      },
+    },
+  },
+  {
+    id: 'models',
+    localePages: {
+      en: {
+        path: '/models',
+        indexing: 'noindex',
+        contentModifiedAt: '2026-08-16',
+      },
+      zh: {
+        path: '/models',
+        indexing: 'noindex',
+        contentModifiedAt: '2026-08-16',
       },
     },
   },

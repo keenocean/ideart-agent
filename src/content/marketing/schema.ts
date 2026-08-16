@@ -3,6 +3,8 @@ import { z } from 'zod';
 import type { MarketingAsset } from '@/config/catalog/types';
 import type { AppLocale } from '@/config/locale';
 
+import type { ModelDirectoryItem } from '../models/listing';
+import type { ModelPageContent, ModelPageSourceContent } from '../models/types';
 import type { ToolDirectoryItem } from '../tools/listing';
 import type { ToolPageContent, ToolPageSourceContent } from '../tools/types';
 
@@ -261,6 +263,134 @@ function toolContentSchema(
 export const toolPageSourceContentSchema = toolContentSchema(sourceMediaSchema);
 export const toolPageContentSchema = toolContentSchema(resolvedMediaSchema);
 
+function modelContentSchema(
+  mediaSchema: typeof sourceMediaSchema | typeof resolvedMediaSchema
+) {
+  const labels = z
+    .object({
+      modality: nonEmpty,
+      duration: nonEmpty,
+      resolutions: nonEmpty,
+      aspectRatios: nonEmpty,
+      audio: nonEmpty,
+      referenceImages: nonEmpty,
+      enabled: nonEmpty,
+      disabled: nonEmpty,
+      image: nonEmpty,
+      video: nonEmpty,
+      notApplicable: nonEmpty,
+    })
+    .strict();
+  const previewLabels = z
+    .object({
+      image: nonEmpty,
+      video: nonEmpty,
+      prompt: nonEmpty,
+      download: nonEmpty,
+      previous: nonEmpty,
+      next: nonEmpty,
+      close: nonEmpty,
+      usePrompt: nonEmpty,
+      expand: nonEmpty,
+    })
+    .strict();
+  const useCase = copyItemSchema
+    .extend({
+      id: routeSegmentSchema,
+      eyebrow: nonEmpty.optional(),
+      bullets: z.array(nonEmpty).min(1).optional(),
+      media: mediaSchema,
+      mediaPosition: z.enum(['left', 'right']).optional(),
+    })
+    .strict();
+  return z
+    .object({
+      entityId: routeSegmentSchema,
+      locale: localeSchema,
+      template: z.enum(['image-model', 'video-model']),
+      seo: z.object({ title: nonEmpty, description: nonEmpty }).strict(),
+      directory: z.object({ title: nonEmpty, description: nonEmpty }).strict(),
+      hero: z
+        .object({ eyebrow: nonEmpty, title: nonEmpty, description: nonEmpty })
+        .strict(),
+      workbench: z
+        .object({
+          title: nonEmpty,
+          description: nonEmpty,
+          placeholder: nonEmpty,
+        })
+        .strict(),
+      specs: z
+        .object({ title: nonEmpty, description: nonEmpty, labels })
+        .strict(),
+      examples: z
+        .object({
+          title: nonEmpty,
+          description: nonEmpty,
+          disclosure: nonEmpty,
+          labels: previewLabels,
+          items: z
+            .array(
+              copyItemSchema
+                .extend({
+                  id: routeSegmentSchema,
+                  prompt: nonEmpty,
+                  media: mediaSchema,
+                })
+                .strict()
+            )
+            .min(1),
+        })
+        .strict(),
+      capabilities: copySectionSchema,
+      workflows: copySectionSchema,
+      promptGuide: copySectionSchema,
+      useCases: z
+        .object({
+          title: nonEmpty,
+          description: nonEmpty,
+          items: z.array(useCase).min(1),
+        })
+        .strict(),
+      comparison: z
+        .object({
+          title: nonEmpty,
+          description: nonEmpty,
+          modelLabel: nonEmpty,
+          relatedModelIds: z.array(routeSegmentSchema),
+        })
+        .strict(),
+      limitations: z
+        .object({
+          title: nonEmpty,
+          description: nonEmpty,
+          items: z.array(nonEmpty).min(1),
+        })
+        .strict(),
+      faq: z
+        .object({
+          title: nonEmpty,
+          items: z
+            .array(z.object({ question: nonEmpty, answer: nonEmpty }).strict())
+            .min(1),
+        })
+        .strict(),
+      cta: z
+        .object({
+          title: nonEmpty,
+          description: nonEmpty,
+          primaryLabel: nonEmpty,
+          secondaryLabel: nonEmpty,
+        })
+        .strict(),
+    })
+    .strict();
+}
+
+export const modelPageSourceContentSchema =
+  modelContentSchema(sourceMediaSchema);
+export const modelPageContentSchema = modelContentSchema(resolvedMediaSchema);
+
 export const toolPageSourceFileSchema = z
   .object({
     schemaVersion: z.literal(MARKETING_CONTENT_SCHEMA_VERSION),
@@ -277,6 +407,25 @@ export const toolPageReleaseObjectSchema = z
     locale: localeSchema,
     contentModifiedAt: z.string().date(),
     content: toolPageContentSchema,
+  })
+  .strict();
+
+export const modelPageSourceFileSchema = z
+  .object({
+    schemaVersion: z.literal(MARKETING_CONTENT_SCHEMA_VERSION),
+    contentModifiedAt: z.string().date(),
+    content: modelPageSourceContentSchema,
+  })
+  .strict();
+
+export const modelPageReleaseObjectSchema = z
+  .object({
+    schemaVersion: z.literal(MARKETING_CONTENT_SCHEMA_VERSION),
+    kind: z.literal('model'),
+    entityId: routeSegmentSchema,
+    locale: localeSchema,
+    contentModifiedAt: z.string().date(),
+    content: modelPageContentSchema,
   })
   .strict();
 
@@ -302,6 +451,17 @@ export const toolDirectoryReleaseObjectSchema = z
   .object({
     schemaVersion: z.literal(MARKETING_CONTENT_SCHEMA_VERSION),
     kind: z.literal('tools'),
+    locale: localeSchema,
+    seo: z.object({ title: nonEmpty, description: nonEmpty }).strict(),
+    hero: z.object({ title: nonEmpty, description: nonEmpty }).strict(),
+    items: z.array(directoryItemSchema),
+  })
+  .strict();
+
+export const modelDirectoryReleaseObjectSchema = z
+  .object({
+    schemaVersion: z.literal(MARKETING_CONTENT_SCHEMA_VERSION),
+    kind: z.literal('models'),
     locale: localeSchema,
     seo: z.object({ title: nonEmpty, description: nonEmpty }).strict(),
     hero: z.object({ title: nonEmpty, description: nonEmpty }).strict(),
@@ -367,7 +527,7 @@ export const marketingContentManifestSchema = z
     pages: z.array(
       z
         .object({
-          kind: z.literal('tool'),
+          kind: z.enum(['tool', 'model']),
           entityId: routeSegmentSchema,
           locale: localeSchema,
           contentModifiedAt: z.string().date(),
@@ -378,7 +538,7 @@ export const marketingContentManifestSchema = z
     directories: z.array(
       z
         .object({
-          kind: z.literal('tools'),
+          kind: z.enum(['tools', 'models']),
           locale: localeSchema,
           itemCount: z.number().int().nonnegative(),
           ...manifestObjectFields,
@@ -419,6 +579,27 @@ export type ToolDirectoryReleaseObject = {
   hero: { title: string; description: string };
   items: ToolDirectoryItem[];
 };
+export type ModelPageSourceFile = {
+  schemaVersion: typeof MARKETING_CONTENT_SCHEMA_VERSION;
+  contentModifiedAt: string;
+  content: ModelPageSourceContent;
+};
+export type ModelPageReleaseObject = {
+  schemaVersion: typeof MARKETING_CONTENT_SCHEMA_VERSION;
+  kind: 'model';
+  entityId: string;
+  locale: AppLocale;
+  contentModifiedAt: string;
+  content: ModelPageContent;
+};
+export type ModelDirectoryReleaseObject = {
+  schemaVersion: typeof MARKETING_CONTENT_SCHEMA_VERSION;
+  kind: 'models';
+  locale: AppLocale;
+  seo: { title: string; description: string };
+  hero: { title: string; description: string };
+  items: ModelDirectoryItem[];
+};
 export type HomeProjectionReleaseObject = z.infer<
   typeof homeProjectionReleaseObjectSchema
 >;
@@ -440,12 +621,30 @@ export function parseToolPageReleaseObject(
   return toolPageReleaseObjectSchema.parse(value) as ToolPageReleaseObject;
 }
 
+export function parseModelPageSourceFile(value: unknown): ModelPageSourceFile {
+  return modelPageSourceFileSchema.parse(value) as ModelPageSourceFile;
+}
+
+export function parseModelPageReleaseObject(
+  value: unknown
+): ModelPageReleaseObject {
+  return modelPageReleaseObjectSchema.parse(value) as ModelPageReleaseObject;
+}
+
 export function parseToolDirectoryReleaseObject(
   value: unknown
 ): ToolDirectoryReleaseObject {
   return toolDirectoryReleaseObjectSchema.parse(
     value
   ) as ToolDirectoryReleaseObject;
+}
+
+export function parseModelDirectoryReleaseObject(
+  value: unknown
+): ModelDirectoryReleaseObject {
+  return modelDirectoryReleaseObjectSchema.parse(
+    value
+  ) as ModelDirectoryReleaseObject;
 }
 
 export function parseHomeProjectionReleaseObject(

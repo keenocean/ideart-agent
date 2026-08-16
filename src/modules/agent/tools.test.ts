@@ -279,6 +279,35 @@ describe('providerOptionsFor', () => {
       ],
     });
   });
+
+  it('maps Seedance 2.5 adaptive and image inputs to EvoLink', () => {
+    expect(
+      providerOptionsFor({
+        provider: 'evolink',
+        modelKey: 'seedance-2-5',
+        kind: 'animate',
+        options: {
+          aspect_ratio: 'auto',
+          duration: 30,
+          resolution: '720p',
+          image_input: [
+            'https://cdn.example.com/start.png',
+            'https://cdn.example.com/end.png',
+            'https://cdn.example.com/ignored.png',
+          ],
+        },
+      })
+    ).toEqual({
+      aspect_ratio: 'adaptive',
+      duration: 30,
+      quality: '720p',
+      generate_audio: true,
+      image_input: [
+        'https://cdn.example.com/start.png',
+        'https://cdn.example.com/end.png',
+      ],
+    });
+  });
 });
 
 describe('pickVideoProvider', () => {
@@ -309,6 +338,21 @@ describe('pickVideoProvider', () => {
         },
         'seedance-2-0',
         'generate',
+        '720p'
+      )
+    ).toBe('evolink');
+  });
+
+  it('selects EvoLink for Seedance 2.5 when it is configured', () => {
+    expect(
+      pickVideoProvider(
+        {
+          evolink_api_key: 'e',
+          grouter_api_key: 'g',
+          grouter_base_url: 'https://gateway.example.com',
+        },
+        'seedance-2-5',
+        'animate',
         '720p'
       )
     ).toBe('evolink');

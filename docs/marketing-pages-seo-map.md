@@ -363,7 +363,7 @@ Shared fields for the entries below:
 - User stage: compare
 - Boundary: only product-verified runtime facts; no unsupported official/provider claims
 - Required evidence/limits: runtime parameters, actual configured provider route, examples, audio/reference and resolution limits
-- Claim source: `AGENT_MODEL_OPTIONS.seedance-2-5`; external specification verification pending
+- Claim source: `AGENT_MODEL_OPTIONS.seedance-2-5` and executable EvoLink mapping; EvoLink Seedance 2.5 page reviewed 2026-08-16 for route-name corroboration only
 - Inbound/outbound: `/models` and video tools → “Seedance 2.5”; related to MiniMax H3 and task pages
 
 ## seedance-2-5 · zh
@@ -374,7 +374,7 @@ Shared fields for the entries below:
 - User stage: compare
 - Boundary: 只描述产品 runtime 可验证事实，不扩写未核实官方/Provider 能力
 - Required evidence/limits: runtime 参数、实际 Provider 路由、案例、音频/参考和分辨率限制
-- Claim source: `AGENT_MODEL_OPTIONS.seedance-2-5`；外部规格待上线前核验
+- Claim source: `AGENT_MODEL_OPTIONS.seedance-2-5` 与可执行 EvoLink mapping；EvoLink Seedance 2.5 页面于 2026-08-16 复核，仅用于交叉确认路由命名
 - Inbound/outbound: 中文 `/models` 与视频工具 →“Seedance 2.5”；关联 MiniMax H3 与任务页
 
 ## seedance-2-0 · en

@@ -335,14 +335,17 @@ describe('providerModelFor', () => {
     expect(providerModelFor('seedance-2-0', 'evolink', 'animate', '720p')).toBe(
       'seedance-2.0-image-to-video'
     );
+    expect(
+      providerModelFor('seedance-2-5', 'evolink', 'generate', '720p')
+    ).toBe('seedance-2.5-text-to-video');
+    expect(providerModelFor('seedance-2-5', 'evolink', 'animate', '720p')).toBe(
+      'seedance-2.5-image-to-video'
+    );
   });
 
   it('does not downgrade Seedance on Replicate', () => {
     expect(
       providerModelFor('seedance-2-5', 'replicate', 'generate', '720p')
-    ).toBeUndefined();
-    expect(
-      providerModelFor('seedance-2-5', 'evolink', 'generate', '720p')
     ).toBeUndefined();
   });
 

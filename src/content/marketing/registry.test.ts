@@ -32,6 +32,8 @@ async function releaseFixture(): Promise<Fixture> {
       'en'
     ),
     marketingDirectoryObjectKey(pointer.releaseId, 'tools', 'en'),
+    marketingPageObjectKey(pointer.releaseId, 'model', 'seedance-2-5', 'en'),
+    marketingDirectoryObjectKey(pointer.releaseId, 'models', 'en'),
     marketingHomeProjectionObjectKey(pointer.releaseId, 'en'),
   ];
   return {
@@ -78,6 +80,17 @@ describe('marketing content release registry', () => {
       kind: 'tools',
       locale: 'en',
       items: [{ entityId: 'ai-image-generator' }],
+    });
+    await expect(
+      registry.getModelPage('seedance-2-5', 'en')
+    ).resolves.toMatchObject({
+      kind: 'model',
+      entityId: 'seedance-2-5',
+      content: { template: 'video-model' },
+    });
+    await expect(registry.getModelDirectory('en')).resolves.toMatchObject({
+      kind: 'models',
+      items: [{ entityId: 'seedance-2-5' }],
     });
     const home = await registry.getHomeProjection('en');
     expect(home).toMatchObject({

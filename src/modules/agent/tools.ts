@@ -687,6 +687,17 @@ export function providerOptionsFor({
   }
 
   if (modelKey === 'seedance-2-5') {
+    if (provider === 'evolink') {
+      return {
+        aspect_ratio: aspectRatio === 'auto' ? 'adaptive' : aspectRatio,
+        duration,
+        quality: resolution,
+        generate_audio: true,
+        ...(kind === 'animate' && imageUrls.length > 0
+          ? { image_input: imageUrls.slice(0, 2) }
+          : {}),
+      };
+    }
     if (provider === 'fal') {
       return {
         ...(aspectRatio !== 'auto' ? { aspect_ratio: aspectRatio } : {}),

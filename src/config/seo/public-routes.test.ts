@@ -12,6 +12,7 @@ import {
 const routeFiles: Record<FixedRouteId, string> = {
   home: '../../routes/index.tsx',
   tools: '../../routes/tools/index.tsx',
+  models: '../../routes/models/index.tsx',
   pricing: '../../routes/pricing.tsx',
   'privacy-policy': '../../routes/(pages)/privacy-policy.tsx',
   'terms-of-service': '../../routes/(pages)/terms-of-service.tsx',
@@ -42,5 +43,6 @@ describe('fixed public route registry', () => {
       selectIndexableFixedUrls().some((entry) => entry.id === 'tools')
     ).toBe(false);
     expect(getFixedRouteAlternates('tools', 'en')).toEqual([]);
+    expect(getFixedRouteAlternates('models', 'en')).toEqual([]);
   });
 });
