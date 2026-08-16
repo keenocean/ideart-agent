@@ -93,6 +93,7 @@ describe('marketing content release registry', () => {
       },
     });
     expect(home?.media.examples).toHaveLength(8);
+    expect(home?.media.marquee).toHaveLength(8);
     expect(home?.media.useCases).toHaveLength(3);
     await expect(registry.getToolPage('unknown', 'en')).resolves.toBeNull();
   });

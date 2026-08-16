@@ -178,10 +178,28 @@
       transform: translate3d(4%, 6%, 0) scale(1.08);
     }
   }
+
+  @keyframes catalog-media-marquee {
+    to {
+      transform: translate3d(-50%, 0, 0);
+    }
+  }
+
+  .catalog-media-marquee-track {
+    animation: catalog-media-marquee 44s linear infinite;
+    will-change: transform;
+  }
+
+  .catalog-media-marquee:hover .catalog-media-marquee-track,
+  .catalog-media-marquee[data-paused='true'] .catalog-media-marquee-track {
+    animation-play-state: paused;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .animate-drift-a,
     .animate-drift-b,
-    .animate-drift-c {
+    .animate-drift-c,
+    .catalog-media-marquee-track {
       animation: none !important;
     }
   }

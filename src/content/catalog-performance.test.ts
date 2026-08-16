@@ -15,6 +15,7 @@ import {
   CATALOG_FIRST_FOLD_MAX_TOTAL_BYTES,
   selectCatalogFirstFoldItems,
 } from '@/content/catalog-performance';
+import { getDefaultMarketingContentRegistry } from '@/content/marketing/store';
 import { loadToolContentOrNull } from '@/content/tools/manifest';
 import { validateToolPageContent } from '@/content/tools/validate';
 
@@ -106,6 +107,22 @@ describe('catalog first-fold performance policy', () => {
             validateToolPageContent(definition, content)
           ).not.toThrow();
       }
+    }
+  });
+
+  it('keeps JSON-driven homepage marquee media within its eager budget', async () => {
+    const registry = await getDefaultMarketingContentRegistry();
+    for (const locale of locales) {
+      const home = await registry.getHomeProjection(locale);
+      expect(home?.media.marquee).toHaveLength(8);
+      expect(home?.media.marquee.every((asset) => asset.kind === 'image')).toBe(
+        true
+      );
+      expect(
+        home?.media.marquee
+          .slice(0, 3)
+          .reduce((total, asset) => total + asset.bytes, 0)
+      ).toBeLessThanOrEqual(64 * 1024);
     }
   });
 

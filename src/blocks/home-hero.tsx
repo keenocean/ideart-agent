@@ -2,18 +2,9 @@ import { CheckCircle2 } from 'lucide-react';
 
 import { m } from '@/paraglide/messages.js';
 import { PromptLauncher } from '@/components/agent/prompt-launcher';
-import {
-  CatalogMedia,
-  type CatalogMediaAsset,
-} from '@/components/catalog/catalog-media';
 import { CatalogSection } from '@/components/catalog/catalog-section';
 
-export function HomeHero({ media }: { media: CatalogMediaAsset }) {
-  // A video frame can replace its poster as the LCP candidate long after the
-  // page is visibly ready. Keep the initial hero deterministic and let the
-  // animated examples below the fold demonstrate motion instead.
-  const heroMedia: CatalogMediaAsset =
-    media.kind === 'video' ? { ...media.poster, alt: media.alt } : media;
+export function HomeHero() {
   const proofPoints = [
     m['landing.hero.proof_1'](),
     m['landing.hero.proof_2'](),
@@ -23,7 +14,7 @@ export function HomeHero({ media }: { media: CatalogMediaAsset }) {
   return (
     <CatalogSection
       id="generator"
-      className="relative overflow-hidden pt-12 pb-16 sm:pt-16"
+      className="relative overflow-hidden pt-12 pb-0 sm:pt-16"
     >
       <header className="mx-auto max-w-3xl text-center">
         <p className="text-primary text-xs font-semibold tracking-[0.16em] uppercase">
@@ -51,14 +42,6 @@ export function HomeHero({ media }: { media: CatalogMediaAsset }) {
           </li>
         ))}
       </ul>
-
-      <div className="border-border bg-card relative mx-auto mt-12 aspect-[16/8.5] max-w-5xl overflow-hidden rounded-[2rem] border shadow-sm">
-        <CatalogMedia asset={heroMedia} priority />
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent" />
-        <p className="absolute inset-x-0 bottom-0 px-6 py-5 text-sm text-white sm:px-8">
-          {m['landing.hero.media_caption']()}
-        </p>
-      </div>
     </CatalogSection>
   );
 }

@@ -89,6 +89,9 @@ const resolvedMediaSchema = z.union([
   imageAssetSchema.extend({ alt: nonEmpty }).strict(),
   videoAssetSchema.extend({ alt: nonEmpty }).strict(),
 ]);
+const resolvedImageMediaSchema = imageAssetSchema
+  .extend({ alt: nonEmpty })
+  .strict();
 
 const copyItemSchema = z
   .object({ title: nonEmpty, description: nonEmpty })
@@ -336,7 +339,8 @@ export const homeProjectionReleaseObjectSchema = z
     media: z
       .object({
         hero: resolvedMediaSchema,
-        og: imageAssetSchema.extend({ alt: nonEmpty }).strict(),
+        og: resolvedImageMediaSchema,
+        marquee: z.array(resolvedImageMediaSchema).length(8),
         examples: z.array(resolvedMediaSchema).length(8),
         useCases: z.array(resolvedMediaSchema).length(3),
       })

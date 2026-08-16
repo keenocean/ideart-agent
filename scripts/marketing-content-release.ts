@@ -347,6 +347,15 @@ async function buildHomeProjections(
         'landing.seo.og_alt',
         assets
       ),
+      marquee: Array.from({ length: 8 }, (_, index) =>
+        resolveHomeMedia(
+          messages,
+          locale,
+          `landing.media_marquee.item_${index + 1}_asset_id`,
+          `landing.media_marquee.item_${index + 1}_alt`,
+          assets
+        )
+      ),
       examples: Array.from({ length: 8 }, (_, index) =>
         resolveHomeMedia(
           messages,
