@@ -154,8 +154,7 @@ export function SkillsQuickPicker({
                         aria-selected={selected}
                         onMouseEnter={() => setPreviewName(skill.name)}
                         onFocus={() => setPreviewName(skill.name)}
-                        onClick={() => setPreviewName(skill.name)}
-                        onDoubleClick={() => applySkill(skill)}
+                        onClick={() => applySkill(skill)}
                         className={cn(
                           'focus-visible:ring-primary flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors focus-visible:ring-2 focus-visible:outline-none',
                           selected
