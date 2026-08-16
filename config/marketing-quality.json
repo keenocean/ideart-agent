@@ -5,20 +5,46 @@
       "/",
       "/pricing",
       "/(pages)",
+      "/tools/",
+      "/tools/$slug",
       "/blog/",
       "/blog/$slug"
     ],
     "baselineGzipBytes": {
-      "__root__": 272684,
-      "/": 382525,
-      "/pricing": 320711,
-      "/(pages)": 282335,
-      "/blog/": 292012,
-      "/blog/$slug": 292297
+      "__root__": 276844,
+      "/": 385568,
+      "/pricing": 354430,
+      "/(pages)": 286497,
+      "/tools/": 346996,
+      "/tools/$slug": 374496,
+      "/blog/": 347510,
+      "/blog/$slug": 347790
     },
     "explainedGzipIncreases": {},
     "explainIncreaseAboveGzipBytes": 102400,
     "maxClientJsRawBytes": 500000
+  },
+  "publicAssets": {
+    "baselineFileCount": 48,
+    "baselineBytes": 52951151,
+    "shellAllowlist": ["favicon.ico", "imgs/icons/creem.png"],
+    "baselineManifest": "config/marketing-public-assets-baseline.json"
+  },
+  "importGraph": {
+    "roots": [
+      "src/blocks",
+      "src/components/catalog",
+      "src/config/catalog",
+      "src/content/marketing",
+      "src/content/tools",
+      "product/marketing",
+      "src/routes/index.tsx",
+      "src/routes/pricing.tsx",
+      "src/routes/tools",
+      "src/routes/blog",
+      "src/routes/(pages)"
+    ],
+    "eagerGlobAllowlist": ["src/routes/(pages)/-static-page.tsx"]
   },
   "cloudflare": {
     "plan": "free",

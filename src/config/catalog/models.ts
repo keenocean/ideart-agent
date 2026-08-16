@@ -1,3 +1,1 @@
-import type { ModelDefinition } from './types';
-
-export const modelCatalog: readonly ModelDefinition[] = [];
+export { modelCatalog } from './product-catalog';

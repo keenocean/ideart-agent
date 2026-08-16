@@ -12,7 +12,7 @@ export type ToolCopySection = {
   items: readonly ToolCopyItem[];
 };
 
-/** Authoring reference stored in messages/marketing. Resolved during release build. */
+/** Authoring reference stored in product/marketing. Resolved during release build. */
 export type ToolMediaSourceReference = {
   assetId: string;
   alt: string;

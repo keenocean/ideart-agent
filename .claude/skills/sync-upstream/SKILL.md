@@ -1,138 +1,158 @@
 ---
 name: sync-upstream
-description: Port the latest ShipAny Next template changes from the upstream repo (git@github.com:shipany-ai/shipany-next, main branch) into this TanStack Start repo, adapting framework-coupled code (next-intl→paraglide, app router→file routes) along the way. Use when the user asks to "update from upstream", "sync the template", "拉取上游更新", "更新模板", or wants the newest ShipAny features in shipany-tanstack.
+description: "Sync reusable platform changes into an Agent SaaS product while preserving its Product Pack. Use when the user asks to update from the template, sync the template, pull upstream changes, 拉取上游更新, or 更新模板. Downstream products merge template/main; template maintainers classify ugcmind-source changes and exclude source-product identity."
+argument-hint: "[template remote/branch or source range]"
+user-invocable: true
 ---
 
-# Sync Upstream (shipany-tanstack ← shipany-next)
+# Sync Upstream — $ARGUMENTS
 
-Port the latest features from `shipany-ai/shipany-next` (the Next.js edition,
-`main` branch) into this TanStack Start repo. **This is a port-based sync, not a
-git merge** — the framework layer was replaced wholesale (Next.js → TanStack
-Start, next-intl → paraglide), so upstream commits are re-applied selectively
-and adapted. This repo has zero merge commits by design; keep it that way.
+Adopt reusable platform updates without replacing the downstream product. Read
+`docs/template-upgrades.md` completely before acting; it is the canonical
+ownership and conflict policy.
 
-Topology note: shipany-next is the hub. shipany-vinext syncs from it too, but
-its Vite/CF layer (the `vinext` CLI) is Next-specific — nothing in vinext is a
-source for this repo. Workers fixes that first land in vinext get re-implemented
-in shipany-next, then arrive here through this skill.
+## Select the lane
 
-## Layer map (decides what to do with each upstream change)
+### Downstream product
 
-| Upstream path | Action |
-|---|---|
-| `src/modules/`, `src/lib/`, `src/core/{payment,email,storage,ai,auth(server logic)}` | **Port near-verbatim** — shared business layer, same paths here |
-| `src/config/` (schema templates, locale message JSON) | **Port**; locale JSON keys feed paraglide instead of next-intl — keep key parity |
-| `src/core/db/` | **Port logic, keep local wiring** — `driver-stub.ts`, `cloudflare:workers` imports, and vite.config driver-stub list are this repo's adaptations |
-| `src/blocks/`, `src/components/` | **Port + adapt imports** (see adaptation table) |
-| `src/app/**` (pages, layouts, API routes) | **Re-implement** in `src/routes/` — no 1:1 file mapping |
-| `src/core/i18n/` | **Skip** — this repo's paraglide implementation keeps the same import surface (`@/core/i18n/navigation`); only port new exported helpers by re-implementing |
-| `next.config.ts`, middleware, Next-only deps | **Skip** |
-| `AGENTS.md`, `README.md`, skills | **Skip**; port new sections manually if relevant |
+Use this lane when the repository consumes the Agent SaaS template through a
+remote named `template`. Merge `template/main`; never merge Ugcmind or ShipAny
+directly into a downstream product.
 
-## Adaptation table (Next.js → this repo)
+### Template maintainer
 
-- `next-intl` `getTranslations`/`useTranslations` → paraglide messages (`@/paraglide/messages`)
-- `next/link`, `@/core/i18n/navigation` Link → this repo's `@/core/i18n/navigation` (same path, TanStack Router underneath — usually no edit needed)
-- `next/headers`, server components → route loaders / server functions
-- `src/app/api/<x>/route.ts` → `src/routes/api/<x>.ts` (keep `respData`/`respErr`)
-- `next/image` → `<img>` (no Image component here)
-- Node-only APIs in request paths → Workers-compatible alternative (cf:build must pass)
+Use this lane only in the template repository when importing reusable changes
+from its provenance remote `ugcmind-source`. Classify every incoming change as:
+
+1. reusable platform/runtime;
+2. Product Pack schema or sample migration;
+3. source-product-only identity/content.
+
+Adopt category 1 normally, require an explicit migration for category 2, and
+exclude category 3.
 
 ## Workflow
 
 ### 1. Preflight
 
-```bash
-git status --porcelain       # must be empty — ask the user to commit/stash first
-git remote get-url upstream 2>/dev/null \
-  || git remote add upstream git@github.com:shipany-ai/shipany-next.git
-git fetch upstream main
-```
-
-If the SSH fetch fails, switch to HTTPS (`https://github.com/shipany-ai/shipany-next.git`) and retry.
-
-### 2. Find the porting baseline
-
-Port commits record the upstream SHA they covered in an `Upstream-sync:` trailer:
+Record repository state and remotes:
 
 ```bash
-git log --grep '^Upstream-sync:' -1 --format=%B | grep '^Upstream-sync:'
+git status --short --branch
+git remote -v
 ```
 
-- Found → baseline is that SHA.
-- Not found (older port commits predate this convention) → bootstrap baseline:
-  upstream `8dbc80d` (everything up to and including the Workers auth/db
-  per-request fix was ported as of 2026-06-06).
+Do not overwrite unrelated work. Start the merge only from a clean worktree; if
+changes belong to the user, report the exact overlap rather than stashing or
+discarding them without authorization.
 
-### 3. Review what's incoming
+For a downstream product, ensure the template remote exists and fetch it:
 
 ```bash
-git log --oneline --reverse <baseline>..upstream/main
+git remote get-url template
+git fetch template main
+git log --oneline --reverse HEAD..template/main
 ```
 
-- Empty → already up to date; report and stop.
-- Otherwise show the user the commit list and classify each against the layer
-  map before touching anything.
+If `template` is absent, discover whether the original clone remote was renamed
+or ask only for the missing template repository URL.
 
-### 4. Port commit-by-commit (in upstream order)
-
-For each incoming commit:
+For template-maintainer sync, use the already configured fetch-only provenance
+remote:
 
 ```bash
-git show <sha> --stat                  # what it touches
-git show <sha> -- <shared paths>       # the actual diff
+git remote get-url ugcmind-source
+git fetch ugcmind-source main
+git log --oneline --reverse HEAD..ugcmind-source/main
 ```
 
-- **Shared-layer files** (modules/lib/core business): try
-  `git cherry-pick -n <sha>` then unstage/discard the skipped paths; or apply
-  the diff manually if the cherry-pick drags in framework files.
-- **Adapt-layer files** (blocks/components): apply, then walk the adaptation
-  table over the new code.
-- **Re-implement-layer** (`src/app/**`): read the upstream change, write the
-  equivalent in `src/routes/`.
-- **Schema templates changed?** `schema.ts` is the gitignored working copy — do
-  NOT run `db:setup` over it. Port new columns/tables into `schema.ts` manually,
-  then `pnpm db:push` (dev) or generate a migration.
-- **New env vars?** Check upstream's `.env.example` diff; mirror into this
-  repo's `.env.example` and tell the user what to add to `.env.development`
-  and (server-side) `wrangler.jsonc`.
+### 2. Review the incoming surface
 
-Group the ported changes into one or a few commits, message style:
-`feat: port upstream shipany-next features (<summary>)`, ending with the trailer:
+Inspect the commits and diff before merging. Identify:
 
+- Product Pack schema/version changes;
+- shared runtime, module, route, dependency, schema, env, and deployment changes;
+- downstream custom platform extensions;
+- product identity/content that must not cross the boundary;
+- database migrations or external release steps requiring special care.
+
+An empty commit range means the repository is current; report and stop.
+
+### 3. Merge without committing
+
+Create a dedicated branch, then merge the selected source without committing:
+
+```bash
+git switch -c chore/template-sync-YYYYMMDD
+git merge --no-commit template/main
 ```
-Upstream-sync: <newest upstream sha covered>
+
+Template maintainers substitute `ugcmind-source/main` and apply the three-way
+classification above.
+
+Resolve conflicts by ownership:
+
+- Under `product/**`, preserve downstream identity/content and apply only the
+  documented schema migration.
+- In shared platform code, prefer the template implementation unless the
+  downstream has an intentional extension.
+- Preserve product-specific database migrations and modules deliberately; do
+  not let their existence justify keeping stale shared runtime code.
+- Never resolve the repository wholesale with `ours` or `theirs`.
+
+### 4. Rebuild generated artifacts
+
+After conflict resolution:
+
+```bash
+pnpm install
+pnpm product:validate
+pnpm skills:build
+pnpm marketing:sync-content-release
+pnpm i18n:check
 ```
+
+Generated release objects and indexes are build output. Regenerate them from
+the preserved Product Pack rather than hand-merging generated payloads.
 
 ### 5. Verify
 
+Run:
+
 ```bash
-pnpm install                 # if deps changed
-pnpm build                   # Node/Nitro build must pass
-pnpm cf:build                # Workers bundle must build too
+pnpm test
+pnpm exec tsc --noEmit
+pnpm build
+git diff --check
 ```
 
-Quick smoke via `pnpm dev`: homepage + one DB-backed API route.
+Run `pnpm cf:build`, `pnpm cf:dry-run`, and `pnpm cf:check-budget` when the
+incoming changes touch Worker/runtime/deployment surfaces. Smoke-test the
+downstream homepage, `/tools`, `/models`, representative details, and Agent
+entry points in every supported locale.
 
-### 6. Report
-
-- Incoming commits (count + notable features) and how each was classified
-- Adaptations made (per the adaptation table)
-- Anything deliberately skipped and why
-- Schema/env follow-ups the user must do
-- Build status (both builds)
-
-Do NOT push — let the user review first.
+Run the repository security-scan workflow before committing. Use the Lore
+commit protocol and record the source commit, Product Pack migrations,
+intentional deviations, tests, and known gaps. Do not push without explicit
+authorization.
 
 ## Rules
 
-1. **Never `git merge upstream/main`** — the framework layers diverged; a merge
-   would replay months of Next.js-only history as conflicts.
-2. **The layer map decides** what is ported, adapted, re-implemented, or skipped.
-3. **Record the `Upstream-sync:` trailer** on every port commit — it is the
-   baseline for the next run.
-4. **Never touch `schema.ts` automatically** — it's the user's working copy.
-5. **Never push commits back to upstream** — shared fixes (including Workers
-   fixes discovered here or in shipany-vinext) are re-implemented in
-   shipany-next first.
-6. **Both `pnpm build` and `pnpm cf:build` must pass** before declaring done.
+1. `product/**` is downstream-owned; a template merge may migrate its schema but
+   may not replace its identity/content.
+2. Shared fixes should land in the template first when reusable, then flow to
+   products through `template/main`.
+3. Do not import source-product content from `ugcmind-source` into the template
+   merely because it arrived with a platform commit.
+4. Do not run destructive database migrations or external publish/deploy steps
+   without the authority required by repository guidance.
+5. Do not declare completion while Product Pack validation, tests, typecheck,
+   production build, or required route smoke checks are failing.
+
+## Report
+
+Lead with the adopted template/source commit and outcome. Include incoming
+commits, conflict decisions by ownership zone, schema migrations, deliberate
+skips, verification evidence, remaining deployment/data work, and whether the
+branch was committed. Never claim a push or production mutation that did not
+occur.

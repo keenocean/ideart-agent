@@ -13,6 +13,7 @@ import {
 import { toast } from 'sonner';
 
 import { Link } from '@/core/i18n/navigation';
+import { envConfigs } from '@/config';
 import {
   classifyAgentPromptSkill,
   type AgentPromptSkill,
@@ -185,7 +186,7 @@ function SkillDetailPage() {
                 </p>
               </div>
               <div className="relative z-10 flex items-center justify-between text-[10px] font-medium tracking-[0.14em] text-white/60 uppercase">
-                <span>Ideart</span>
+                <span>{envConfigs.app_name}</span>
                 <span>Skill</span>
               </div>
             </SkillCover>

@@ -12,15 +12,16 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 describe('Agent Skill release builder', () => {
-  it('builds an empty release for projects without bundled Skills yet', async () => {
+  it('builds a valid immutable release for an empty product catalog', async () => {
     const root = await mkdtemp(
-      path.join(tmpdir(), 'agent-skills-release-empty-test-')
+      path.join(tmpdir(), 'agent-skills-empty-release-test-')
     );
     try {
       const source = path.join(root, 'source');
       const output = path.join(root, 'output');
+      const catalogText = `${JSON.stringify({ schemaVersion: 1, skills: [] }, null, 2)}\n`;
       await mkdir(source, { recursive: true });
-      await writeFile(path.join(source, 'catalog.json'), '{"skills":[]}\n');
+      await writeFile(path.join(source, 'catalog.json'), catalogText);
 
       const result = spawnSync(
         process.execPath,
@@ -34,14 +35,22 @@ describe('Agent Skill release builder', () => {
 
       expect(result.status).toBe(0);
       expect(result.stdout).toContain('Built 0 prompt skills as release');
+
       const pointer = JSON.parse(
         await readFile(path.join(output, 'current.json'), 'utf8')
       ) as { releaseId: string; manifestKey: string };
-      expect(pointer.releaseId).toMatch(/^[a-f0-9]{64}$/);
       const manifest = JSON.parse(
         await readFile(path.join(output, pointer.manifestKey), 'utf8')
-      ) as { skills: unknown[] };
-      expect(manifest.skills).toEqual([]);
+      ) as { releaseId: string; skills: unknown[] };
+
+      expect(pointer.releaseId).toMatch(/^[a-f0-9]{64}$/);
+      expect(pointer.manifestKey).toBe(
+        `agent-skills/releases/${pointer.releaseId}/manifest.json`
+      );
+      expect(manifest).toMatchObject({
+        releaseId: pointer.releaseId,
+        skills: [],
+      });
     } finally {
       await rm(root, { recursive: true, force: true });
     }

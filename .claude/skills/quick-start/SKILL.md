@@ -41,6 +41,33 @@ Based on what the user provided, automatically select the right mode:
 
 ---
 
+## Product Pack Overlay (all modes)
+
+This repository adds a versioned Product Pack to the upstream quick-start
+workflow. Keep the Mode A/B/C flow above; apply these ownership rules while
+executing it:
+
+- Read `docs/product-pack.md` before changing product identity or public
+  content.
+- Put brand defaults in `product/brand.json`, the primary Agent persona in
+  `product/agent.json`, and homepage section order/enabled state in
+  `product/home.json`.
+- Put short UI/homepage copy in `product/messages/`, public route definitions
+  in `product/catalog/`, long-form tool/model content and media inventory in
+  `product/marketing/`, and optional Skills in `product/skills/`.
+- Preserve the existing homepage blocks, Catalog routes, and platform modules
+  when the brief only changes content or branding. Edit shared TypeScript only
+  when the product needs a new interaction, information architecture, or
+  executable capability.
+- JSON is content and typed configuration, never executable behavior. Provider
+  calls, billing, authorization, database access, and React component
+  registries remain in TypeScript.
+- Run `pnpm product:validate` after Product Pack edits. Use the
+  `marketing-seo` skill when adding, renaming, publishing, or removing public
+  tool/model pages.
+
+---
+
 ## Phase 0: Project Config (all modes)
 
 ### 0.1 Ask the user what they need
@@ -58,6 +85,10 @@ Before doing anything, ask the user these questions (skip any already answered i
 If the user doesn't specify, default to **SQLite** and move on — don't block on this.
 
 ### 0.2 Configure environment
+
+First update `product/brand.json` and `product/agent.json` with repository
+defaults derived from the brief. Use `VITE_APP_*` only as deployment-specific
+overrides; do not duplicate the product identity across source files.
 
 If `.env.development` doesn't exist yet, copy the template first: `cp .env.example .env.development`. Then set the values in `.env.development` (the canonical local-dev env file — loaded by both `vite dev` and the `db:*` scripts, ahead of `.env.local`/`.env`). Public, client-visible vars use the `VITE_` prefix:
 ```env
@@ -108,32 +139,33 @@ Ask the user for their admin email and password. If they don't provide one, just
 
 ### 0.5 Update translations
 
-Translations are flat, dot-keyed JSON in `messages/en.json` and `messages/zh.json` (one file per locale). Update **both**:
+Translations are flat, dot-keyed JSON in `product/messages/en.json` and `product/messages/zh.json` (one file per locale). Update **both**:
 - Set `common.metadata.title` and `common.metadata.description` to the app name and description.
 
 Decide which modules to keep based on user's features. Default: keep all. Only remove if the user explicitly doesn't need something.
 
 ### 0.6 Generate logo & favicon
 
-The template ships **placeholder** `public/logo.svg` + `public/favicon.svg` (a single
-letter on a rounded square), already wired up: `app_logo` defaults to `/logo.svg`
-(`src/config/index.ts`) and the root route head (`src/routes/__root.tsx`) links the
-favicon → `/favicon.svg`. There is **no** committed `logo.png`/`favicon.ico` — don't
-re-introduce a heavy binary.
+The template ships `public/logo.png` + `public/favicon.ico`. The repository
+default logo path is owned by `product/brand.json`; the favicon link lives in
+`src/routes/__root.tsx`.
 
 **If the user provided their own logo/favicon:** drop their files into `public/`
-(`logo.svg`/`logo.png`, `favicon.svg`/`favicon.ico`), point `app_logo` + the
-`__root.tsx` head favicon link at them, and skip generation.
+(`logo.svg`/`logo.png`, `favicon.svg`/`favicon.ico`), point
+`product/brand.json.logo` plus the `__root.tsx` head favicon link at them, and
+skip generation.
 
-**Otherwise, generate a letter mark from the product name** — overwrite the two
-placeholder files (no code change needed):
+**Otherwise, generate a letter mark from the product name** — replace the
+bundled mark and update its Product Pack/root references:
 
 1. **Letter** = first character of the app name, uppercased (e.g. `Acme` → `A`). For a
    CJK-only name, use the first character as-is, or the initial of its English name if one exists.
-2. **Color** = the theme's primary color (read `--primary` from `src/app/globals.css`); fall
+2. **Color** = the theme's primary color (read `--primary` from `src/styles/globals.css`); fall
    back to `#0a0a0a` background + `#ffffff` letter. Ensure the letter contrasts the background.
-3. Write `public/logo.svg` and `public/favicon.svg` from this template (swap the letter,
-   `fill`, and text color; favicon uses a larger `font-size` so the glyph reads at 16px):
+3. Write `public/logo.svg` and `public/favicon.svg` from this template, set
+   `product/brand.json.logo` to `/logo.svg`, and update the root favicon link
+   (swap the letter, `fill`, and text color; favicon uses a larger `font-size`
+   so the glyph reads at 16px):
 
    ```svg
    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
@@ -198,6 +230,12 @@ Then continue to Phase 3 (Dashboard Pages) and beyond.
 
 ### 3.1 Landing Page (`src/routes/index.tsx`)
 
+**Product Pack default:** First keep the registered homepage blocks and set
+their order/enabled state in `product/home.json`; replace `landing.*` copy in
+`product/messages/` and media in `product/marketing/assets.json`. Recompose the
+route or rewrite blocks only when the brief/reference requires a genuinely new
+section, interaction, or information architecture.
+
 **Mode A & B:** Already handled by `/clone-website` in Phase 1. Skip to 3.2.
 
 **Mode C — Generated from scratch:**
@@ -234,7 +272,7 @@ Workflow:
    <Footer />
    ```
 
-4. **Rewrite the `landing.*` keys in `messages/en.json` and `messages/zh.json`** — the block translations (flat dot-keyed, e.g. `"landing.hero.headline"`).
+4. **Rewrite the `landing.*` keys in `product/messages/en.json` and `product/messages/zh.json`** — the block translations (flat dot-keyed, e.g. `"landing.hero.headline"`).
 
 5. **Generate visuals via `/generate-image`** — a landing page made of plain text and shadcn cards looks generic. For each block that benefits from imagery, generate one image and reference it from the block:
 
@@ -249,7 +287,23 @@ Workflow:
 
 Make it visually polished — use gradients, subtle shadows, proper spacing, animations (fade-in on scroll). Don't generate a "template-looking" page.
 
-### 3.2 Auth Pages
+### 3.2 Public Catalog
+
+When the brief exposes public tools or models:
+
+1. Define routes and runtime bindings in `product/catalog/tools.json` and
+   `product/catalog/models.json`.
+2. Add matching localized content under
+   `product/marketing/<kind>/<entityId>/<locale>.json` and directory copy under
+   `product/marketing/directories/`.
+3. Register referenced media once in `product/marketing/assets.json`.
+4. Reference only runtime capability keys already implemented by the platform.
+   Add a typed provider/runtime capability before exposing a new executable
+   model.
+5. Run `pnpm product:validate`; before publication also run
+   `pnpm marketing:check-assets-online`.
+
+### 3.3 Auth Pages
 
 Auth pages (`src/routes/(auth)/sign-in.tsx` and `sign-up.tsx`) are already built with:
 - shadcn login-03 block styling (Card + Field components), TanStack Form + zod validation
@@ -257,7 +311,7 @@ Auth pages (`src/routes/(auth)/sign-in.tsx` and `sign-up.tsx`) are already built
 - Social login buttons (Google/GitHub) that auto-show based on admin config
 - No changes needed unless the user wants a custom design.
 
-### 3.3 Dashboard Pages
+### 3.4 Dashboard Pages
 
 Dashboard pages do client-side data fetching with TanStack Query + `@/lib/api-client`, using `AppLayout` from `@/components/app-layout`.
 
@@ -271,14 +325,14 @@ Based on the user's features, create dashboard pages:
 
 3. **Update nav items** in the layout `src/routes/settings/route.tsx` — add entries to the nav array
 
-### 3.4 Legal Pages
+### 3.5 Legal Pages
 
 Legal pages are MDX content files in `src/content/pages/`, rendered by per-slug route files in `(pages)/` (shared `-static-page.tsx` factory):
 - Privacy Policy already exists at `src/content/pages/privacy-policy.{en,zh}.mdx` — update content for the product
 - Terms of Service at `src/content/pages/terms-of-service.{en,zh}.mdx` — update content
 - Add more if needed (e.g., refund policy) using `/new-static-page` pattern — add the MDX file plus a thin route file `src/routes/(pages)/<slug>.tsx` via `staticPageRouteOptions`
 
-### 3.5 Module Wiring
+### 3.6 Module Wiring
 
 Connect landing page elements to modules:
 
@@ -307,19 +361,18 @@ Connect landing page elements to modules:
 
 ## Git Remotes
 
-This project starts as a clone of the ShipAny Next template — rewire the remotes
-before handing off:
+This project starts as a clone of the Agent SaaS template. Give the downstream
+product its own `origin` and keep the template as a remote named `template`:
 
-1. **Wire the template as `upstream`** (enables `/sync-upstream` for future
-   template updates — local changes win on conflict):
-   ```bash
-   git remote get-url upstream 2>/dev/null \
-     || git remote add upstream git@github.com:shipany-ai/shipany-tanstack.git
-   ```
-2. **Point `origin` at the user's own repository.** If `origin` still points at
-   `shipany-ai/shipany-tanstack`, ask the user for their new repo URL and run
-   `git remote set-url origin <their-repo-url>`. If they haven't created one
-   yet, include the command in the completion report for them to run later.
+```bash
+git remote rename origin template
+git remote add origin <product-repository-url>
+```
+
+If the remotes are already configured, preserve them. Future platform upgrades
+come from `template/main`; follow `docs/template-upgrades.md` rather than
+merging `ugcmind-agent` or ShipAny directly. Push only when the user explicitly
+authorized publication to that repository.
 
 ---
 
@@ -334,10 +387,11 @@ Report:
 - Modules kept/removed/wired
 - Assets downloaded (count)
 - Build status
-- Git remotes: origin (user's repo) + upstream (template); `/sync-upstream`
-  pulls future template updates, keeping their changes on conflict
+- Product Pack files changed and any shared runtime extension added
+- Git remotes: `origin` (product repo) + `template` (this template);
+  `docs/template-upgrades.md` defines future merge ownership
 - Remaining TODOs for the user:
-  - `git remote set-url origin <url>` if not done yet
+  - `git remote add origin <url>` or `git remote set-url origin <url>` if not done yet
   - API keys to configure (Stripe, Resend, etc.)
   - Content to customize
   - `pnpm dev` to start iterating
@@ -355,9 +409,10 @@ Report:
 7. **Use `envConfigs.app_name`** — never hardcode the app name.
 8. **Imports:** `respData`/`respErr` from `@/lib/resp`. `apiGet`/`apiPost` from `@/lib/api-client`. `Link`/`useRouter` from `@/core/i18n/navigation`. `m` from `@/paraglide/messages.js`. `getUuid` from `@/lib/hash`.
 9. **Dashboard pages fetch via TanStack Query + `@/lib/api-client`** — no raw `fetch`, don't import server-only modules (`@/modules/*`, `@/core/db`) in components; use `m['...']()` from `@/paraglide/messages.js` for i18n.
-10. **`pnpm build` must pass** at every checkpoint.
+10. **`pnpm product:validate` and `pnpm build` must pass** at every Product Pack checkpoint.
 11. **shadcn/ui v4 (Base Nova)** — no `asChild` prop. Use `className={cn(buttonVariants())}` on Link.
-12. **i18n** — all user-facing text uses `m['ns.key']()` from `@/paraglide/messages.js`. Add each new key to **both** `messages/en.json` and `messages/zh.json` (flat dot-keyed; no per-namespace files, no path registration).
+12. **i18n** — all user-facing text uses `m['ns.key']()` from `@/paraglide/messages.js`. Add each new key to **both** `product/messages/en.json` and `product/messages/zh.json` (flat dot-keyed; no per-namespace files, no path registration).
 13. **Legal pages** — MDX content in `src/content/pages/`, rendered by per-slug route files in `(pages)/` via the `-static-page.tsx` factory. Layout is shared.
 14. **Static pages** — use `/new-static-page` skill for additional content pages.
 15. **For complex landing pages** (Mode A/B with 8+ sections), use worktree agents to build sections in parallel.
+16. **Product Pack first** — keep ordinary product identity/content changes in `product/**`; document every intentional shared-runtime edit in the completion report.

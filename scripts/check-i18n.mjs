@@ -25,7 +25,10 @@ const catalogs = Object.fromEntries(
     locales.map(async (locale) => [
       locale,
       JSON.parse(
-        await fs.readFile(path.join(root, 'messages', `${locale}.json`), 'utf8')
+        await fs.readFile(
+          path.join(root, 'product', 'messages', `${locale}.json`),
+          'utf8'
+        )
       ),
     ])
   )

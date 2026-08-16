@@ -88,7 +88,7 @@ type ReleaseFile = {
 
 function parseArgs(argv: string[]): Options {
   const options: Options = {
-    source: 'messages/marketing',
+    source: 'product/marketing',
     output: '.marketing-content',
     indexFile: 'src/content/marketing/release-index.generated.ts',
     config: 'wrangler.jsonc',
@@ -390,7 +390,7 @@ async function buildHomeProjections(
   for (const localeValue of [...locales].sort()) {
     const locale = localeValue as AppLocale;
     const messages = (await readJson(
-      path.join('messages', `${locale}.json`)
+      path.join('product', 'messages', `${locale}.json`)
     )) as LandingMessages;
     const media = {
       hero: resolveHomeMedia(

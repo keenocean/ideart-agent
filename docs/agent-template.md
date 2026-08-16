@@ -1,6 +1,6 @@
 # Agent Template
 
-This project ships one `primary` conversational Agent with image and video generation built in. A new product normally changes only [`src/config/agent.ts`](../src/config/agent.ts):
+This project ships one `primary` conversational Agent with image and video generation built in. Ideart's product-owned Agent definition lives in [`product/agent.json`](../product/agent.json); the typed loader stays in `src/config/agent.ts`:
 
 - `id`: stable audit identity; keep `primary` unless the persisted identity is intentionally changing.
 - `name`: product-facing Agent name.

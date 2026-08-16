@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "templateId": "agent-saas-template",
+  "productPackVersion": 1,
+  "provenance": {
+    "repository": "ugcmind-agent",
+    "commit": "e0ca1b075bc1b46cbcad426237302a53913f7a82",
+    "extractedAt": "2026-08-16"
+  }
+}

@@ -21,7 +21,7 @@ const SAFE_DIRECTORY_PATTERN = /^[a-zA-Z0-9._/-]+$/;
 
 function parseArgs(argv) {
   const options = {
-    source: 'packages/agent-skills',
+    source: 'product/skills',
     output: '.agent-skills',
     config: 'wrangler.jsonc',
     publish: false,

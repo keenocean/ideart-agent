@@ -1,3 +1,1 @@
-import type { ToolDefinition } from './types';
-
-export const toolCatalog: readonly ToolDefinition[] = [];
+export { toolCatalog } from './product-catalog';

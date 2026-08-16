@@ -319,7 +319,11 @@ src/
 ├── lib/agent-settings.ts   # Model catalog, capabilities, prices, route mapping
 └── config/pricing.ts       # Plans and top-up packs
 
-messages/{en,zh}.json       # All copy, flat dot-keyed
+product/messages/{en,zh}.json # All copy, flat dot-keyed
+product/agent.json          # Ideart Agent identity and default Prompt
+product/catalog/*.json      # Public tool/model Catalog (empty until published)
+product/marketing/          # Versioned marketing content sources
+product/skills/             # Optional private Skills (empty until published)
 public/videos/showcase/     # Bundled masonry example clips
 ```
 
