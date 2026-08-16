@@ -163,8 +163,8 @@ export function ToolQuickStarts({
       : items.length === 2
         ? 'grid-cols-2'
         : items.length === 3
-          ? 'grid-cols-2 sm:grid-cols-3'
-          : 'grid-cols-2 sm:grid-cols-4';
+          ? 'grid-cols-3'
+          : 'grid-cols-4';
 
   return (
     <div className="mt-6">
@@ -278,7 +278,7 @@ export function CatalogFinalCta({
   return (
     <CatalogSection width="narrow">
       <div className="border-border bg-card w-full rounded-[2rem] border px-6 py-12 text-center shadow-sm sm:py-14">
-        <h2 className="text-foreground font-serif text-3xl font-normal tracking-[-0.01em] sm:text-4xl">
+        <h2 className="text-foreground content-heading text-3xl font-normal tracking-[-0.01em] sm:text-4xl">
           {title}
         </h2>
         <p className="text-muted-foreground mx-auto mt-4 max-w-xl text-sm leading-relaxed sm:text-base">
@@ -338,7 +338,7 @@ export function CatalogMediaExplainer({
           )}
         </div>
         <div className="bg-muted relative min-h-80 lg:min-h-[28rem]">
-          <CatalogMedia asset={media} />
+          <CatalogMedia asset={media} deferUntilVisible />
         </div>
       </div>
     </CatalogSection>
@@ -398,7 +398,7 @@ export function CatalogMediaCarousel({
       className="text-foreground w-full scroll-mt-20 py-16"
     >
       <div className="mx-auto max-w-5xl px-6 text-center">
-        <h2 className="text-foreground font-serif text-4xl leading-[1.08] font-normal tracking-[-0.02em] text-balance sm:text-5xl">
+        <h2 className="text-foreground content-heading text-4xl leading-[1.08] font-normal tracking-[-0.02em] text-balance sm:text-5xl">
           {title}
         </h2>
         {description && (
@@ -424,6 +424,7 @@ export function CatalogMediaCarousel({
               <span className="bg-muted relative block aspect-video overflow-hidden">
                 <CatalogMedia
                   asset={item.media}
+                  deferUntilVisible
                   className="transition-transform duration-500 ease-out group-hover:scale-[1.03] motion-reduce:transition-none"
                 />
                 {item.media.kind === 'video' && (

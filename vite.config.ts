@@ -185,8 +185,24 @@ export default defineConfig({
     }),
     tanstackStart({
       srcDirectory: 'src',
+      server: {
+        build: {
+          // Keep the first paint independent of a second, render-blocking CSS
+          // request. The global stylesheet is intentionally kept below the
+          // catalog bundle budget and contains no network font declarations.
+          inlineCss: true,
+        },
+      },
     }),
     viteReact(),
-    nitro(),
+    nitro({
+      // Node deployments do not have Cloudflare's automatic edge
+      // compression. Pre-compress immutable client assets so both Node
+      // production and local Lighthouse exercise the real transfer path.
+      // Workers assets stay singular because Cloudflare compresses them.
+      compressPublicAssets: isCloudflareBuild
+        ? false
+        : { gzip: true, brotli: true },
+    }),
   ],
 });

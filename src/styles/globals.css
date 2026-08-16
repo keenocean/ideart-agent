@@ -3,11 +3,16 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* Editorial type with a technical edge: Plex Sans for the production UI and
-   Plex Serif for the cinematic headline voice. */
+/* System stacks remove the stylesheet -> webfont dependency from first paint.
+   Catalog headings stay sans on small screens and switch to serif on wider
+   viewports without requiring a network font. */
 :root {
-  --font-sans: 'IBM Plex Sans Variable', 'IBM Plex Sans', sans-serif;
-  --font-serif-display: 'IBM Plex Serif', serif;
+  --font-sans-stack:
+    ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    Helvetica, Arial, sans-serif;
+  --font-serif-stack:
+    ui-serif, Georgia, Cambria, 'Times New Roman', 'Noto Serif SC',
+    'Source Han Serif SC', 'Songti SC', 'SimSun', Times, serif;
 }
 
 @theme inline {
@@ -47,15 +52,8 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
-  --font-sans:
-    var(--font-sans), -apple-system, 'system-ui', 'Segoe UI', Helvetica, Arial,
-    sans-serif;
-  /* CJK serif glyphs use locally-installed fonts — a Chinese serif webfont
-     ships 300+ @font-face subsets (~100KB render-blocking CSS on every page)
-     and is not worth it for headings. */
-  --font-serif:
-    var(--font-serif-display), ui-serif, Georgia, Cambria, 'Times New Roman',
-    'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', 'SimSun', Times, serif;
+  --font-sans: var(--font-sans-stack);
+  --font-serif: var(--font-serif-stack);
 }
 
 @layer base {
@@ -132,6 +130,16 @@
     --sidebar-accent-foreground: oklch(0.95 0.01 345);
     --sidebar-border: oklch(0.3 0.032 330);
     --sidebar-ring: oklch(0.6628 0.2141 23.81);
+  }
+}
+
+.content-heading {
+  font-family: var(--font-sans-stack);
+}
+
+@media (min-width: 640px) {
+  .content-heading {
+    font-family: var(--font-serif-stack);
   }
 }
 

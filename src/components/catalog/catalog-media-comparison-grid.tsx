@@ -48,7 +48,7 @@ export function CatalogMediaComparisonGrid({
                   className="overflow-hidden"
                   style={{ aspectRatio: `${media.width} / ${media.height}` }}
                 >
-                  <CatalogMedia asset={media} />
+                  <CatalogMedia asset={media} deferUntilVisible />
                 </div>
                 <figcaption className="bg-background/85 text-foreground absolute top-3 left-3 rounded-full px-3 py-1 text-xs font-medium backdrop-blur-sm">
                   {label}

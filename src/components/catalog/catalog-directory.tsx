@@ -31,7 +31,7 @@ export function CatalogDirectory({
         <p className="text-primary text-sm font-semibold tracking-[0.16em] uppercase">
           {eyebrow}
         </p>
-        <h1 className="mt-4 font-serif text-4xl font-normal tracking-tight sm:text-5xl">
+        <h1 className="content-heading mt-4 text-4xl font-normal tracking-tight sm:text-5xl">
           {title}
         </h1>
         <p className="text-muted-foreground mt-5 max-w-2xl text-base leading-7 sm:text-lg">

@@ -61,7 +61,7 @@ export function CatalogShowcaseCardGrid({
                       key={asset.id}
                       className="bg-muted block min-w-0 overflow-hidden"
                     >
-                      <CatalogMedia asset={asset} />
+                      <CatalogMedia asset={asset} deferUntilVisible />
                     </span>
                   ))}
                 </span>
@@ -94,6 +94,7 @@ export function CatalogShowcaseCardGrid({
                 <span className="bg-muted block aspect-video overflow-hidden">
                   <CatalogMedia
                     asset={item.media}
+                    deferUntilVisible
                     className="transition-transform duration-300 group-hover:scale-[1.025] motion-reduce:transition-none"
                   />
                 </span>
@@ -124,7 +125,7 @@ function ShowcaseHeading({
 }) {
   return (
     <header>
-      <h2 className="text-foreground font-serif text-2xl leading-tight font-normal tracking-[-0.02em] sm:text-3xl">
+      <h2 className="text-foreground content-heading text-2xl leading-tight font-normal tracking-[-0.02em] sm:text-3xl">
         {title}
       </h2>
       <p className="text-muted-foreground mt-3 max-w-2xl text-sm leading-relaxed">

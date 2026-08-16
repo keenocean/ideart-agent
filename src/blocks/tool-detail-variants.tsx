@@ -25,6 +25,7 @@ import {
   ToolDetailShell,
   type ToolDetailRelatedItem,
 } from '@/components/catalog/tool-detail-shell';
+import { selectToolFirstFoldItems } from '@/content/tools/performance';
 import type {
   ToolPageContent,
   ToolPageContentFor,
@@ -179,7 +180,12 @@ function galleryItems(
 function ImageGeneratorToolTemplate(props: ToolDetailTemplateProps) {
   const content = contentFor(props.content, 'image-generator');
   const items = galleryItems(content);
-  const quickStarts = items.slice(0, 4);
+  const firstFoldAssetIds = new Set(
+    selectToolFirstFoldItems(content).map((item) => item.media.id)
+  );
+  const quickStarts = items.filter((item) =>
+    firstFoldAssetIds.has(item.media.id)
+  );
 
   return (
     <ToolTemplateFrame

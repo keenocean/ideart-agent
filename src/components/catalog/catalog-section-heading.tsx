@@ -22,7 +22,7 @@ export function CatalogSectionHeading({
     >
       <h2
         className={cn(
-          'text-foreground font-serif font-normal tracking-[-0.02em] text-balance',
+          'text-foreground content-heading font-normal tracking-[-0.02em] text-balance',
           size === 'editorial'
             ? 'text-4xl leading-[1.08] sm:text-5xl lg:text-[3.5rem]'
             : 'text-2xl leading-tight sm:text-3xl'

@@ -250,6 +250,7 @@ function GalleryCard({
       >
         <CatalogMedia
           asset={item.media}
+          deferUntilVisible
           className="transition-transform duration-500 ease-out group-hover:scale-[1.025] motion-reduce:transition-none"
         />
       </span>

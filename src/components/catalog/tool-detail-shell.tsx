@@ -75,7 +75,7 @@ export function ToolDetailShell({
         <p className="sr-only">
           {hero.eyebrow} · {availabilityLabel}
         </p>
-        <h1 className="text-foreground text-center font-serif text-3xl font-normal tracking-[-0.01em] sm:text-4xl">
+        <h1 className="text-foreground content-heading text-center text-3xl font-normal tracking-[-0.01em] sm:text-4xl">
           {hero.title}
         </h1>
         <p className="text-muted-foreground mx-auto mt-4 max-w-2xl text-center text-sm leading-relaxed sm:text-base">

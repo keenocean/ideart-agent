@@ -73,7 +73,7 @@ function MediaFeatureMedia({
           : 'aspect-[3/2] rounded-2xl'
       )}
     >
-      <CatalogMedia asset={item.media} />
+      <CatalogMedia asset={item.media} deferUntilVisible />
     </div>
   );
 }
@@ -97,7 +97,7 @@ function MediaFeatureCopy({
       )}
       <h3
         className={cn(
-          'text-foreground font-serif font-normal tracking-[-0.02em] text-balance',
+          'text-foreground content-heading font-normal tracking-[-0.02em] text-balance',
           (item.eyebrow || item.icon) && 'mt-6',
           variant === 'banded'
             ? 'text-2xl leading-[1.12] md:text-4xl lg:text-[2.75rem]'

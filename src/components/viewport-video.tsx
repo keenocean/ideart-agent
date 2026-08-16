@@ -67,7 +67,7 @@ export function ViewportVideo({
     <video
       ref={videoRef}
       src={shouldLoad ? src : undefined}
-      poster={poster}
+      poster={shouldLoad ? poster : undefined}
       loop={loop}
       muted={muted}
       controls={controls}

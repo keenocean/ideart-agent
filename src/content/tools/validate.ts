@@ -1,5 +1,6 @@
 import type { ToolDefinition } from '@/config/catalog/types';
 
+import { validateToolFirstFoldMedia } from './performance';
 import type { ToolMediaReference, ToolPageContent } from './types';
 
 function assertAssetKind(
@@ -62,6 +63,7 @@ export function validateToolPageContent(
         );
       }
     }
+    validateToolFirstFoldMedia(content);
     return;
   }
 
@@ -102,4 +104,5 @@ export function validateToolPageContent(
         break;
     }
   }
+  validateToolFirstFoldMedia(content);
 }
