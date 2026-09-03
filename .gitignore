@@ -70,3 +70,6 @@ package-lock.json
 
 # Runtime image uploads (no-storage local fallback)
 /public/uploads/
+
+# agent planning artifacts (local working notes)
+.omx/

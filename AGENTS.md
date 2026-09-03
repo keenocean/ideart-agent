@@ -424,6 +424,83 @@ The `/quick-start` and `/clone-website` skills automate this workflow.
 
 The split is not cosmetic — it's **what survives a rebrand**. Primitives survive; block content doesn't.
 
+### SEO Copywriting Rules (public pages)
+
+Two reference docs govern **all** public-facing page copy. Read the relevant one
+in full before writing or rewriting a landing page, tool page, or blog article —
+this section is only the index.
+
+| Doc                                     | Scope                                                                                        |
+| --------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `docs/seo-landingpages-instruct-doc.md` | Homepage, tool/feature pages, site structure, internal linking, schema markup, domain choice |
+| `docs/seo-blog-instruct-doc.md`         | Blog articles and the `/blog/` list page — topic selection, article structure, CTA funnel    |
+
+Both end with a numbered self-check table (section 九) — run the matching one
+before calling a page done. `/marketing-seo` and `/launch-audit seo` assume it
+has been applied.
+
+These rules apply to `product/home.json`, `product/catalog/*`, `product/marketing/**`,
+the `landing.*` keys in `product/messages/{en,zh}.json`, MDX under `src/content/`,
+and any public route under `src/routes/` — i.e. the surfaces `/quick-start`,
+`/clone-website`, and `/marketing-seo` own. They do not apply to authenticated
+app screens (`settings/`, `admin/`).
+
+**The three foundations**
+
+1. **TDH, not TDK** — Title + Description + H1 (plus the H2–H6 skeleton) decide the
+   ranking. The `keywords` meta tag is dead; don't emit it.
+2. **分门别类罗列** — use the Headings tree to lay every sub-topic out in the open,
+   with a keyword-anchored internal link at each H2/H3 that has its own page.
+3. **One core keyword per page** — the core keyword owns one page; its semantic
+   variants live on that same page; its second/third-level long-tail terms each get
+   their own page, all linked into a tree that funnels weight back to the homepage.
+
+**Every public page**
+
+- Title: core keyword first, brand last, ≤ 60 chars. Description: ~150–160 chars,
+  keyword + a reason to click. Exactly one H1 containing the full core keyword.
+- Never put an invented, zero-volume term in the Title/H1 — verify search volume first.
+- Every `<img>` needs a keyword-bearing `alt`, explicit width/height, WebP, lazy loading.
+- URLs: hyphenated keyword slugs under sub-directories (never sub-domains, never
+  query-param ids), one self-referencing canonical per page.
+- Content must be in the server-rendered HTML. TanStack Start loaders + route `head`
+  give this for free — resolve titles/descriptions in the `loader` and return them
+  from `head`, never set them from a client effect.
+- Internal links use keyword anchor text (varied, not 100% exact-match), never
+  "click here"; the shared nav and footer funnel weight to `/`.
+
+**Landing & tool pages** (`seo-landingpages-instruct-doc.md`)
+
+- The homepage logo is the `<h1>`; on every inner page the logo is a `<div>` and the
+  H1 belongs to that page's own keyword.
+- Tool pages put the tool entry **above the fold, directly under the H1** — never
+  three paragraphs of prose before the input.
+- Body copy 800–2000 words, keyword density ~3–5%, achieved through the Headings
+  skeleton rather than stuffing.
+- JSON-LD in `head` where it applies: `SoftwareApplication` (tool pages), `FAQPage`
+  (any FAQ block), `HowTo` (step-by-step), `BreadcrumbList`, `Organization`
+  (homepage). Never fabricate `AggregateRating` values.
+
+**Blog** (`seo-blog-instruct-doc.md`)
+
+- The blog is the assist layer, not the main event. Every article targets one keyword
+  with real search volume and a beatable KD, vetted against the live SERP before
+  drafting. No company news, product updates, or keyword-less posts.
+- Five article types only: how-to, what-is, best/top list, X vs Y, question answer.
+  Word count follows the per-type table (floor 600 — below that is thin content),
+  density 2–4%.
+- The keyword must appear in the Title, H1, first H2, first 100 words, last H2 section,
+  the Description, and at least one `img` alt.
+- Links are **one-way: blog → tool page**, never tool page → blog. 2–10 body links
+  scaled to article length, each target linked once.
+- Close with a CTA banner whose `H2` contains the tool keyword and links to the tool
+  page, plus 2–4 related-article cards.
+- Schema: `Article` + `BreadcrumbList` on every post, `FAQPage` when there's an FAQ.
+- AI-drafted prose must be fact-checked and stripped of tells ("delve into",
+  "moreover", "in conclusion", "in today's digital landscape").
+- `/blog/` list page: 8–12 posts per page, `/blog/page/2/` URLs, category pages once
+  past ~20 articles, and no tag-aggregation pages.
+
 ## Adding a New Feature
 
 1. **Need new DB tables?** Add to `src/config/db/schema.ts` (under the "Custom tables" section), run `pnpm db:push`
@@ -550,7 +627,8 @@ Keep `.env.example` minimal; don't add provider keys to it.
 6. **Translations live in `product/messages/{en,zh}.json`** with flat dot keys; access via `m['ns.key']()` (add the key to both locale files)
 7. **Always verify `pnpm build` passes** after making changes
 8. **Return `respData`/`respErr`** from API routes
-9. **Run the `security-scan` skill before every `git commit`** — it checks for leaked secrets, injection/XSS/logic vulnerabilities in the diff, and `.gitignore`/`.dockerignore` gaps. HIGH findings block the commit.
+9. **Follow `docs/seo-landingpages-instruct-doc.md` and `docs/seo-blog-instruct-doc.md` for every public page** — TDH (not TDK), one H1, one core keyword per page, tool entry above the fold, server-rendered metadata via the route `loader` + `head`
+10. **Run the `security-scan` skill before every `git commit`** — it checks for leaked secrets, injection/XSS/logic vulnerabilities in the diff, and `.gitignore`/`.dockerignore` gaps. HIGH findings block the commit.
 
 ## Cloud Sandbox Notes (ShipAny Code / e2b)
 
@@ -567,3 +645,21 @@ domain: `https://<port>-<sandboxId>.e2b.app`.
   external domain; changing it breaks auth redirects.
 - OAuth providers (Google/GitHub) cannot complete their redirect flow on a
   sandbox preview domain; test with email+password instead.
+
+## Browser Debugging (this dev server)
+
+This server runs an XFCE desktop on `DISPLAY=:1` via TigerVNC, so pages can be
+driven and screenshotted in a real Chrome rather than inferred from SSR output.
+Use it whenever a change needs to be _seen_ — responsive breakpoints, light/dark
+theme, locale prefixes, lazy-loaded media, hydration and 4xx errors — instead of
+reasoning about the markup.
+
+Playwright (global, at `/usr/lib/node_modules/playwright`) drives the system
+Chrome via `channel: 'chrome'`. Non-interactive shells inherit no `DISPLAY`;
+export `DISPLAY=:1` and `XAUTHORITY=/home/ubuntu/.Xauthority` first, and pass
+`--disable-gpu` or headed screenshots fail. Start `pnpm dev` first and keep
+throwaway driver scripts in the scratchpad, not in the repo.
+
+See `docs/browser-debugging.md` for the connection details, runnable snippets,
+and the lazy-loading and responsive-variant traps that make correct pages look
+broken.
