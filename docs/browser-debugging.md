@@ -51,7 +51,9 @@ page.on(
 await page.goto('http://localhost:3000/', { waitUntil: 'networkidle' });
 ```
 
-Run `pnpm dev` first — these snippets assume the app is up on port 3000.
+These snippets assume the app is up on port 3000. Run `pnpm dev` first: on this
+machine it reuses this checkout's dev server or starts one, and prints the URL
+to use — another port when 3000 belongs to a different project.
 Put throwaway scripts in the scratchpad, not in the repo.
 
 Whole-desktop capture, when you want the browser chrome and window manager too:

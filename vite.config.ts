@@ -107,6 +107,12 @@ const keepPostgres = workersDb === 'postgresql' || workersDb === 'postgres';
 export default defineConfig({
   server: {
     port: 3000,
+    // Fail instead of silently taking 3001, 3002, ... A second `pnpm dev`
+    // against a server that is already up should be an error the developer
+    // sees, not a second server nobody knows about: the e2b preview panel
+    // and the browser-debugging docs both assume 3000 specifically, and
+    // orphaned dev servers are invisible until they have eaten the RAM.
+    strictPort: true,
     // Cloud sandboxes (ShipAny Code / e2b) proxy the dev server through a
     // per-sandbox subdomain; without this Vite's host check blocks the
     // preview with "Blocked request. This host is not allowed."

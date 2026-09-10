@@ -657,8 +657,21 @@ reasoning about the markup.
 Playwright (global, at `/usr/lib/node_modules/playwright`) drives the system
 Chrome via `channel: 'chrome'`. Non-interactive shells inherit no `DISPLAY`;
 export `DISPLAY=:1` and `XAUTHORITY=/home/ubuntu/.Xauthority` first, and pass
-`--disable-gpu` or headed screenshots fail. Start `pnpm dev` first and keep
-throwaway driver scripts in the scratchpad, not in the repo.
+`--disable-gpu` or headed screenshots fail. Keep throwaway driver scripts in the
+scratchpad, not in the repo.
+
+**On this machine `pnpm dev` means "make sure this checkout's dev server is
+up".** Several agent sessions share the box, so a shim in `~/.local/bin` makes
+the call idempotent. It reuses this checkout's running server, or starts one
+detached from your shell, and prints the URL once it answers: tens of seconds
+cold, under a second when the server is already up. If port 3000 belongs to
+another project it takes :3100 and says so. Run it whenever you need the app,
+but never to pick up a change — edits reload by themselves. Don't stop the
+server when you are done, because another session may be using it; the reaper
+stops it after about half an hour idle. Don't start one with
+`pnpm exec vite dev`, which bypasses the shim. `pnpm dev --logs` shows the
+server's output, and `pnpm dev --restart` restarts it, for example after an
+`.env` change.
 
 See `docs/browser-debugging.md` for the connection details, runnable snippets,
 and the lazy-loading and responsive-variant traps that make correct pages look
