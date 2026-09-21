@@ -44,7 +44,7 @@ Every other step (D1 create, schema migrations, RBAC seed, optional Skill releas
 | 4 Schema migrations | local `drizzle/meta/_journal.json` entry count == remote applied count | Skip apply (wrangler is idempotent, skip is for speed) |
 | 4.5 RBAC seed | `SELECT COUNT(*) FROM role` ≥ 1 on remote D1 | Skip local-sqlite dance entirely |
 | 5 Secrets | `wrangler secret list` already contains the name | Skip per-secret upload (`--rotate-secrets` forces) |
-| 5.5 Production URL | `.env.production` `VITE_APP_URL` AND `wrangler.jsonc` `vars.VITE_APP_URL` are both consistent with routes (workers.dev + no routes, OR custom domain matching a routes pattern) | Skip the prompt (`--domain=X` overrides) |
+| 5.5 Production URL | `.env.production` `VITE_APP_URL` AND `wrangler.jsonc` `vars.VITE_APP_URL` are both consistent with routes (workers.dev + no routes, OR custom domain matching a routes pattern) AND, on a custom domain, a `www.` route exists | Skip the prompt (`--domain=X` overrides) |
 | 6 Optional Skill release + deploy | Skill scripts absent, or latest immutable release is already pinned | Publish/verify Skills when present, then fresh `pnpm run cf:deploy` with the latest code/env |
 | 7 URL fix | Both `.env.production` AND `wrangler.jsonc` vars already match the deployed URL | Skip redeploy |
 | 9 Admin | `SELECT COUNT(*) FROM user_role ur JOIN role r ON r.id=ur.role_id WHERE r.name='super_admin'` ≥ 1 | Don't prompt (explicit `--admin*` flags still run) |
@@ -280,7 +280,7 @@ Provider credentials (Stripe/Resend/R2/AI/OAuth) normally live in admin → Sett
 
 ## Phase 5.5: Production URL (one prompt unless already set or `--domain=` passed)
 
-**Skip if:** `.env.production` `VITE_APP_URL` AND `wrangler.jsonc` `vars.VITE_APP_URL` are both consistent with routes (workers.dev URL + no `routes`, or custom domain matching a `routes[].pattern`). `--domain=X` uses X directly; `--domain=default`/`--domain=workers.dev` forces the default URL.
+**Skip if:** `.env.production` `VITE_APP_URL` AND `wrangler.jsonc` `vars.VITE_APP_URL` are both consistent with routes (workers.dev URL + no `routes`, or custom domain matching a `routes[].pattern`) — and, on a custom domain, `routes` also carries the `www.` twin described below. `--domain=X` uses X directly; `--domain=default`/`--domain=workers.dev` forces the default URL.
 
 Otherwise prompt:
 
@@ -294,13 +294,40 @@ Create/update `.env.production`(gitignored): `VITE_APP_URL=https://<worker>.work
 
 ### On custom domain
 
-Same two files but with the exact URL, plus:
+Same two files but with the exact URL, plus a route for the domain **and its
+`www.` twin**:
 
 ```jsonc
-"routes": [{ "pattern": "app.example.com", "custom_domain": true }]
+"routes": [
+  { "pattern": "example.com", "custom_domain": true },
+  { "pattern": "www.example.com", "custom_domain": true }
+]
 ```
 
 Warn: the zone must already exist in the account, else deploy fails with "not a zone in your account".
+
+**Always register the www twin, even though nothing is served on it.** The
+Worker 301s `www.` and every `http://` request onto `VITE_APP_URL`
+(`src/lib/canonical-origin.ts`), so the site answers on exactly one origin and
+Search Console never reports the variants as duplicates. That redirect can only
+run if the hostname resolves and reaches the Worker, and `custom_domain: true`
+is what makes wrangler create the proxied DNS record on deploy. Skip it and
+`www.example.com` is NXDOMAIN — a visitor who types www gets a browser error.
+
+This replaces the old dashboard steps. Do **not** tell the user to turn on
+"Always Use HTTPS" or hand-write a www Redirect Rule: the Worker already covers
+both, on every project, without a per-zone setting anyone can forget.
+
+Already-deployed sites that pre-date this rule: add the www route, redeploy,
+then confirm with
+
+```bash
+curl -sI https://www.example.com/ | head -3   # expect 301 -> https://example.com/
+curl -sI http://example.com/     | head -3   # expect 301 -> https://example.com/
+```
+
+If the apex is registered as a zone route (`{"pattern": "example.com/*", "zone_id": "..."}`)
+rather than a custom domain, leave it as is and add only the www entry.
 
 ## Phase 6: Optional Skill release and deploy — Interruption #2 (the only confirmation)
 
@@ -409,7 +436,7 @@ Just the `INSERT OR IGNORE ... SELECT` + verify from above. 0 rows → user hasn
 | Sign-in 403 `Invalid origin` from a browser (curl works) | localhost URL baked into the bundle — `.env.local`/`.env.development` beat `.env.production` because `loadEnvFiles` doesn't overwrite existing keys and prefers `.env.local` | Deploy via `pnpm run cf:deploy` (sources `.env.production` first), ensure `wrangler.jsonc` `vars.VITE_APP_URL` is set; verify with `grep -o 'https://[^"]*' .output/server/_ssr/*.mjs \| head` |
 | `wrangler d1 migrations apply` finds no migrations | `migrations_dir` missing from the `d1_databases` entry | Set `"migrations_dir": "drizzle"` |
 | `/api/agent/skills` returns 503 | Optional Skill binding/release missing, or release was not published | Run `pnpm skills:publish -- --bucket=<skills-bucket>` if Ideart has enabled Skills, verify the `AGENT_SKILLS` binding, then redeploy |
-| Bundle > limit (3 MiB free / 10 MiB paid, gzip) | Heavy server deps | Paid plan, or dynamic-import heavy modules |
+| Bundle > 64 MiB (uncompressed; the same on Free and Paid)                                          | Heavy server deps bundled rather than fetched at runtime                                                                     | Move data to KV/R2/D1 or dynamic-import the heavy modules. Upgrading does not raise this limit, and the `gzip` figure wrangler prints is informational — `Total Upload` is what counts |
 | Image upload fails on Workers | No-storage local-disk fallback needs a filesystem | Configure R2 in admin → Settings → Storage |
 | drizzle-kit "Interactive prompts require a TTY" | Column-conflict resolution needed | User runs `pnpm db:generate` in their terminal once |
 | `sqlite3: command not found` (Phase 4.5/9.A) | CLI missing | `brew install sqlite` / `apt-get install sqlite3` |

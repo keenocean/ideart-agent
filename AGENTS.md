@@ -17,7 +17,7 @@ This is a **headless SaaS engine** — pre-wired business logic (payments, credi
 ## Commands
 
 - `pnpm dev` — Vite dev server (port 3000)
-- `pnpm build` — Vite production build (always verify after changes)
+- `pnpm build` — Vite production build. Run it once before committing, not after every change; `pnpm cf:deploy` builds by itself
 - `pnpm start` — Run the production server (`node .output/server/index.mjs`)
 - `pnpm db:setup` — Copy schema template based on `DATABASE_PROVIDER` (run once after clone)
 - `pnpm db:push` — Push schema to database (development — direct sync, may lose data)
@@ -521,19 +521,21 @@ the same files (SKILL.md open standard, agentskills.io). If your agent runtime
 doesn't auto-discover skills, read `.claude/skills/<name>/SKILL.md` and follow
 it when the task matches:
 
-| Skill               | When to use                                                                                                                         |
-| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| `quick-start`       | Build a complete SaaS project from a brief/reference URL                                                                            |
-| `clone-website`     | Clone/rebuild an existing website pixel-perfect                                                                                     |
-| `new-module`        | New backend service + API following the module pattern                                                                              |
-| `new-page`          | New dashboard page with API wiring + nav entry                                                                                      |
-| `new-static-page`   | Static MDX page (legal, about, etc.)                                                                                                |
-| `generate-image`    | AI-generate a decorative image for a page/block                                                                                     |
-| `marketing-seo`     | Agent-owned lifecycle for adding, updating, renaming, publishing, or monitoring public tool/model/marketing pages                   |
-| `security-scan`     | **Before every git commit** — secrets, vulns, ignore gaps                                                                           |
-| `launch-audit`      | Whole-project sweep on one axis — responsive, light/dark theme, SEO, performance (Lighthouse), or security; run `all` before deploy |
-| `sync-upstream`     | Pull latest template updates; local changes win on conflict                                                                         |
-| `deploy-cloudflare` | Deploy to Cloudflare Workers (DB, private release buckets, content publish/pinning, secrets, schema; idempotent)                    |
+| Skill               | When to use                                                                                                                              |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `quick-start`       | Build a complete SaaS project from a brief/reference URL                                                                                 |
+| `clone-website`     | Clone/rebuild an existing website pixel-perfect                                                                                          |
+| `new-module`        | New backend service + API following the module pattern                                                                                   |
+| `new-page`          | New dashboard page with API wiring + nav entry                                                                                           |
+| `new-static-page`   | Static MDX page (legal, about, etc.)                                                                                                     |
+| `generate-image`    | AI-generate a decorative image for a page/block                                                                                          |
+| `marketing-seo`     | Agent-owned lifecycle for adding, updating, renaming, publishing, or monitoring public tool/model/marketing pages                        |
+| `write-blog`        | Draft one SEO article the right way — SERP gap, product-only material, self-score, strip machine tells; hands lifecycle to marketing-seo |
+| `write-tool-page`   | Write tool-page or homepage copy: keyword, H1 + tool entry above the fold, Headings skeleton, 800–3000 words from product truth          |
+| `security-scan`     | **Before every git commit** — secrets, vulns, ignore gaps                                                                                |
+| `launch-audit`      | Whole-project sweep on one axis — responsive, light/dark theme, SEO, performance (Lighthouse), or security; run `all` before deploy      |
+| `sync-upstream`     | Pull latest template updates; local changes win on conflict                                                                              |
+| `deploy-cloudflare` | Deploy to Cloudflare Workers (DB, private release buckets, content publish/pinning, secrets, schema; idempotent)                         |
 
 **Database backends on Cloudflare Workers** (chosen by `wrangler.jsonc` `vars.DATABASE_PROVIDER`):
 
@@ -617,6 +619,19 @@ storage (R2), AI (Replicate/Gemini/Fal), and analytics are configured at
 — same-named env vars still work as fallbacks, but database values win.
 Keep `.env.example` minimal; don't add provider keys to it.
 
+**The env fallback only exists for keys `src/config/index.ts` actually maps.** A
+provider whose config key is missing from `envConfigs` can be configured through
+the admin panel and nowhere else, which silently breaks every CLI script, since
+those run without an admin session. When adding a provider, map its keys in
+`envConfigs` under the same names the service reads.
+
+**An empty local config table is not evidence that a provider is unconfigured.**
+A fresh clone always has one, while the real credentials live in the deployed
+environment. Before concluding something does not exist, check the deployed
+config and the authenticated CLI (for R2: `wrangler r2 bucket list`). For one-off
+object operations on a bucket you can already reach, `wrangler r2 object get|put
+<bucket>/<key> --remote` needs no application credentials at all.
+
 ## Critical Rules
 
 1. **Don't import between modules** (except the documented payment→credits/subscriptions dependency)
@@ -625,7 +640,7 @@ Keep `.env.example` minimal; don't add provider keys to it.
 4. **Don't hardcode app name** — use `envConfigs.app_name` from `@/config`
 5. **Use `@/lib/api-client` + TanStack Query for client data fetching** — no raw `fetch` in components
 6. **Translations live in `product/messages/{en,zh}.json`** with flat dot keys; access via `m['ns.key']()` (add the key to both locale files)
-7. **Always verify `pnpm build` passes** after making changes
+7. **Build once, before you commit** — not after every change. While iterating, check with `pnpm exec tsc --noEmit`, the tests for the code you touched, and the running dev server; run `pnpm build` once right before `git commit` and fix what it reports. `pnpm cf:deploy` builds on its own, so don't build separately before deploying. Where a skill lists `pnpm build` as a verify step, that is this one pre-commit build.
 8. **Return `respData`/`respErr`** from API routes
 9. **Follow `docs/seo-landingpages-instruct-doc.md` and `docs/seo-blog-instruct-doc.md` for every public page** — TDH (not TDK), one H1, one core keyword per page, tool entry above the fold, server-rendered metadata via the route `loader` + `head`
 10. **Run the `security-scan` skill before every `git commit`** — it checks for leaked secrets, injection/XSS/logic vulnerabilities in the diff, and `.gitignore`/`.dockerignore` gaps. HIGH findings block the commit.
