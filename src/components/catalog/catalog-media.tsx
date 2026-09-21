@@ -1,5 +1,3 @@
-import { useEffect, useRef, useState } from 'react';
-
 import type { MarketingAsset } from '@/config/catalog/types';
 import { cn } from '@/lib/utils';
 import { ViewportVideo } from '@/components/viewport-video';
@@ -23,7 +21,16 @@ export function CatalogMedia({
   priority?: boolean;
   controls?: boolean;
   autoPlay?: boolean;
-  /** Keep below-fold image URLs out of SSR and the initial network queue. */
+  /**
+   * Below-fold image: keep it out of the initial network queue.
+   *
+   * The URL is still in the server-rendered markup. An earlier version
+   * attached `src` only once an IntersectionObserver fired, which kept the
+   * bytes off the critical path but also hid every below-fold image from
+   * crawlers — on /image-to-video four of five `<img>` tags reached Google
+   * with no `src` at all. Native `loading="lazy"` with a low fetch priority
+   * gives the same deferral while the image stays visible in the HTML.
+   */
   deferUntilVisible?: boolean;
 }) {
   const mediaClassName = cn(
@@ -33,18 +40,16 @@ export function CatalogMedia({
   );
 
   if (asset.kind === 'image') {
-    if (deferUntilVisible && !priority) {
-      return <DeferredCatalogImage asset={asset} className={mediaClassName} />;
-    }
+    const eager = priority && !deferUntilVisible;
     return (
       <img
         src={asset.url}
         alt={asset.alt}
         width={asset.width}
         height={asset.height}
-        loading={priority ? 'eager' : 'lazy'}
+        loading={eager ? 'eager' : 'lazy'}
         fetchPriority={priority ? 'high' : 'low'}
-        decoding={priority ? 'sync' : 'async'}
+        decoding={eager ? 'sync' : 'async'}
         className={mediaClassName}
       />
     );
@@ -58,51 +63,6 @@ export function CatalogMedia({
       autoPlay={autoPlay}
       ariaLabel={asset.alt}
       className={mediaClassName}
-    />
-  );
-}
-
-function DeferredCatalogImage({
-  asset,
-  className,
-}: {
-  asset: Extract<CatalogMediaAsset, { kind: 'image' }>;
-  className: string;
-}) {
-  const imageRef = useRef<HTMLImageElement>(null);
-  const [shouldLoad, setShouldLoad] = useState(false);
-
-  useEffect(() => {
-    const image = imageRef.current;
-    if (!image) return;
-    if (typeof IntersectionObserver === 'undefined') {
-      setShouldLoad(true);
-      return;
-    }
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (!entry?.isIntersecting) return;
-        setShouldLoad(true);
-        observer.disconnect();
-      },
-      { rootMargin: '240px', threshold: 0.01 }
-    );
-    observer.observe(image);
-    return () => observer.disconnect();
-  }, []);
-
-  return (
-    <img
-      ref={imageRef}
-      src={shouldLoad ? asset.url : undefined}
-      alt={asset.alt}
-      width={asset.width}
-      height={asset.height}
-      loading="lazy"
-      fetchPriority="low"
-      decoding="async"
-      className={className}
     />
   );
 }

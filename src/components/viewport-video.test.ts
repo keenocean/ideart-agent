@@ -47,7 +47,7 @@ describe('CatalogMedia', () => {
     expect(markup).toContain('decoding="sync"');
   });
 
-  it('withholds below-fold image URLs from server markup', () => {
+  it('keeps below-fold image URLs in server markup, lazily loaded', () => {
     const markup = renderToStaticMarkup(
       createElement(CatalogMedia, {
         asset: {
@@ -65,6 +65,12 @@ describe('CatalogMedia', () => {
     );
 
     expect(markup).toContain('alt="Gallery image"');
-    expect(markup).not.toContain('https://cdn.example.com/gallery.jpg');
+    // Crawlers read the served HTML only: the URL has to be there, and the
+    // deferral comes from native lazy loading rather than a client effect.
+    expect(markup).toContain('src="https://cdn.example.com/gallery.jpg"');
+    expect(markup).toContain('loading="lazy"');
+    expect(markup).toContain('fetchPriority="low"');
+    expect(markup).toContain('decoding="async"');
+    expect(markup).toContain('width="1280"');
   });
 });

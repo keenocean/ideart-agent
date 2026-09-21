@@ -22,7 +22,7 @@ const items: CatalogMediaMarqueeItem[] = Array.from(
 );
 
 describe('CatalogMediaMarquee', () => {
-  it('limits first-fold requests and keeps duplicate media deferred', () => {
+  it('limits first-fold requests and keeps the rest lazy but present', () => {
     const markup = renderToStaticMarkup(
       createElement(CatalogMediaMarquee, {
         items,
@@ -38,8 +38,15 @@ describe('CatalogMediaMarquee', () => {
     expect(markup).toContain('/item-0.jpg');
     expect(markup).toContain('/item-1.jpg');
     expect(markup).toContain('/item-2.jpg');
-    expect(markup).not.toContain('/item-3.jpg');
-    expect(markup).not.toContain('/item-4.jpg');
+    // The rest stay in the HTML for crawlers but out of the first-fold
+    // request queue: only the first three are preloaded and eager.
+    expect(markup).toContain(
+      '<img src="/item-3.jpg" alt="Item 3" width="320" height="568" loading="lazy" fetchPriority="low" decoding="async"'
+    );
+    expect(markup).toContain(
+      '<img src="/item-4.jpg" alt="Item 4" width="320" height="568" loading="lazy" fetchPriority="low" decoding="async"'
+    );
+    expect(markup).not.toContain('href="/item-3.jpg"');
     expect(markup.match(/fetchPriority="high"/g)).toHaveLength(6);
   });
 });
