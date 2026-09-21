@@ -66,13 +66,21 @@ export const envConfigs: Record<string, string> = {
   resend_sender_email:
     procEnv.RESEND_SENDER_EMAIL ?? procEnv.RESEND_EMAIL_FROM ?? '',
 
-  // Storage - S3/R2
-  storage_endpoint: procEnv.STORAGE_ENDPOINT ?? '',
-  storage_region: procEnv.STORAGE_REGION ?? 'auto',
-  storage_access_key: procEnv.STORAGE_ACCESS_KEY ?? '',
-  storage_secret_key: procEnv.STORAGE_SECRET_KEY ?? '',
-  storage_bucket: procEnv.STORAGE_BUCKET ?? '',
-  storage_public_domain: procEnv.STORAGE_PUBLIC_DOMAIN ?? '',
+  // Storage - Cloudflare R2.
+  //
+  // These key names must match what `src/modules/config/settings.ts` writes and
+  // what `src/modules/storage/service.ts` reads (`r2_*`). They were previously
+  // spelled `storage_*` here, which no code ever read, so the documented env
+  // fallback silently did nothing and R2 could only be configured through the
+  // admin panel. CLI scripts run without an admin session, so the env path is
+  // the only one they have.
+  r2_account_id: procEnv.R2_ACCOUNT_ID ?? '',
+  r2_access_key: procEnv.R2_ACCESS_KEY ?? '',
+  r2_secret_key: procEnv.R2_SECRET_KEY ?? '',
+  r2_bucket_name: procEnv.R2_BUCKET_NAME ?? '',
+  r2_upload_path: procEnv.R2_UPLOAD_PATH ?? '',
+  r2_endpoint: procEnv.R2_ENDPOINT ?? '',
+  r2_domain: procEnv.R2_DOMAIN ?? '',
   inline_image_max_kb: procEnv.INLINE_IMAGE_MAX_KB ?? '2048',
 
   // AI
