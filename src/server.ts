@@ -1,5 +1,6 @@
 import handler from '@tanstack/react-start/server-entry';
 
+import { buildCanonicalOriginRedirect } from './lib/canonical-origin';
 import { getCookieFromHeader } from './lib/cookie';
 import { deLocalizeUrl } from './paraglide/runtime.js';
 import { paraglideMiddleware } from './paraglide/server.js';
@@ -99,6 +100,10 @@ function compressNodeHtmlResponse(req: Request, response: Response): Response {
 export default {
   async fetch(req: Request): Promise<Response> {
     await ensureCloudflareEnv();
+    // Fold http:// and every non-canonical host onto the single origin the
+    // canonical links and sitemap already advertise, before any rendering.
+    const canonicalRedirect = buildCanonicalOriginRedirect(req);
+    if (canonicalRedirect) return canonicalRedirect;
     const response = await paraglideMiddleware(req, () => handler.fetch(req));
     const utmSource = new URL(req.url).searchParams.get('utm_source');
     const existing = getCookieFromHeader(
